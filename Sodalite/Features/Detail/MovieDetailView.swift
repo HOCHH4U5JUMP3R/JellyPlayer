@@ -21,6 +21,7 @@ struct MovieDetailView: View {
     @State private var trailerItem: JellyfinItem?
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
+    @State private var isPresentingRatingPicker = false
     @FocusState private var playButtonFocused: Bool
     /// Which control in the action row holds focus, nil while focus is anywhere else on the page.
     /// The secondaries leave the focus engine for that time, so an up-move out of the content can
@@ -251,6 +252,13 @@ struct MovieDetailView: View {
             }
             // Open the animation gate once the cover's present transition has settled.
             deferOnMain(by: 0.35) { didSettleIn = true }
+        }
+        .sheet(isPresented: $isPresentingRatingPicker) {
+            if let vm = viewModel {
+                PersonalRatingPicker(initialRating: vm.userRating) { rating in
+                    await vm.setUserRating(rating)
+                }
+            }
         }
         .menuPresentation(isPresented: $isPresentingMoreDetails, panel: .plain) {
             if let vm = viewModel {
@@ -609,6 +617,12 @@ struct MovieDetailView: View {
                 )
                 .focused($focusedAction, equals: .trailer)
             }
+
+            GlassActionButton(
+                title: "Bewerten",
+                systemImage: "star",
+                action: { isPresentingRatingPicker = true }
+            )
 
             if vm.item.type != .episode {
                 GlassActionButton(
