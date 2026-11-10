@@ -457,7 +457,7 @@ struct SeriesDetailView: View {
                                 lastPlayedDate: nil, rating: rating
                             )
                         }
-                        await dependencies.posterBadgeStore.refreshSeriesRating(userID: userID, seriesID: vm.item.id)
+                        await dependencies.posterBadgeStore.refreshSeriesRating(userID: userID, seriesID: item.id)
                     } catch {
                         // Keep the current episode snapshot if Jellyfin rejects the update.
                     }
