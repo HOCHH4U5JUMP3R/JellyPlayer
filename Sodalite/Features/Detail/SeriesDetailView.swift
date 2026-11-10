@@ -42,6 +42,7 @@ struct SeriesDetailView: View {
     @FocusState private var focusedAction: DetailAction?
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
+    @State private var isPresentingRatingPicker = false
     /// Sodalite#146 round 3: Watched on a SERIES is the one control on the page that cannot be
     /// undone by pressing it again. The server cascades the mark to every episode and drops the
     /// show out of Resume, and pressing it a second time marks the whole show UNWATCHED rather than
@@ -430,6 +431,33 @@ struct SeriesDetailView: View {
         // either redundant or a move, depending on which lands first, and that is decided by how fast
         // the detail fetch returns.
         .defaultFocus($playButtonFocused, true)
+        .sheet(isPresented: $isPresentingRatingPicker) {
+            SeriesPersonalRatingPicker(initialRating: displayItem.userData?.rating) { rating in
+                if let episode = selectedEpisode {
+                    guard let userID = appState.activeUser?.id else { return }
+                    do {
+                        try await dependencies.jellyfinItemService.setUserRating(
+                            userID: userID,
+                            itemID: episode.id,
+                            rating: rating
+                        )
+                        if let userData = selectedEpisode?.userData {
+                            selectedEpisode?.userData = userData.with(rating: rating)
+                        } else {
+                            selectedEpisode?.userData = UserItemData(
+                                playbackPositionTicks: nil, playCount: nil, isFavorite: nil,
+                                played: nil, unplayedItemCount: nil, playedPercentage: nil,
+                                lastPlayedDate: nil, rating: rating
+                            )
+                        }
+                    } catch {
+                        // Keep the current episode snapshot if Jellyfin rejects the update.
+                    }
+                } else {
+                    await viewModel?.setUserRating(rating)
+                }
+            }
+        }
         .onChange(of: selectedEpisode?.id) { _, newID in
             updateBackdropURL()
             // Episode lists are slim (no MediaStreams/MediaSources); on opening into episode mode pull full detail and swap in (same id) so the TechInfoBox can render codec/resolution.
@@ -725,6 +753,22 @@ struct SeriesDetailView: View {
 
             // Sodalite#146: series synopsis in the series state, the episode's own in episode state,
             // which is what displayItem/displayOverview already resolve for the box below the fold.
+            HStack(spacing: 18) {
+                if let communityRating = displayItem.communityRating {
+                    Label(String(format: "%.1f", communityRating), systemImage: "star.circle")
+                        .foregroundStyle(.secondary)
+                }
+                if let personalRating = displayItem.userData?.rating {
+                    Label("Meine Bewertung: \(Int(personalRating.rounded())) / 10", systemImage: "star.fill")
+                        .foregroundStyle(.yellow)
+                } else {
+                    Label("Noch nicht bewertet", systemImage: "star")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(.subheadline)
+            .accessibilityElement(children: .combine)
+
             DetailHeroSynopsis(
                 text: displayOverview,
                 isPending: overviewMayStillLand,
@@ -989,6 +1033,13 @@ struct SeriesDetailView: View {
                 )
                 .focused($focusedAction, equals: .replay)
             }
+
+            GlassActionButton(
+                title: "Bewerten",
+                systemImage: "star",
+                action: { isPresentingRatingPicker = true }
+            )
+            .focused($focusedAction, equals: .rating)
 
             if !isShowingEpisode && vm.hasLocalTrailer {
                 GlassActionButton(
@@ -1643,4 +1694,52 @@ struct SeriesDetailView: View {
             }
         }
     }
+
+/// tvOS-friendly personal rating picker for the currently displayed series or episode.
+private struct SeriesPersonalRatingPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var selection: Int
+    let onSave: (Double?) async -> Void
+
+    init(initialRating: Double?, onSave: @escaping (Double?) async -> Void) {
+        _selection = State(initialValue: initialRating.map { min(10, max(1, Int($0.rounded()))) } ?? 0)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        VStack(spacing: 28) {
+            Text("Deine Bewertung").font(.title2.weight(.semibold))
+            HStack(spacing: 8) {
+                ForEach(1...10, id: \.self) { value in
+                    Button { selection = value } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: value <= selection ? "star.fill" : "star").font(.title2)
+                            Text("\(value)").font(.caption)
+                        }
+                        .frame(minWidth: 48, minHeight: 72)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(value <= selection ? .yellow : .secondary)
+                }
+            }
+            Text(selection == 0 ? "Bitte 1 bis 10 Sterne auswählen" : "\(selection) von 10")
+                .font(.headline)
+            HStack(spacing: 20) {
+                Button("Abbrechen") { dismiss() }
+                Button("Bewertung entfernen", role: .destructive) {
+                    Task { await onSave(nil); dismiss() }
+                }
+                Button("Speichern") {
+                    Task { await onSave(Double(selection)); dismiss() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selection == 0)
+            }
+        }
+        .padding(40)
+        .frame(minWidth: 760, minHeight: 300)
+    }
+}
+
 }
