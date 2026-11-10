@@ -1707,8 +1707,8 @@ struct SeriesDetailView: View {
                     .padding(.vertical, 8)
                 }
                 .onChange(of: focusedSeasonID) { oldID, newID in
-                    // Force focus back to the current season on entry from above (oldID nil), return from the episode row (episodesHadFocus), or fall-through.
-                    let cameFromOutside = oldID == nil || episodesHadFocus
+                    // Only redirect a fresh entry from outside the season/episode block. The episode-row bridge already writes the selected season before focus arrives; redirecting again here caused a visible flash on the previously selected tab.
+                    let cameFromOutside = oldID == nil
                     if cameFromOutside, let newID, newID != vm.selectedSeasonID {
                         let target = vm.selectedSeasonID
                         // Defer one runloop tick: a synchronous @FocusState write inside its own onChange is dropped on tvOS; DispatchQueue.main is honored, Task/Task.sleep hops are swallowed.
