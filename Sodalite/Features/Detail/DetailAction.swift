@@ -17,6 +17,7 @@ enum DetailAction: Hashable {
     case version
     case shuffle
     case replay
+    case rating
     case trailer
     case favorite
     case watched
