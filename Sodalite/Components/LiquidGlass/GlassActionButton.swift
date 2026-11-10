@@ -297,8 +297,14 @@ struct GlassButtonStyle: ButtonStyle {
                     Capsule().strokeBorder(Color.Theme.hairline, lineWidth: 1)
                 }
             }
-            .focusStroke(Capsule(), isFocused: isFocused)
-            .background(isFocused ? Color.Theme.focusFill.opacity(0.14) : .clear, in: Capsule())
+            .overlay {
+                if focusLiftEnabled {
+                    Capsule()
+                        .strokeBorder(.tint, lineWidth: FocusStroke.width)
+                        .opacity(isFocused ? 1 : 0)
+                }
+            }
+            .background(isFocused ? Color.Theme.focusFill.opacity(0.18) : .clear, in: Capsule())
             .modifier(ConditionalPillLift(enabled: focusLiftEnabled, isFocused: isFocused, isPressed: configuration.isPressed))
     }
 
