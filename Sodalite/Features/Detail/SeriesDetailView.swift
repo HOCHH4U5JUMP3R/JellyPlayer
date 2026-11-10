@@ -954,7 +954,14 @@ struct SeriesDetailView: View {
             InfuseDetailActionButton(title: "Metadaten synchronisieren", symbol: "arrow.clockwise", isLoading: isRefreshingMetadata) {
                 guard !isRefreshingMetadata else { return }
                 isRefreshingMetadata = true
-                Task { await vm.refreshMetadata(); isRefreshingMetadata = false }
+                Task {
+                    let selectedID = selectedEpisode?.id
+                    await vm.refreshMetadata()
+                    if let selectedID, let refreshed = vm.episodes.first(where: { $0.id == selectedID }) {
+                        selectedEpisode = refreshed
+                    }
+                    isRefreshingMetadata = false
+                }
             }.focused($focusedAction, equals: .sync)
             InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
                 if let target = playTarget(vm: vm) { requestPlay(target, fromBeginning: false, fromPlayButton: true) }
