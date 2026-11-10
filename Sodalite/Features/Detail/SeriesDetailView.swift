@@ -218,7 +218,6 @@ struct SeriesDetailView: View {
         //
         // Via the nil-passing helper, because an empty closure would swallow the press that has to
         // reach the cover or the navigation stack behind it (Sodalite#140).
-        .onExitCommandIfEnabled(isShowingEpisode && episodeOrigin.hasSeriesStateBehind, perform: closeEpisodeState)
         // iPhone portrait respects the safe area so detail content is not clipped under the status
         // bar; the backdrop keeps its own .ignoresSafeArea() to stay full-bleed. tvOS/iPad full-bleed.
         .ignoresSafeArea(when: !isPhonePortrait)
@@ -687,6 +686,29 @@ struct SeriesDetailView: View {
                     } else if vm.isLoadingSeasons {
                         seasonSectionSkeleton(vm: vm).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     }
+                    // Keep cast in the same continuous tvOS scroll content as the season and episode rows.
+                    if let people = displayItem.people ?? vm.item.people, !people.isEmpty {
+                        let cast = jellyfinCastMembers(
+                            from: people,
+                            imageService: dependencies.jellyfinImageService,
+                            imageWidth: metrics.castImageWidth
+                        )
+                        MediaCastRow(
+                            members: cast,
+                            focusedID: $focusedCastID,
+                            onSelect: { handlePersonTap($0) }
+                        )
+                        .onFocusMoveUp(active: true) {
+                            if let lastEpisode = vm.episodes.last {
+                                pendingEpisodeFocus = lastEpisode.id
+                            } else {
+                                focusedSeasonID = vm.selectedSeasonID
+                            }
+                        }
+                        .onChange(of: focusedCastID) { _, newID in
+                            aimFirstCastEntry(at: newID, in: cast)
+                        }
+                    }
                 }
                 .padding(.horizontal, metrics.rowInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -743,6 +765,7 @@ struct SeriesDetailView: View {
                     let seasonBlockIsFirst = !vm.seasons.isEmpty || vm.isLoadingSeasons
                     let hasCast = !((displayItem.people ?? vm.item.people) ?? []).isEmpty
 
+                    #if !os(tvOS)
                     if let people = (displayItem.people ?? vm.item.people), !people.isEmpty {
                         let cast = jellyfinCastMembers(
                             from: people,
@@ -767,6 +790,7 @@ struct SeriesDetailView: View {
                             aimFirstCastEntry(at: newID, in: cast)
                         }
                     }
+                    #endif
 
                     if !vm.similarItems.isEmpty {
                         HorizontalMediaRow(
@@ -1042,7 +1066,7 @@ struct SeriesDetailView: View {
     }
 
     private func trailerActionButton(vm: DetailViewModel) -> some View {
-        GlassActionButton(
+        GlassActionButton(focusLiftEnabled: false,
             title: "detail.trailer",
             systemImage: "play.rectangle",
             action: {
@@ -1060,7 +1084,7 @@ struct SeriesDetailView: View {
     }
 
     private func primaryActionButton(vm: DetailViewModel) -> some View {
-        GlassActionButton(
+        GlassActionButton(focusLiftEnabled: false,
             title: "detail.play",
             systemImage: "play.fill",
             isProminent: true,
@@ -1132,7 +1156,7 @@ struct SeriesDetailView: View {
         #if os(tvOS)
         // The 10-foot detail page intentionally has the four compact controls from the reference.
         // Less-used actions remain available from the episode/season context menus.
-        GlassActionButton(
+        GlassActionButton(focusLiftEnabled: false,
             title: isShowingEpisode
                 ? (selectedEpisode.map { vm.isPlayed($0) } == true ? "detail.markUnwatched" : "detail.markWatched")
                 : (vm.isPlayed ? "detail.markUnwatched" : "detail.markWatched"),
@@ -1150,18 +1174,18 @@ struct SeriesDetailView: View {
         )
         .focused($focusedAction, equals: .watched)
 
-        GlassActionButton(
+        GlassActionButton(focusLiftEnabled: false,
             title: "Bewerten",
             systemImage: "star",
             action: { isPresentingRatingPicker = true }
         )
         .focused($focusedAction, equals: .rating)
 
-        GlassActionButton(
+        GlassActionButton(focusLiftEnabled: false,
             title: isShowingEpisode
                 ? (selectedEpisode.map { vm.isFavorite($0) } == true ? "detail.unfavorite" : "detail.favorite")
                 : (vm.isFavorite ? "detail.unfavorite" : "detail.favorite"),
-            systemImage: "text.badge.plus",
+            systemImage: vm.isFavorite ? "heart.fill" : "heart",
             action: {
                 if let episode = selectedEpisode {
                     let target = !vm.isFavorite(episode)
@@ -1173,7 +1197,7 @@ struct SeriesDetailView: View {
         )
         .focused($focusedAction, equals: .favorite)
 
-        GlassActionButton(
+        GlassActionButton(focusLiftEnabled: false,
             title: "action.shuffle",
             systemImage: "shuffle",
             isLoading: isShuffleLoading,
@@ -1207,7 +1231,7 @@ struct SeriesDetailView: View {
             if let target = playTarget(vm: vm),
                VersionSelection.isOffered(for: target),
                let sources = target.mediaSources {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: "detail.version.button",
                     systemImage: "film.stack",
                     subtitle: versionSelection.resolvedSource(for: target)?.versionLabel,
@@ -1225,7 +1249,7 @@ struct SeriesDetailView: View {
 
             // Shuffle whole series (server SortBy=Random scoped by series id). Hidden in the episode panel.
             if !isShowingEpisode {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: "action.shuffle",
                     systemImage: "shuffle",
                     // Spinner on tap (VideoShuffleQueue.build lands a few hundred ms later), else the row sits inert until showPlayer flips.
@@ -1258,7 +1282,7 @@ struct SeriesDetailView: View {
             if let target = playTarget(vm: vm),
                let ticks = target.userData?.playbackPositionTicks,
                ticks > 0 {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: "detail.replay",
                     systemImage: "arrow.counterclockwise",
                     action: {
@@ -1268,7 +1292,7 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .replay)
             }
 
-            GlassActionButton(
+            GlassActionButton(focusLiftEnabled: false,
                 title: "Bewerten",
                 systemImage: "star",
                 action: { isPresentingRatingPicker = true }
@@ -1276,7 +1300,7 @@ struct SeriesDetailView: View {
             .focused($focusedAction, equals: .rating)
 
             if !isShowingEpisode {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: vm.isFavorite ? "detail.unfavorite" : "detail.favorite",
                     systemImage: vm.isFavorite ? "heart.fill" : "heart",
                     action: { Task { await vm.toggleFavorite() } }
@@ -1285,7 +1309,7 @@ struct SeriesDetailView: View {
             }
 
             if !isShowingEpisode {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: vm.isPlayed ? "detail.markUnwatched" : "detail.markWatched",
                     systemImage: vm.isPlayed ? "checkmark.circle.fill" : "checkmark.circle",
                     action: { isConfirmingPlayedChange = true }
@@ -1300,7 +1324,7 @@ struct SeriesDetailView: View {
                 let hidesNow = dependencies
                     .spoilerPolicy(userID: appState.activeUser?.id)
                     .effectiveHidesSeries(seriesID)
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: hidesNow ? "detail.spoiler.show" : "detail.spoiler.hide",
                     systemImage: hidesNow ? "eye" : "eye.slash",
                     action: { setSpoilerRule(hidesNow ? .shown : .hidden, seriesID: seriesID) }
@@ -1312,7 +1336,7 @@ struct SeriesDetailView: View {
             if isShowingEpisode {
                 // `tv`, not `xmark` (Sodalite#146): the glyph said "close this panel" while the
                 // label said "show the series", and only one of the two is what pressing it does.
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: "detail.showSeries",
                     systemImage: "tv",
                     action: { closeEpisodeState() }
@@ -1323,7 +1347,7 @@ struct SeriesDetailView: View {
             // Deliberately selectedEpisode, not playTarget: playTarget also resolves to an episode
             // while the panel is closed, so the series button would silently favorite an episode.
             if isShowingEpisode, let ep = selectedEpisode {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: vm.isFavorite(ep) ? "detail.unfavorite" : "detail.favorite",
                     systemImage: vm.isFavorite(ep) ? "heart.fill" : "heart",
                     action: {
@@ -1335,7 +1359,7 @@ struct SeriesDetailView: View {
             }
 
             if isShowingEpisode, let ep = selectedEpisode {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: vm.isPlayed(ep) ? "detail.markUnwatched" : "detail.markWatched",
                     systemImage: vm.isPlayed(ep) ? "checkmark.circle.fill" : "checkmark.circle",
                     action: {
@@ -1350,7 +1374,7 @@ struct SeriesDetailView: View {
                appState.isSeerrConnected,
                let tmdbID = vm.item.tmdbID,
                shouldShowSeerrRequest(for: vm.item) {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: "detail.requestInSeerr",
                     systemImage: "tray.and.arrow.down",
                     action: {
@@ -1362,7 +1386,7 @@ struct SeriesDetailView: View {
 
             // Last of the informational controls, and the page's only route to the full synopsis
             // and the technical detail (Sodalite#146).
-            GlassActionButton(
+            GlassActionButton(focusLiftEnabled: false,
                 title: isSynopsisVeiled ? "spoiler.reveal" : "detail.moreDetails",
                 systemImage: isSynopsisVeiled ? "eye.circle" : "info.circle",
                 action: {
@@ -1385,7 +1409,7 @@ struct SeriesDetailView: View {
 
             // Delete last, matching MovieDetailView, so the destructive action sits furthest from Play.
             if canDelete(displayItem) && !isShowingEpisode {
-                GlassActionButton(
+                GlassActionButton(focusLiftEnabled: false,
                     title: "detail.delete.button",
                     systemImage: "trash",
                     isDestructive: true,
