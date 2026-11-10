@@ -58,6 +58,8 @@ enum JellyfinEndpoint: APIEndpoint {
     // Played
     case markPlayed(userID: String, itemID: String)
     case unmarkPlayed(userID: String, itemID: String)
+    case setUserRating(userID: String, itemID: String, rating: Double)
+    case clearUserRating(userID: String, itemID: String)
 
     // Search
     case searchHints(userID: String, query: String, limit: Int)
@@ -154,6 +156,8 @@ enum JellyfinEndpoint: APIEndpoint {
             "/Users/\(userID)/PlayedItems/\(itemID)"
         case .unmarkPlayed(let userID, let itemID):
             "/Users/\(userID)/PlayedItems/\(itemID)"
+        case .setUserRating(let userID, let itemID, _), .clearUserRating(let userID, let itemID):
+            "/Users/\(userID)/Items/\(itemID)/Rating"
         case .searchHints:
             "/Search/Hints"
         case .mediaSegments(let itemID):
@@ -210,14 +214,14 @@ enum JellyfinEndpoint: APIEndpoint {
     var method: HTTPMethod {
         switch self {
         case .authenticateByName, .quickConnectInitiate, .quickConnectAuthenticate, .markFavorite,
-             .markPlayed, .sessionLogout,
+             .markPlayed, .setUserRating, .sessionLogout,
              .playbackInfo, .livePlaybackInfo,
              .sessionPlaying, .sessionProgress, .sessionStopped,
              .closeLiveStream,
              .createLiveTvTimer, .createLiveTvSeriesTimer,
              .downloadRemoteSubtitle:
             .post
-        case .unmarkFavorite, .unmarkPlayed, .deleteItem, .stopActiveEncodings,
+        case .unmarkFavorite, .unmarkPlayed, .clearUserRating, .deleteItem, .stopActiveEncodings,
              .deleteLiveTvTimer, .deleteLiveTvSeriesTimer, .deleteSubtitle:
             .delete
         default:
@@ -240,6 +244,9 @@ enum JellyfinEndpoint: APIEndpoint {
 
     var queryItems: [URLQueryItem]? {
         switch self {
+        case .setUserRating(_, _, let rating):
+            return [URLQueryItem(name: "rating", value: String(rating))]
+
         case .quickConnectCheck(let secret):
             return [URLQueryItem(name: "secret", value: secret)]
 
