@@ -812,8 +812,8 @@ struct SeriesDetailView: View {
         let token = EpisodeMetadataFormatter.seasonEpisode(
             season: displayItem.parentIndexNumber,
             episode: displayItem.indexNumber
-        ).replacingOccurrences(of: ", ", with: " – ")
-        return [token, displayItem.name].filter { !$0.isEmpty }.joined(separator: " · ")
+        ).replacingOccurrences(of: ", ", with: " • ")
+        return [token, displayItem.name].filter { !$0.isEmpty }.joined(separator: " - ")
     }
 
     @ViewBuilder
@@ -930,7 +930,7 @@ struct SeriesDetailView: View {
                     HStack(spacing: 14) {
                         primaryActionButton(vm: vm)
                             .frame(maxWidth: .infinity)
-                        if !isShowingEpisode && vm.hasLocalTrailer {
+                        if vm.hasLocalTrailer {
                             trailerActionButton(vm: vm)
                                 .frame(maxWidth: .infinity)
                         }
