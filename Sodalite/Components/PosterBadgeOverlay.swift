@@ -24,7 +24,7 @@ struct PosterBadgeOverlay: View {
                     Image(systemName: "star.fill")
                     Text("\(rating)")
                 }
-                .font(.system(size: max(9, fontSize - 2), weight: .semibold))
+                .font(.system(size: fontSize * (0.13 / 0.06) * 0.90, weight: .semibold))
                 .foregroundStyle(.white)
                 .accessibilityLabel("Meine Serienbewertung \(rating) von 10")
             }
