@@ -929,8 +929,10 @@ struct SeriesDetailView: View {
 
                     HStack(spacing: 14) {
                         primaryActionButton(vm: vm)
+                            .frame(maxWidth: .infinity)
                         if !isShowingEpisode && vm.hasLocalTrailer {
                             trailerActionButton(vm: vm)
+                                .frame(maxWidth: .infinity)
                         }
                     }
                 }
