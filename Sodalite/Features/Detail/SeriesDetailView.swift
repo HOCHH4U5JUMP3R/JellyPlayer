@@ -434,14 +434,21 @@ struct SeriesDetailView: View {
         .sheet(isPresented: $isPresentingRatingPicker) {
             SeriesPersonalRatingPicker(initialRating: displayItem.userData?.rating) { rating in
                 if let episode = selectedEpisode {
+                    guard let userID = appState.activeUser?.id else { return }
                     do {
                         try await dependencies.jellyfinItemService.setUserRating(
-                            userID: appState.activeUser?.id ?? "",
+                            userID: userID,
                             itemID: episode.id,
                             rating: rating
                         )
                         if let userData = selectedEpisode?.userData {
                             selectedEpisode?.userData = userData.with(rating: rating)
+                        } else {
+                            selectedEpisode?.userData = UserItemData(
+                                playbackPositionTicks: nil, playCount: nil, isFavorite: nil,
+                                played: nil, unplayedItemCount: nil, playedPercentage: nil,
+                                lastPlayedDate: nil, rating: rating
+                            )
                         }
                     } catch {
                         // Keep the current episode snapshot if Jellyfin rejects the update.
@@ -1690,7 +1697,7 @@ struct SeriesDetailView: View {
 
 /// tvOS-friendly personal rating picker for the currently displayed series or episode.
 private struct SeriesPersonalRatingPicker: View {
-    @Environment(\\.dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var selection: Int
     let onSave: (Double?) async -> Void
 
@@ -1703,11 +1710,11 @@ private struct SeriesPersonalRatingPicker: View {
         VStack(spacing: 28) {
             Text("Deine Bewertung").font(.title2.weight(.semibold))
             HStack(spacing: 8) {
-                ForEach(1...10, id: \\.self) { value in
+                ForEach(1...10, id: \.self) { value in
                     Button { selection = value } label: {
                         VStack(spacing: 8) {
                             Image(systemName: value <= selection ? "star.fill" : "star").font(.title2)
-                            Text("\\(value)").font(.caption)
+                            Text("\(value)").font(.caption)
                         }
                         .frame(minWidth: 48, minHeight: 72)
                         .contentShape(Rectangle())
@@ -1716,7 +1723,7 @@ private struct SeriesPersonalRatingPicker: View {
                     .tint(value <= selection ? .yellow : .secondary)
                 }
             }
-            Text(selection == 0 ? "Bitte 1 bis 10 Sterne auswählen" : "\\(selection) von 10")
+            Text(selection == 0 ? "Bitte 1 bis 10 Sterne auswählen" : "\(selection) von 10")
                 .font(.headline)
             HStack(spacing: 20) {
                 Button("Abbrechen") { dismiss() }
