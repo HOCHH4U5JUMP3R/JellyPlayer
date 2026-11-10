@@ -100,10 +100,10 @@ final class SeerrRequestDraft {
     /// One-shot, so reopening the sheet does not wipe a selection the user has since adjusted.
     private var didSeed = false
 
-    init(mediaType: SeerrMediaType, tmdbID: Int, options: SeerrRequestOptions = SeerrRequestOptions()) {
+    init(mediaType: SeerrMediaType, tmdbID: Int, options: SeerrRequestOptions? = nil) {
         self.mediaType = mediaType
         self.tmdbID = tmdbID
-        self.options = options
+        self.options = options ?? SeerrRequestOptions()
     }
 
     // MARK: - Selection
