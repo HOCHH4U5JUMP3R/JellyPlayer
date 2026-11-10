@@ -245,13 +245,13 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                     VStack(alignment: .leading, spacing: 0) {
                         // The reference uses a top-left title over the artwork, not a bottom-anchored logo.
                         gradientWithHero
-                            .frame(maxWidth: 900, alignment: .leading)
                             .padding(.top, 34)
                             .padding(.leading, 42)
 
                         VStack(alignment: .leading, spacing: 0) {
                             primary()
                         }
+                        .padding(.top, 20)
                         .padding(.leading, safeLeading + 42)
                         .padding(.trailing, safeTrailing)
                         .frame(maxWidth: 900, alignment: .leading)
@@ -624,9 +624,17 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     }
 
     // Hero rides as a gradient overlay (not a stacked layer) to keep the sibling structure the focus engine scrolls; drawn on top so the logo stays visible. Full-bleed redesign (Sodalite#15): backdrop stays behind a scrim, text containers carry their own material.
+    private var heroAlignment: Alignment {
+        #if os(tvOS)
+        .topLeading
+        #else
+        .bottomLeading
+        #endif
+    }
+
     private var gradientWithHero: some View {
         #if os(tvOS)
-        let heroHeight: CGFloat = 96
+        let heroHeight: CGFloat = 110
         #else
         let heroHeight: CGFloat = 200
         #endif
@@ -636,24 +644,12 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
             endPoint: .bottom
         )
         .frame(height: heroHeight)
-        .overlay(alignment: {
-            #if os(tvOS)
-            .topLeading
-            #else
-            .bottomLeading
-            #endif
-        }()) {
+        .overlay(alignment: heroAlignment) {
             hero()
                 .padding(.horizontal, metrics.rowInset)
                 .padding(.leading, safeLeading)
                 .padding(.trailing, safeTrailing)
-                .padding(.top, {
-                    #if os(tvOS)
-                    0
-                    #else
-                    0
-                    #endif
-                }())
+                .padding(.top, 8)
                 .padding(.bottom, 8)
         }
     }

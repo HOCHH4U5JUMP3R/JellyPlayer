@@ -627,6 +627,7 @@ struct SeriesDetailView: View {
                     actionButtonRow(vm: vm)
                     if !vm.seasons.isEmpty {
                         seasonSection(vm: vm)
+                            .padding(.top, 80)
                             .id("episodeRow")
                     } else if vm.isLoadingSeasons {
                         seasonSectionSkeleton(vm: vm)
@@ -806,6 +807,7 @@ struct SeriesDetailView: View {
                 isPending: overviewMayStillLand,
                 spoilerItem: displayItem
             )
+            .frame(maxWidth: 760, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         // No separate glass card: the information sits directly over the full-bleed artwork.
