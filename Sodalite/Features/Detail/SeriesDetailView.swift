@@ -600,8 +600,22 @@ struct SeriesDetailView: View {
             heroImageURL: backdropURL,
             heroPosterURL: vm.heroPosterURL(for: vm.item),
             hero: {
-            // Series logo, both modes (episode has none); observes the VM so it appears once an episode deep-link's series stub loads imageTags, no scroll needed.
-            DetailHeroLogo(viewModel: vm)
+            // Infuse-style text title: keep the series name visible while the episode line follows focus.
+            VStack(alignment: .leading, spacing: 8) {
+                Text(vm.item.name)
+                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                if isShowingEpisode {
+                    Text(episodeHeading(vm: vm))
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
         }, primary: {
             // Glass panel + action buttons as the bottom-aligned first-page block (Sodalite#15 round 6), kept one unit so the id-rebuild and episode crossfade cover both.
             VStack(alignment: .leading, spacing: 24) {
@@ -712,21 +726,7 @@ struct SeriesDetailView: View {
 
     private func glassPanel(vm: DetailViewModel) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            // The series logo remains in the artwork hero. In episode mode keep the parent show
-            // visible as a quiet eyebrow and give the selected episode the strongest hierarchy.
-            if isShowingEpisode {
-                Text(vm.item.name)
-                    .font(.headline)
-                    .foregroundStyle(.white.opacity(0.78))
-                    .lineLimit(1)
-
-                Text(episodeHeading(vm: vm))
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .multilineTextAlignment(isPhonePortrait ? .center : .leading)
-                    .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
-            }
+            // The title and episode heading live in the artwork hero, matching the reference layout.
 
             DetailInfoRows(
                 item: vm.item,
@@ -771,12 +771,6 @@ struct SeriesDetailView: View {
                 if let personalRating = displayItem.userData?.rating {
                     Label("Meine Bewertung  ·  \(Int(personalRating.rounded()))/10", systemImage: "star.fill")
                         .foregroundStyle(.yellow)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(.ultraThinMaterial, in: Capsule())
-                } else {
-                    Label("Noch nicht bewertet", systemImage: "star")
-                        .foregroundStyle(.white.opacity(0.82))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(.ultraThinMaterial, in: Capsule())
@@ -1524,15 +1518,30 @@ struct SeriesDetailView: View {
                     }
                 }
                 .onChange(of: focusedEpisodeID) { oldEpisode, newEpisode in
-                    if newEpisode != nil {
+                    if let newEpisode {
                         episodesHadFocus = true
                         lastFocusedArea = .episode
+                        // Infuse behaviour: focus previews the episode immediately. Select/play
+                        // remains a separate action on the Siri Remote.
+                        if selectedEpisode?.id != newEpisode,
+                           let episode = vm.episodes.first(where: { $0.id == newEpisode }) {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                selectedEpisode = episode
+                            }
+                            episodeOrigin.openedFromStrip()
+                        }
                     } else if let oldEpisode {
                         episodeAim.focusLeft(oldEpisode)
                     }
                 }
                 .onChange(of: vm.selectedSeasonID) { _, newID in
                     episodeRedirectDone = false
+                    // Do not keep showing an episode from the previous season while the new row loads.
+                    if let selectedEpisode, selectedEpisode.seasonId != newID {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            self.selectedEpisode = nil
+                        }
+                    }
                     withAnimation { proxy.scrollTo(newID, anchor: .center) }
                 }
             }
