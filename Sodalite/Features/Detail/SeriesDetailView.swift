@@ -1645,6 +1645,7 @@ struct SeriesDetailView: View {
             // metadata provider, so it renders only where the library actually has one. Placed below the
             // bar (it describes the season the tabs just selected) and above the focus bridge, so an
             // up-swipe out of the episode row still hits the bridge first and its redirect is unchanged.
+            #if !os(tvOS)
             if let season = vm.selectedSeason, let seasonOverview = seasonOverview(vm: vm) {
                 ExpandableTextBox(
                     text: seasonOverview,
@@ -1662,6 +1663,7 @@ struct SeriesDetailView: View {
                 )
                 .padding(.horizontal, metrics.rowInset)
             }
+            #endif
 
             // Full-width invisible focus bridge between the season bar and episode row: an up-swipe from a far-right episode lands here before tvOS's picker continues up into the overview/tech-info cards, then redirects by which row the user came from on the next cycle.
             // Height 24pt: tvOS's geographic picker weights frame size on proximity ties and skips sub-10pt focusables near larger ones (1pt missed often, 8pt flaky on fast season-tab→down). 24pt is reliable.
@@ -1730,10 +1732,12 @@ struct SeriesDetailView: View {
                                     .contextMenu { episodeContextMenu(episode, vm: vm) }
 
                                     // Per-card synopsis box; reserves a fixed three-line height even when empty so every column stays the same height.
+                                    #if !os(tvOS)
                                     EpisodeSynopsisBox(
                                         episode: episode,
                                         text: episode.overview?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                                     )
+                                    #endif
                                 }
                                 .id(episode.id)
                             }
