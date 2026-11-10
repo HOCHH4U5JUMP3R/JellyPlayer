@@ -200,6 +200,10 @@ struct SeriesDetailView: View {
     }
 
     var body: some View {
+        detailRootDialogs
+    }
+
+    private var detailRootBase: some View {
         detailRootContent
         .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
     // Menu returns to the series state rather than dismissing the page (Sodalite#146). The page
@@ -265,7 +269,12 @@ struct SeriesDetailView: View {
                 versionChoice = nil
             }
         }
-        .onChange(of: showPlayer) { _, isPlaying in
+        
+    }
+
+    private var detailRootPlaybackObservers: some View {
+        detailRootBase
+.onChange(of: showPlayer) { _, isPlaying in
             if !isPlaying {
                 // Restore focus to the control the user used (Play button vs episode card). Two-step write (nil then target) forces a real transition (same-value write is a no-op); DispatchQueue.main.async batches the second write into the same render cycle so no intermediate no-focus flash.
                 if playOriginatedFromPlayButton {
@@ -354,7 +363,12 @@ struct SeriesDetailView: View {
                 patchSelectedEpisodePosition(itemID: itemID, ticks: ticks)
             }
         }
-        .navigationDestination(item: $navigateToItem) { item in
+        
+    }
+
+    private var detailRootNavigation: some View {
+        detailRootPlaybackObservers
+.navigationDestination(item: $navigateToItem) { item in
             DetailRouterView(item: item)
                 .detailCoverPush()
         }
@@ -420,7 +434,12 @@ struct SeriesDetailView: View {
         // either redundant or a move, depending on which lands first, and that is decided by how fast
         // the detail fetch returns.
         .defaultFocus($playButtonFocused, true)
-        .sheet(isPresented: $isPresentingRatingPicker) {
+        
+    }
+
+    private var detailRootSheets: some View {
+        detailRootNavigation
+.sheet(isPresented: $isPresentingRatingPicker) {
             SeriesPersonalRatingPicker(initialRating: displayItem.userData?.rating) { rating in
                 if let episode = selectedEpisode {
                     guard let userID = appState.activeUser?.id else { return }
@@ -477,7 +496,12 @@ struct SeriesDetailView: View {
                 isPresented: $isPresentingMoreDetails
             )
         }
-        .alert(
+        
+    }
+
+    private var detailRootDialogs: some View {
+        detailRootSheets
+.alert(
             viewModel?.isPlayed == true
                 ? "detail.markUnwatched.confirm.title"
                 : "detail.markWatched.confirm.title",
@@ -560,6 +584,8 @@ struct SeriesDetailView: View {
             }
         }
     }
+
+
 
 /// Keep the root view's conditional branches separate. The complete detail screen has a
     /// substantial modifier chain; extracting these layers prevents Swift's type checker from
