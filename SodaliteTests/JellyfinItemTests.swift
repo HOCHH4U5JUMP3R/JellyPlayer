@@ -87,6 +87,21 @@ struct JellyfinItemTests {
         #expect(ChapterInfo(startPositionTicks: 10_000_000, name: nil, imageTag: nil).startSeconds == 1.0)
     }
 
+
+    @Test func personalRatingDecodesFromUserData() throws {
+        let item = try decodeItem(#"{"Id":"m","Name":"M","Type":"Movie","UserData":{"Rating":8.5}}"#)
+        #expect(item.userData?.rating == 8.5)
+        #expect(item.communityRating == nil)
+    }
+
+    @Test func personalRatingPatchPreservesOtherUserData() throws {
+        let item = try decodeItem(#"{"Id":"m","Name":"M","Type":"Movie","UserData":{"Rating":7,"Played":true,"IsFavorite":true}}"#)
+        let updated = try #require(item.userData).with(rating: 9)
+        #expect(updated.rating == 9)
+        #expect(updated.played == true)
+        #expect(updated.isFavorite == true)
+    }
+
     // MARK: - Multi-version source resolution (issue #37)
 
     /// Two versions: primary (item-level + first source) is AV1, second is HEVC/x265.
