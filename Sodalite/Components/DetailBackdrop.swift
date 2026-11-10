@@ -77,8 +77,21 @@ struct DetailBackdrop: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
-            // Light uniform dim for hero-text readability.
-            .overlay(Color.black.opacity(0.15))
+            // Infuse reference: darken the information side while leaving the artwork on the right clear.
+            .overlay {
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.78), location: 0),
+                        .init(color: .black.opacity(0.62), location: 0.28),
+                        .init(color: .black.opacity(0.28), location: 0.52),
+                        .init(color: .black.opacity(0.04), location: 0.76),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            }
+            .overlay(Color.black.opacity(0.08))
         }
     }
 }
@@ -619,12 +632,17 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
 
     // Hero rides as a gradient overlay (not a stacked layer) to keep the sibling structure the focus engine scrolls; drawn on top so the logo stays visible. Full-bleed redesign (Sodalite#15): backdrop stays behind a scrim, text containers carry their own material.
     private var gradientWithHero: some View {
-        LinearGradient(
+        #if os(tvOS)
+        let heroHeight: CGFloat = 150
+        #else
+        let heroHeight: CGFloat = 200
+        #endif
+        return LinearGradient(
             colors: [.clear, .black.opacity(0.35), .black.opacity(0.55)],
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(height: 200)
+        .frame(height: heroHeight)
         .overlay(alignment: .bottomLeading) {
             hero()
                 .padding(.horizontal, metrics.rowInset)

@@ -600,27 +600,58 @@ struct SeriesDetailView: View {
             heroImageURL: backdropURL,
             heroPosterURL: vm.heroPosterURL(for: vm.item),
             hero: {
-            // Series logo, both modes (episode has none); observes the VM so it appears once an episode deep-link's series stub loads imageTags, no scroll needed.
-            DetailHeroLogo(viewModel: vm)
+            // Infuse-style text title: keep the series name visible while the episode line follows focus.
+            VStack(alignment: .leading, spacing: 8) {
+                Text(vm.item.name)
+                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                if isShowingEpisode {
+                    Text(episodeHeading(vm: vm))
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
         }, primary: {
-            // Glass panel + action buttons as the bottom-aligned first-page block (Sodalite#15 round 6), kept one unit so the id-rebuild and episode crossfade cover both.
+            #if os(tvOS)
+            // Keep the season selector and episode thumbnails in the same viewport as the hero,
+            // metadata and playback actions, as in the supplied Infuse reference.
+            ScrollViewReader { outerProxy in
+                VStack(alignment: .leading, spacing: 24) {
+                    glassPanel(vm: vm)
+                        .id(Self.pageTopAnchor)
+                    actionButtonRow(vm: vm)
+                    if !vm.seasons.isEmpty {
+                        seasonSection(vm: vm)
+                            .id("episodeRow")
+                    } else if vm.isLoadingSeasons {
+                        seasonSectionSkeleton(vm: vm)
+                            .id("episodeRow")
+                    }
+                }
+                .padding(.horizontal, metrics.rowInset)
+                .id("\(vm.item.id)-\(vm.isLoading)")
+                .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
+                .onAppear { episodeRowScrollProxy = outerProxy }
+            }
+            #else
             VStack(alignment: .leading, spacing: 24) {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
                 actionButtonRow(vm: vm)
-                // See MovieDetailView: with this line below the fold the page measures ~30 pt of
-                // content down there, the trailing chrome adds 200, and tvOS scrolls 116 pt to park
-                // the focused Play button. Up here the block measures zero, the chrome goes with it,
-                // and the page is exactly one viewport and cannot be scrolled (Sodalite#146 round 2).
                 if !hasBelowFoldSections(vm: vm), let caption = techFacts().caption {
                     DetailFileCaption(caption: caption)
                         .padding(.horizontal, -metrics.rowInset)
                 }
             }
             .padding(.horizontal, metrics.rowInset)
-            // Keyed on item + load state only, NOT genre count: on an instant-paint episode deep-link the series genres land post-paint, flipping the count rebuilt the panel and broke scroll-to-top back to Play. Genres fill in via in-place diff.
             .id("\(vm.item.id)-\(vm.isLoading)")
             .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
+            #endif
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
             ScrollViewReader { outerProxy in
@@ -631,6 +662,7 @@ struct SeriesDetailView: View {
                     // between. The season bar is the first stop now, and the up-move out of it is
                     // handled the way #53 measured: the secondaries leave the focus engine while
                     // focus is not in the action row.
+                    #if !os(tvOS)
                     if !vm.seasons.isEmpty {
                         seasonSection(vm: vm)
                             .id("episodeRow")
@@ -639,6 +671,8 @@ struct SeriesDetailView: View {
                         seasonSectionSkeleton(vm: vm)
                             .id("episodeRow")
                     }
+
+                    #endif
 
                     // Cast above Related (Sodalite#47): with the season/episode block over
                     // it, the cast row already sits far down the page for viewers who only
@@ -700,7 +734,9 @@ struct SeriesDetailView: View {
                     }
                 }
                 .onAppear {
+                    #if !os(tvOS)
                     episodeRowScrollProxy = outerProxy
+                    #endif
                 }
             }
         }
@@ -712,21 +748,7 @@ struct SeriesDetailView: View {
 
     private func glassPanel(vm: DetailViewModel) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            // The series logo remains in the artwork hero. In episode mode keep the parent show
-            // visible as a quiet eyebrow and give the selected episode the strongest hierarchy.
-            if isShowingEpisode {
-                Text(vm.item.name)
-                    .font(.headline)
-                    .foregroundStyle(.white.opacity(0.78))
-                    .lineLimit(1)
-
-                Text(episodeHeading(vm: vm))
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .multilineTextAlignment(isPhonePortrait ? .center : .leading)
-                    .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
-            }
+            // The title and episode heading live in the artwork hero, matching the reference layout.
 
             DetailInfoRows(
                 item: vm.item,
@@ -774,12 +796,6 @@ struct SeriesDetailView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(.ultraThinMaterial, in: Capsule())
-                } else {
-                    Label("Noch nicht bewertet", systemImage: "star")
-                        .foregroundStyle(.white.opacity(0.82))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(.ultraThinMaterial, in: Capsule())
                 }
             }
             .font(.subheadline)
@@ -818,8 +834,8 @@ struct SeriesDetailView: View {
         let token = EpisodeMetadataFormatter.seasonEpisode(
             season: displayItem.parentIndexNumber,
             episode: displayItem.indexNumber
-        ).replacingOccurrences(of: ", ", with: " – ")
-        return [token, displayItem.name].filter { !$0.isEmpty }.joined(separator: " · ")
+        ).replacingOccurrences(of: ", ", with: " • ")
+        return [token, displayItem.name].filter { !$0.isEmpty }.joined(separator: " - ")
     }
 
     @ViewBuilder
@@ -935,8 +951,10 @@ struct SeriesDetailView: View {
 
                     HStack(spacing: 14) {
                         primaryActionButton(vm: vm)
-                        if !isShowingEpisode && vm.hasLocalTrailer {
+                            .frame(maxWidth: .infinity)
+                        if vm.hasLocalTrailer {
                             trailerActionButton(vm: vm)
+                                .frame(maxWidth: .infinity)
                         }
                     }
                 }
@@ -1033,6 +1051,77 @@ struct SeriesDetailView: View {
 
     @ViewBuilder
     private func secondaryActionButtons(vm: DetailViewModel) -> some View {
+        #if os(tvOS)
+        // The 10-foot detail page intentionally has the four compact controls from the reference.
+        // Less-used actions remain available from the episode/season context menus.
+        GlassActionButton(
+            title: isShowingEpisode
+                ? (selectedEpisode.map { vm.isPlayed($0) } == true ? "detail.markUnwatched" : "detail.markWatched")
+                : (vm.isPlayed ? "detail.markUnwatched" : "detail.markWatched"),
+            systemImage: (isShowingEpisode
+                ? (selectedEpisode.map { vm.isPlayed($0) } == true)
+                : vm.isPlayed) ? "checkmark" : "checkmark",
+            action: {
+                if let episode = selectedEpisode {
+                    let target = !vm.isPlayed(episode)
+                    Task { await vm.setEpisodePlayed(episode, isPlayed: target) }
+                } else {
+                    isConfirmingPlayedChange = true
+                }
+            }
+        )
+        .focused($focusedAction, equals: .watched)
+
+        GlassActionButton(
+            title: "Bewerten",
+            systemImage: "star",
+            action: { isPresentingRatingPicker = true }
+        )
+        .focused($focusedAction, equals: .rating)
+
+        GlassActionButton(
+            title: isShowingEpisode
+                ? (selectedEpisode.map { vm.isFavorite($0) } == true ? "detail.unfavorite" : "detail.favorite")
+                : (vm.isFavorite ? "detail.unfavorite" : "detail.favorite"),
+            systemImage: "text.badge.plus",
+            action: {
+                if let episode = selectedEpisode {
+                    let target = !vm.isFavorite(episode)
+                    Task { await vm.setEpisodeFavorite(episode, isFavorite: target) }
+                } else {
+                    Task { await vm.toggleFavorite() }
+                }
+            }
+        )
+        .focused($focusedAction, equals: .favorite)
+
+        GlassActionButton(
+            title: "action.shuffle",
+            systemImage: "shuffle",
+            isLoading: isShuffleLoading,
+            action: {
+                guard let userID = appState.activeUser?.id else { return }
+                let seriesID = vm.item.id
+                isShuffleLoading = true
+                Task {
+                    let queue = await VideoShuffleQueue.build(
+                        parentID: seriesID,
+                        itemTypes: [.episode],
+                        service: dependencies.jellyfinLibraryService,
+                        userID: userID
+                    )
+                    isShuffleLoading = false
+                    guard let first = queue.first else { return }
+                    playItem = first
+                    playQueue = queue
+                    playFromBeginning = true
+                    playOriginatedFromPlayButton = true
+                    showPlayer = true
+                }
+            }
+        )
+        .focused($focusedAction, equals: .shuffle)
+        #else
             // First after Play, always labelled, same as movie detail: the version belongs to the
             // episode Play would start, so it rides with playTarget and disappears with it. Series
             // roots take their target from the slim episode list, which carries no MediaSources, so
@@ -1226,8 +1315,8 @@ struct SeriesDetailView: View {
                 )
                 .focused($focusedAction, equals: .delete)
             }
+        #endif
     }
-
     /// Patch the open episode panel's resume position when the played item is selectedEpisode (issue #24). selectedEpisode lives on the view not the VM, and playTarget prioritises it, so applyPlaybackPosition can't reach it. No-op unless the id matches.
     private func patchSelectedEpisodePosition(itemID: String?, ticks: Int64?) {
         guard let itemID, let ticks,
@@ -1524,15 +1613,30 @@ struct SeriesDetailView: View {
                     }
                 }
                 .onChange(of: focusedEpisodeID) { oldEpisode, newEpisode in
-                    if newEpisode != nil {
+                    if let newEpisode {
                         episodesHadFocus = true
                         lastFocusedArea = .episode
+                        // Infuse behaviour: focus previews the episode immediately. Select/play
+                        // remains a separate action on the Siri Remote.
+                        if selectedEpisode?.id != newEpisode,
+                           let episode = vm.episodes.first(where: { $0.id == newEpisode }) {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                selectedEpisode = episode
+                            }
+                            episodeOrigin.openedFromStrip()
+                        }
                     } else if let oldEpisode {
                         episodeAim.focusLeft(oldEpisode)
                     }
                 }
                 .onChange(of: vm.selectedSeasonID) { _, newID in
                     episodeRedirectDone = false
+                    // Do not keep showing an episode from the previous season while the new row loads.
+                    if let selectedEpisode, selectedEpisode.seasonId != newID {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            self.selectedEpisode = nil
+                        }
+                    }
                     withAnimation { proxy.scrollTo(newID, anchor: .center) }
                 }
             }
