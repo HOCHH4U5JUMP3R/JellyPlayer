@@ -57,7 +57,7 @@ struct EpisodeCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         // Stroke drawn inside EpisodeLandscapeCard so it hugs the thumbnail only, not the caption below.
         configuration.label
-            .focusResponse(.card, isFocused: isFocused)
+            .background(isFocused ? Color.Theme.focusFill.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -69,18 +69,7 @@ struct SeasonTabButtonStyle: ButtonStyle {
         configuration.label
             // Not `.focusStroke`: this stroke carries its own asymmetric timing, which the shared
             // modifier has no place for. The width is the same 3.
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(.tint, lineWidth: FocusStroke.width)
-                    .opacity(isFocused ? 1 : 0)
-                    .animation(
-                        isFocused
-                            ? .easeIn(duration: 0.15).delay(0.05)
-                            : .easeOut(duration: 0.1),
-                        value: isFocused
-                    )
-            )
-            .focusResponse(.chip, isFocused: isFocused)
+            .background(isFocused ? Color.Theme.focusFill.opacity(0.22) : .clear, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 

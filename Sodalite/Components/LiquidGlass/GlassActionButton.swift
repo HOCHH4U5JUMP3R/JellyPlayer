@@ -3,6 +3,7 @@ import SwiftUI
 struct GlassActionButton: View {
     @Environment(\.appearanceTheme) private var appearanceTheme
 
+    var focusLiftEnabled: Bool = true
     let title: LocalizedStringKey
     let systemImage: String
     var isProminent: Bool = false
@@ -50,7 +51,8 @@ struct GlassActionButton: View {
             isProminent: isProminent,
             isDestructive: isDestructive,
             progressFraction: progressFraction,
-            contentColor: contentColor
+            contentColor: contentColor,
+            focusLiftEnabled: focusLiftEnabled
         ))
         .disabled(isLoading && disablesWhileLoading)
         // Keep the title for VoiceOver even when the visible label collapses to an icon-only pill.
@@ -190,6 +192,19 @@ private struct CappedPillLift: ViewModifier {
     }
 }
 
+private struct ConditionalPillLift: ViewModifier {
+    let enabled: Bool
+    let isFocused: Bool
+    let isPressed: Bool
+    func body(content: Content) -> some View {
+        if enabled {
+            content.modifier(CappedPillLift(isFocused: isFocused, isPressed: isPressed))
+        } else {
+            content
+        }
+    }
+}
+
 private struct PillWidthKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -245,6 +260,7 @@ struct GlassButtonStyle: ButtonStyle {
     /// What the label, the glyph and the progress bar are painted in. Derived by the button from
     /// the accent, so this style never has to know which accent is in play.
     var contentColor: Color = .white
+    var focusLiftEnabled: Bool = true
     @Environment(\.isFocused) private var isFocused
 
     /// The fill the label's contrast was measured against (Sodalite#113). Named so the test can
@@ -282,9 +298,8 @@ struct GlassButtonStyle: ButtonStyle {
                 }
             }
             .focusStroke(Capsule(), isFocused: isFocused)
-            // The role's curve matches the label-reveal spring here, so scale, border and
-            // icon->label expansion move together. Capped, and therefore measured: see liftCeiling.
-            .modifier(CappedPillLift(isFocused: isFocused, isPressed: configuration.isPressed))
+            .background(isFocused ? Color.Theme.focusFill.opacity(0.14) : .clear, in: Capsule())
+            .modifier(ConditionalPillLift(enabled: focusLiftEnabled, isFocused: isFocused, isPressed: configuration.isPressed))
     }
 
     /// How far a pill may grow on one side when focus lifts it. `DetailActionRow` sets its buttons
