@@ -29,6 +29,10 @@ final class PosterBadgeStore {
     /// so per-row serialisation would still let ten rows fan out; the chain makes it one sample at
     /// a time for the whole app.
     private var seriesTail: Task<Void, Never>?
+    /// Cached personal show ratings, calculated from rated episodes grouped and rounded per season.
+    private var seriesRatings: [String: Int] = [:]
+    private var seriesRatingsLoaded: Set<String> = []
+    private var seriesRatingsInFlight: Set<String> = []
 
     /// `userID` is passed per call rather than resolved here: `DependencyContainer.activeUserID`
     /// reads the keychain, and the callers hold `AppState.activeUser?.id` already (same reason
@@ -49,6 +53,53 @@ final class PosterBadgeStore {
                            audio: found.audio ?? base.audio,
                            audioCodec: found.audioCodec ?? base.audioCodec,
                            channelLayout: found.channelLayout ?? base.channelLayout)
+    }
+
+    func personalSeriesRating(for item: JellyfinItem) -> Int? { seriesRatings[item.id] }
+
+    /// Average rated episodes within each season, round each season to a whole 1–10 rating,
+    /// then average those season ratings and round the series result.
+    func enrichSeriesRatings(userID: String, items: [JellyfinItem]) async {
+        for series in items where series.type == .series
+            && !seriesRatingsLoaded.contains(series.id)
+            && !seriesRatingsInFlight.contains(series.id) {
+            guard !Task.isCancelled else { return }
+            seriesRatingsInFlight.insert(series.id)
+            defer { seriesRatingsInFlight.remove(series.id) }
+            let query = ItemQuery(parentID: series.id, includeItemTypes: [.episode], fields: "")
+            guard let response = try? await library.getItems(userID: userID, query: query) else { continue }
+            if let rating = Self.averagePersonalRating(for: response.items) {
+                seriesRatings[series.id] = rating
+            }
+            seriesRatingsLoaded.insert(series.id)
+        }
+    }
+
+    func refreshSeriesRating(userID: String, seriesID: String) async {
+        guard !seriesRatingsInFlight.contains(seriesID) else { return }
+        seriesRatingsInFlight.insert(seriesID)
+        defer { seriesRatingsInFlight.remove(seriesID) }
+        let query = ItemQuery(parentID: seriesID, includeItemTypes: [.episode], fields: "")
+        guard let response = try? await library.getItems(userID: userID, query: query) else { return }
+        if let rating = Self.averagePersonalRating(for: response.items) {
+            seriesRatings[seriesID] = rating
+        } else {
+            seriesRatings.removeValue(forKey: seriesID)
+        }
+        seriesRatingsLoaded.insert(seriesID)
+    }
+
+    static func averagePersonalRating(for episodes: [JellyfinItem]) -> Int? {
+        let rated = episodes.filter { $0.userData?.rating != nil }
+        guard !rated.isEmpty else { return nil }
+        let seasonRatings = Dictionary(grouping: rated, by: { $0.parentIndexNumber ?? 0 })
+            .values.compactMap { season -> Int? in
+                let values = season.compactMap { $0.userData?.rating }
+                guard !values.isEmpty else { return nil }
+                return min(10, max(1, Int((values.reduce(0, +) / Double(values.count)).rounded())))
+            }
+        guard !seasonRatings.isEmpty else { return nil }
+        return min(10, max(1, Int((Double(seasonRatings.reduce(0, +)) / Double(seasonRatings.count)).rounded())))
     }
 
     func enrich(userID: String, _ items: [JellyfinItem]) async {
