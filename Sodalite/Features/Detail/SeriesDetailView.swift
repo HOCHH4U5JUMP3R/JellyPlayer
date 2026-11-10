@@ -1372,6 +1372,15 @@ struct SeriesDetailView: View {
         }
 
         Button {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                selectedEpisode = episode
+            }
+            isPresentingRatingPicker = true
+        } label: {
+            Label("Bewerten", systemImage: "star")
+        }
+
+        Button {
             let target = !vm.isFavorite(episode)
             Task { await vm.setEpisodeFavorite(episode, isFavorite: target) }
         } label: {

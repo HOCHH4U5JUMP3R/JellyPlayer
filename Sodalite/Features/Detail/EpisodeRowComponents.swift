@@ -228,6 +228,19 @@ struct EpisodeLandscapeCard: View {
                     posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+                // Personal Jellyfin rating belongs to this episode, not to its parent series.
+                if let rating = episode.userData?.rating {
+                    Label("\(Int(rating.rounded()))", systemImage: "star.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.72), in: Capsule())
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .padding(10)
+                        .accessibilityLabel("Meine Bewertung \(Int(rating.rounded())) von 10")
+                }
             }
             .frame(width: artworkSize.width, height: artworkSize.height)
             // The ring's room, inside the card rather than outside it.
