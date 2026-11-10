@@ -431,6 +431,8 @@ struct UserItemData: Codable, Sendable, Equatable {
     let playedPercentage: Double?
     /// ISO-8601 last-play timestamp; kept raw (model convention) and unparsed (recency ordering is server-side via SortBy=DatePlayed).
     let lastPlayedDate: String?
+    /// Personal 0–10 rating stored in Jellyfin UserData (not CommunityRating).
+    let rating: Double?
 
     enum CodingKeys: String, CodingKey {
         case playbackPositionTicks = "PlaybackPositionTicks"
@@ -440,6 +442,7 @@ struct UserItemData: Codable, Sendable, Equatable {
         case unplayedItemCount = "UnplayedItemCount"
         case playedPercentage = "PlayedPercentage"
         case lastPlayedDate = "LastPlayedDate"
+        case rating = "Rating"
     }
 
     /// Copy with resume position (and, if known, played percentage) replaced; in-memory patch after playback stops (issue #24). `played` defaults to keep-current, the watched-threshold patch passes it.
@@ -451,7 +454,22 @@ struct UserItemData: Codable, Sendable, Equatable {
             played: newPlayed ?? played,
             unplayedItemCount: unplayedItemCount,
             playedPercentage: pct,
-            lastPlayedDate: lastPlayedDate
+            lastPlayedDate: lastPlayedDate,
+            rating: rating
+        )
+    }
+
+    /// Copy with the personal rating replaced; nil explicitly clears it.
+    func with(rating newRating: Double?) -> UserItemData {
+        UserItemData(
+            playbackPositionTicks: playbackPositionTicks,
+            playCount: playCount,
+            isFavorite: isFavorite,
+            played: played,
+            unplayedItemCount: unplayedItemCount,
+            playedPercentage: playedPercentage,
+            lastPlayedDate: lastPlayedDate,
+            rating: newRating
         )
     }
 }
