@@ -771,7 +771,7 @@ private struct PersonalRatingPicker: View {
     let onSave: (Double?) async -> Void
 
     init(initialRating: Double?, onSave: @escaping (Double?) async -> Void) {
-        _selection = State(initialValue: initialRating.map { min(10, max(1, Int($0.rounded())) } ?? 0)
+        _selection = State(initialValue: initialRating.map { min(10, max(1, Int($0.rounded()))) } ?? 0)
         self.onSave = onSave
     }
 
