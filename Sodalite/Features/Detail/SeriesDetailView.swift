@@ -712,9 +712,13 @@ struct SeriesDetailView: View {
 
     private func glassPanel(vm: DetailViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Panel title is the episode name in episode mode; the series root has none (logo lives in the hero slot, see DetailContentOverlay).
+            // Infuse-style hierarchy: keep the series identity visible above the selected episode.
             if isShowingEpisode {
-                Text(selectedEpisode?.name ?? "")
+                Text(vm.item.name)
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(episodeHeading(vm: vm))
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .lineLimit(2)
@@ -722,19 +726,12 @@ struct SeriesDetailView: View {
                     .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
             }
 
-            // Metadata line with the series tagline set against it, in both modes so the episode
-            // panel matches the root; genres and studios moved into More Details (Sodalite#146
-            // round 2).
+            // The selected episode owns its runtime, release date, age rating and media-format badges.
             DetailInfoRows(
                 item: vm.item,
                 hasFullDetail: vm.hasFullDetail
             ) {
                 if isShowingEpisode {
-                    // Single metadata line (runtime + series genres). S/E pair left the panel (Sodalite#15 round 6) since the play-button subtitle already carries it; keeps the episode panel at title + one line.
-                    // The format pills join that line where it has the width, so the episode panel
-                    // stays at title + one line. Portrait is the exception: the panel is one narrow
-                    // column there and the pills pushed it past the screen edge (Sodalite#145,
-                    // measured on the iPhone 2026-09-14).
                     if isPhonePortrait {
                         VStack(alignment: .leading, spacing: 8) {
                             episodeLine(vm: vm)
@@ -751,8 +748,16 @@ struct SeriesDetailView: View {
                 }
             }
 
-            // Sodalite#146: series synopsis in the series state, the episode's own in episode state,
-            // which is what displayItem/displayOverview already resolve for the box below the fold.
+            // Genres are useful at a glance and follow the selected episode, falling back to series metadata.
+            let visibleGenres = displayItem.genres ?? vm.item.genres ?? []
+            if !visibleGenres.isEmpty {
+                Text(visibleGenres.joined(separator: " · "))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            // Community and personal ratings are separate Jellyfin values; personal rating always follows displayItem.
             HStack(spacing: 18) {
                 if let communityRating = displayItem.communityRating {
                     Label(String(format: "%.1f", communityRating), systemImage: "star.circle")
@@ -792,6 +797,14 @@ struct SeriesDetailView: View {
     private func seasonCount(vm: DetailViewModel) -> [AnyView] {
         guard let count = vm.item.childCount, count > 0 else { return [] }
         return [AnyView(Text("detail.seasonCount \(count)"))]
+    }
+
+    private func episodeHeading(vm: DetailViewModel) -> String {
+        let token = EpisodeMetadataFormatter.seasonEpisode(
+            season: displayItem.parentIndexNumber,
+            episode: displayItem.indexNumber
+        ).replacingOccurrences(of: ", ", with: " – ")
+        return [token, displayItem.name].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     @ViewBuilder
@@ -860,13 +873,27 @@ struct SeriesDetailView: View {
         TechFacts.resolve(item: displayItem, sourceID: versionSelection.preferredSourceID(for: displayItem))
     }
 
-    /// Episode panel's single metadata line, which is the episode's runtime and nothing else since
-    /// the genres left the page (Sodalite#146 round 2): keeping them here would have been the one
-    /// place they survived, on the state that has the least room for them. nil when there is no
-    /// runtime, so the line collapses rather than drawing empty.
+    /// Runtime, premiere date and content rating for the episode currently shown in the panel.
     private func episodeMetadataLine(vm: DetailViewModel) -> String? {
-        guard let runtime = selectedEpisode?.runTimeTicks, runtime > 0 else { return nil }
-        return runtime.ticksToDisplay
+        var parts: [String] = []
+        if let runtime = displayItem.runTimeTicks, runtime > 0 {
+            parts.append(runtime.ticksToDisplay)
+        }
+        if let rawDate = displayItem.premiereDate {
+            let iso = ISO8601DateFormatter()
+            if let date = iso.date(from: rawDate) {
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                formatter.timeStyle = .none
+                parts.append(formatter.string(from: date))
+            } else if rawDate.count >= 10 {
+                parts.append(String(rawDate.prefix(10)))
+            }
+        }
+        if let ageRating = displayItem.officialRating, !ageRating.isEmpty {
+            parts.append(ageRating)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     // MARK: - Action Buttons
