@@ -761,3 +761,62 @@ struct MovieDetailView: View {
         )
     }
 }
+
+
+/// tvOS-friendly personal rating picker. Selection previews while moving focus;
+/// the server is only changed after the explicit Save action.
+private struct PersonalRatingPicker: View {
+    @Environment(\\.dismiss) private var dismiss
+    @State private var selection: Int
+    let onSave: (Double?) async -> Void
+
+    init(initialRating: Double?, onSave: @escaping (Double?) async -> Void) {
+        _selection = State(initialValue: min(10, max(1, Int((initialRating ?? 8).rounded()))))
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        VStack(spacing: 28) {
+            Text("Deine Bewertung")
+                .font(.title2.weight(.semibold))
+            HStack(spacing: 8) {
+                ForEach(1...10, id: \\.self) { value in
+                    Button {
+                        selection = value
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: value <= selection ? "star.fill" : "star")
+                                .font(.title2)
+                            Text("\\(value)")
+                                .font(.caption)
+                        }
+                        .frame(minWidth: 48, minHeight: 72)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(value <= selection ? .yellow : .secondary)
+                }
+            }
+            Text("\\(selection) von 10")
+                .font(.headline)
+            HStack(spacing: 20) {
+                Button("Abbrechen") { dismiss() }
+                Button("Bewertung entfernen", role: .destructive) {
+                    Task {
+                        await onSave(nil)
+                        dismiss()
+                    }
+                }
+                Button("Speichern") {
+                    Task {
+                        await onSave(Double(selection))
+                        dismiss()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(40)
+        .frame(minWidth: 760, minHeight: 300)
+    }
+}
