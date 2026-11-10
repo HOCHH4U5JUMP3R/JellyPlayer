@@ -1027,6 +1027,77 @@ struct SeriesDetailView: View {
 
     @ViewBuilder
     private func secondaryActionButtons(vm: DetailViewModel) -> some View {
+        #if os(tvOS)
+        // The 10-foot detail page intentionally has the four compact controls from the reference.
+        // Less-used actions remain available from the episode/season context menus.
+        GlassActionButton(
+            title: isShowingEpisode
+                ? (selectedEpisode.map { vm.isPlayed($0) } == true ? "detail.markUnwatched" : "detail.markWatched")
+                : (vm.isPlayed ? "detail.markUnwatched" : "detail.markWatched"),
+            systemImage: (isShowingEpisode
+                ? (selectedEpisode.map { vm.isPlayed($0) } == true)
+                : vm.isPlayed) ? "checkmark" : "checkmark",
+            action: {
+                if let episode = selectedEpisode {
+                    let target = !vm.isPlayed(episode)
+                    Task { await vm.setEpisodePlayed(episode, isPlayed: target) }
+                } else {
+                    isConfirmingPlayedChange = true
+                }
+            }
+        )
+        .focused($focusedAction, equals: .watched)
+
+        GlassActionButton(
+            title: "Bewerten",
+            systemImage: "star",
+            action: { isPresentingRatingPicker = true }
+        )
+        .focused($focusedAction, equals: .rating)
+
+        GlassActionButton(
+            title: isShowingEpisode
+                ? (selectedEpisode.map { vm.isFavorite($0) } == true ? "detail.unfavorite" : "detail.favorite")
+                : (vm.isFavorite ? "detail.unfavorite" : "detail.favorite"),
+            systemImage: "text.badge.plus",
+            action: {
+                if let episode = selectedEpisode {
+                    let target = !vm.isFavorite(episode)
+                    Task { await vm.setEpisodeFavorite(episode, isFavorite: target) }
+                } else {
+                    Task { await vm.toggleFavorite() }
+                }
+            }
+        )
+        .focused($focusedAction, equals: .favorite)
+
+        GlassActionButton(
+            title: "action.shuffle",
+            systemImage: "shuffle",
+            isLoading: isShuffleLoading,
+            action: {
+                guard let userID = appState.activeUser?.id else { return }
+                let seriesID = vm.item.id
+                isShuffleLoading = true
+                Task {
+                    let queue = await VideoShuffleQueue.build(
+                        parentID: seriesID,
+                        itemTypes: [.episode],
+                        service: dependencies.jellyfinLibraryService,
+                        userID: userID
+                    )
+                    isShuffleLoading = false
+                    guard let first = queue.first else { return }
+                    playItem = first
+                    playQueue = queue
+                    playFromBeginning = true
+                    playOriginatedFromPlayButton = true
+                    showPlayer = true
+                }
+            }
+        )
+        .focused($focusedAction, equals: .shuffle)
+        #else
             // First after Play, always labelled, same as movie detail: the version belongs to the
             // episode Play would start, so it rides with playTarget and disappears with it. Series
             // roots take their target from the slim episode list, which carries no MediaSources, so
@@ -1220,8 +1291,8 @@ struct SeriesDetailView: View {
                 )
                 .focused($focusedAction, equals: .delete)
             }
+        #endif
     }
-
     /// Patch the open episode panel's resume position when the played item is selectedEpisode (issue #24). selectedEpisode lives on the view not the VM, and playTarget prioritises it, so applyPlaybackPosition can't reach it. No-op unless the id matches.
     private func patchSelectedEpisodePosition(itemID: String?, ticks: Int64?) {
         guard let itemID, let ticks,
