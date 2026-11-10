@@ -202,51 +202,6 @@ struct SeriesDetailView: View {
     var body: some View {
         detailRootContent
         .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
-        /// Keep the root view's conditional branches separate. The complete detail screen has a
-    /// substantial modifier chain; extracting these layers prevents Swift's type checker from
-    /// having to infer the nested ZStack and both optional branches as one expression.
-    @ViewBuilder
-    private var detailRootContent: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            detailBackdropLayer
-            detailForegroundLayer
-        }
-    }
-
-    @ViewBuilder
-    private var detailBackdropLayer: some View {
-        if let vm = viewModel, !vm.isLoading {
-            DetailBackdrop(
-                imageURL: backdropURL,
-                posterFallbackURL: vm.heroPosterURL(for: vm.item)
-            )
-            .id(backdropURL?.absoluteString ?? "empty")
-            .ignoresSafeArea()
-            .transition(.opacity)
-        }
-    }
-
-    @ViewBuilder
-    private var detailForegroundLayer: some View {
-        if let vm = viewModel, !vm.isLoading {
-            contentOverlay(vm: vm)
-        } else {
-            loadingOverlay
-        }
-    }
-
-    private var loadingOverlay: some View {
-        ZStack {
-            ProgressView()
-            // Invisible focus anchor keeps Menu handling on the loading screen.
-            Button("") { dismiss() }
-                .opacity(0)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .transition(.opacity)
-    }
-
     // Menu returns to the series state rather than dismissing the page (Sodalite#146). The page
         // swaps its header for an episode rather than pushing a screen, so tvOS had nothing to pop
         // and Menu went straight past it to the detail cover: opening an episode cost the whole show
@@ -604,6 +559,51 @@ struct SeriesDetailView: View {
                 )
             }
         }
+    }
+
+/// Keep the root view's conditional branches separate. The complete detail screen has a
+    /// substantial modifier chain; extracting these layers prevents Swift's type checker from
+    /// having to infer the nested ZStack and both optional branches as one expression.
+    @ViewBuilder
+    private var detailRootContent: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            detailBackdropLayer
+            detailForegroundLayer
+        }
+    }
+
+    @ViewBuilder
+    private var detailBackdropLayer: some View {
+        if let vm = viewModel, !vm.isLoading {
+            DetailBackdrop(
+                imageURL: backdropURL,
+                posterFallbackURL: vm.heroPosterURL(for: vm.item)
+            )
+            .id(backdropURL?.absoluteString ?? "empty")
+            .ignoresSafeArea()
+            .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private var detailForegroundLayer: some View {
+        if let vm = viewModel, !vm.isLoading {
+            contentOverlay(vm: vm)
+        } else {
+            loadingOverlay
+        }
+    }
+
+    private var loadingOverlay: some View {
+        ZStack {
+            ProgressView()
+            // Invisible focus anchor keeps Menu handling on the loading screen.
+            Button("") { dismiss() }
+                .opacity(0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .transition(.opacity)
     }
 
     private func updateBackdropURL() {
