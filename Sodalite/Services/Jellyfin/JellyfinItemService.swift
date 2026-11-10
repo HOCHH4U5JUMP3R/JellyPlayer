@@ -147,9 +147,9 @@ final class JellyfinItemService: JellyfinItemServiceProtocol {
     func setUserRating(userID: String, itemID: String, rating: Double?) async throws {
         if let rating {
             guard rating.isFinite, (1...10).contains(rating) else { throw APIError.invalidResponse }
-            try await client.request(endpoint: .setUserRating(userID: userID, itemID: itemID, rating: rating))
+            try await client.request(endpoint: JellyfinEndpoint.setUserRating(userID: userID, itemID: itemID, rating: rating))
         } else {
-            try await client.request(endpoint: .clearUserRating(userID: userID, itemID: itemID))
+            try await client.request(endpoint: JellyfinEndpoint.clearUserRating(userID: userID, itemID: itemID))
         }
     }
 
