@@ -617,24 +617,41 @@ struct SeriesDetailView: View {
                 }
             }
         }, primary: {
-            // Glass panel + action buttons as the bottom-aligned first-page block (Sodalite#15 round 6), kept one unit so the id-rebuild and episode crossfade cover both.
+            #if os(tvOS)
+            // Keep the season selector and episode thumbnails in the same viewport as the hero,
+            // metadata and playback actions, as in the supplied Infuse reference.
+            ScrollViewReader { outerProxy in
+                VStack(alignment: .leading, spacing: 24) {
+                    glassPanel(vm: vm)
+                        .id(Self.pageTopAnchor)
+                    actionButtonRow(vm: vm)
+                    if !vm.seasons.isEmpty {
+                        seasonSection(vm: vm)
+                            .id("episodeRow")
+                    } else if vm.isLoadingSeasons {
+                        seasonSectionSkeleton(vm: vm)
+                            .id("episodeRow")
+                    }
+                }
+                .padding(.horizontal, metrics.rowInset)
+                .id("\(vm.item.id)-\(vm.isLoading)")
+                .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
+                .onAppear { episodeRowScrollProxy = outerProxy }
+            }
+            #else
             VStack(alignment: .leading, spacing: 24) {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
                 actionButtonRow(vm: vm)
-                // See MovieDetailView: with this line below the fold the page measures ~30 pt of
-                // content down there, the trailing chrome adds 200, and tvOS scrolls 116 pt to park
-                // the focused Play button. Up here the block measures zero, the chrome goes with it,
-                // and the page is exactly one viewport and cannot be scrolled (Sodalite#146 round 2).
                 if !hasBelowFoldSections(vm: vm), let caption = techFacts().caption {
                     DetailFileCaption(caption: caption)
                         .padding(.horizontal, -metrics.rowInset)
                 }
             }
             .padding(.horizontal, metrics.rowInset)
-            // Keyed on item + load state only, NOT genre count: on an instant-paint episode deep-link the series genres land post-paint, flipping the count rebuilt the panel and broke scroll-to-top back to Play. Genres fill in via in-place diff.
             .id("\(vm.item.id)-\(vm.isLoading)")
             .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
+            #endif
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
             ScrollViewReader { outerProxy in
@@ -645,6 +662,7 @@ struct SeriesDetailView: View {
                     // between. The season bar is the first stop now, and the up-move out of it is
                     // handled the way #53 measured: the secondaries leave the focus engine while
                     // focus is not in the action row.
+                    #if !os(tvOS)
                     if !vm.seasons.isEmpty {
                         seasonSection(vm: vm)
                             .id("episodeRow")
@@ -653,6 +671,8 @@ struct SeriesDetailView: View {
                         seasonSectionSkeleton(vm: vm)
                             .id("episodeRow")
                     }
+
+                    #endif
 
                     // Cast above Related (Sodalite#47): with the season/episode block over
                     // it, the cast row already sits far down the page for viewers who only
