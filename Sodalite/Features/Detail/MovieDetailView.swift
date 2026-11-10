@@ -766,7 +766,7 @@ struct MovieDetailView: View {
 /// tvOS-friendly personal rating picker. Selection previews while moving focus;
 /// the server is only changed after the explicit Save action.
 private struct PersonalRatingPicker: View {
-    @Environment(\\.dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var selection: Int
     let onSave: (Double?) async -> Void
 
@@ -780,14 +780,14 @@ private struct PersonalRatingPicker: View {
             Text("Deine Bewertung")
                 .font(.title2.weight(.semibold))
             HStack(spacing: 8) {
-                ForEach(1...10, id: \\.self) { value in
+                ForEach(1...10, id: \.self) { value in
                     Button {
                         selection = value
                     } label: {
                         VStack(spacing: 8) {
                             Image(systemName: value <= selection ? "star.fill" : "star")
                                 .font(.title2)
-                            Text("\\(value)")
+                            Text("\(value)")
                                 .font(.caption)
                         }
                         .frame(minWidth: 48, minHeight: 72)
@@ -797,7 +797,7 @@ private struct PersonalRatingPicker: View {
                     .tint(value <= selection ? .yellow : .secondary)
                 }
             }
-            Text("\\(selection) von 10")
+            Text("\(selection) von 10")
                 .font(.headline)
             HStack(spacing: 20) {
                 Button("Abbrechen") { dismiss() }
