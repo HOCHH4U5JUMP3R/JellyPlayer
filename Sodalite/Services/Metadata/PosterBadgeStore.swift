@@ -75,6 +75,20 @@ final class PosterBadgeStore {
         }
     }
 
+    func refreshSeriesRating(userID: String, seriesID: String) async {
+        guard !seriesRatingsInFlight.contains(seriesID) else { return }
+        seriesRatingsInFlight.insert(seriesID)
+        defer { seriesRatingsInFlight.remove(seriesID) }
+        let query = ItemQuery(parentID: seriesID, includeItemTypes: [.episode], fields: "")
+        guard let response = try? await library.getItems(userID: userID, query: query) else { return }
+        if let rating = Self.averagePersonalRating(for: response.items) {
+            seriesRatings[seriesID] = rating
+        } else {
+            seriesRatings.removeValue(forKey: seriesID)
+        }
+        seriesRatingsLoaded.insert(seriesID)
+    }
+
     static func averagePersonalRating(for episodes: [JellyfinItem]) -> Int? {
         let rated = episodes.filter { $0.userData?.rating != nil }
         guard !rated.isEmpty else { return nil }
