@@ -930,7 +930,7 @@ struct SeriesDetailView: View {
                 parts.append(formatter.string(from: date))
             } else { parts.append(String(rawDate.prefix(10))) }
         }
-        if let ageRating = displayItem.officialRating, !ageRating.isEmpty {
+        if let ageRating = displayItem.officialRating ?? viewModel?.item.officialRating, !ageRating.isEmpty {
             parts.append(ageRating)
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
