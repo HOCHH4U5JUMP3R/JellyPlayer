@@ -237,7 +237,7 @@ struct EpisodeLandscapeCard: View {
                         .padding(.horizontal, 9)
                         .padding(.vertical, 6)
                         .background(.black.opacity(0.72), in: Capsule())
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(10)
                         .accessibilityLabel("Meine Bewertung \(Int(rating.rounded())) von 10")
                 }
