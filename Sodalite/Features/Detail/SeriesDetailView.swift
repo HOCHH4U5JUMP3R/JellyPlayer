@@ -702,6 +702,7 @@ struct SeriesDetailView: View {
                         )
                         MediaCastRow(
                             members: cast,
+                            inset: 0,
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
@@ -2036,7 +2037,7 @@ private struct SeriesPersonalRatingPicker: View {
 
 private struct InfuseDetailActionButtonStyle: ButtonStyle {
     var isProminent: Bool
-    @Environment(\\.isFocused) private var isFocused
+    @Environment(\.isFocused) private var isFocused
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(RoundedRectangle(cornerRadius: 13).fill(isProminent ? Color(red: 1, green: 0.49, blue: 0) : Color.white.opacity(isFocused ? 0.28 : 0.10)))
