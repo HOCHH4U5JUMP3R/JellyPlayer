@@ -19,6 +19,13 @@ protocol JellyfinItemServiceProtocol: MovieCatalogQuerying {
     func deleteItem(itemID: String) async throws
 }
 
+/// Default for lightweight service doubles that do not exercise rating writes.
+extension JellyfinItemServiceProtocol {
+    func setUserRating(userID: String, itemID: String, rating: Double?) async throws {
+        throw APIError.invalidResponse
+    }
+}
+
 final class JellyfinItemService: JellyfinItemServiceProtocol {
     private let client: JellyfinClient
 
