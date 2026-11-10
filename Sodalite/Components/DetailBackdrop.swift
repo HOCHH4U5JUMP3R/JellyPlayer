@@ -332,7 +332,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                             }
                     }
                 }
-                .background(alignment: .top) { TuckGround(palette: artworkPalette) }
+                .background(Color.clear)
             }
         }
         .background(Color.black.opacity(scrollDim).ignoresSafeArea())
@@ -636,20 +636,20 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
         #else
         let heroHeight: CGFloat = 200
         #endif
+        #if os(tvOS)
+        return Color.clear.frame(height: heroHeight).overlay(alignment: heroAlignment) {
+            hero().padding(.horizontal, metrics.rowInset).padding(.leading, safeLeading)
+                .padding(.trailing, safeTrailing).padding(.top, 8).padding(.bottom, 8)
+        }
+        #else
         return LinearGradient(
             colors: [.clear, .black.opacity(0.35), .black.opacity(0.55)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: heroHeight)
-        .overlay(alignment: heroAlignment) {
-            hero()
-                .padding(.horizontal, metrics.rowInset)
-                .padding(.leading, safeLeading)
-                .padding(.trailing, safeTrailing)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
+            startPoint: .top, endPoint: .bottom
+        ).frame(height: heroHeight).overlay(alignment: heroAlignment) {
+            hero().padding(.horizontal, metrics.rowInset).padding(.leading, safeLeading)
+                .padding(.trailing, safeTrailing).padding(.top, 8).padding(.bottom, 8)
         }
+        #endif
     }
 }
 
