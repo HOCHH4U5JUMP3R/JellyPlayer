@@ -243,30 +243,23 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                     // The open space to the right keeps the backdrop visible and gives the title,
                     // metadata, ratings and controls a stable reading order.
                     VStack(alignment: .leading, spacing: 0) {
+                        // The reference uses a top-left title over the artwork, not a bottom-anchored logo.
                         gradientWithHero
-                            .frame(maxWidth: 980, alignment: .leading)
-                            .padding(.top, 44)
+                            .padding(.top, 34)
+                            .padding(.leading, 42)
 
                         VStack(alignment: .leading, spacing: 0) {
                             primary()
                         }
-                        .padding(.leading, safeLeading)
+                        .padding(.top, 20)
+                        .padding(.leading, safeLeading + 42)
                         .padding(.trailing, safeTrailing)
-                        .frame(maxWidth: 980, alignment: .leading)
+                        .frame(maxWidth: 900, alignment: .leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, ScrollHintPolicy.primaryBottomInset(reservesHint: reservesScrollHint))
-                        .overlay(alignment: .bottom) {
-                            if reservesScrollHint {
-                                ScrollHintChevron(isVisible: showsScrollHint)
-                                    .padding(.bottom, 10)
-                            }
-                        }
-                        .background(Color.Theme.scrim)
-
-                        Spacer(minLength: 0)
+                        // Keep the first page at its natural height. A viewport-sized frame here
+                        // clipped the season's episode rail before it could be rendered.
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .containerRelativeFrame(.vertical)
                     #else
                     // iPad and iPhone landscape retain their existing viewport treatment.
                     VStack(alignment: .leading, spacing: 0) {
@@ -631,9 +624,17 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     }
 
     // Hero rides as a gradient overlay (not a stacked layer) to keep the sibling structure the focus engine scrolls; drawn on top so the logo stays visible. Full-bleed redesign (Sodalite#15): backdrop stays behind a scrim, text containers carry their own material.
+    private var heroAlignment: Alignment {
+        #if os(tvOS)
+        .topLeading
+        #else
+        .bottomLeading
+        #endif
+    }
+
     private var gradientWithHero: some View {
         #if os(tvOS)
-        let heroHeight: CGFloat = 150
+        let heroHeight: CGFloat = 110
         #else
         let heroHeight: CGFloat = 200
         #endif
@@ -643,11 +644,12 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
             endPoint: .bottom
         )
         .frame(height: heroHeight)
-        .overlay(alignment: .bottomLeading) {
+        .overlay(alignment: heroAlignment) {
             hero()
                 .padding(.horizontal, metrics.rowInset)
                 .padding(.leading, safeLeading)
                 .padding(.trailing, safeTrailing)
+                .padding(.top, 8)
                 .padding(.bottom, 8)
         }
     }
