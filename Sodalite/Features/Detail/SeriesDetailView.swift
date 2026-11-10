@@ -471,7 +471,7 @@ struct SeriesDetailView: View {
             // Episode lists are slim (no MediaStreams/MediaSources); on opening into episode mode pull full detail and swap in (same id) so the TechInfoBox can render codec/resolution.
             guard let newID, let vm = viewModel,
                   let episode = selectedEpisode, episode.id == newID,
-                  episode.mediaStreams == nil, episode.mediaSources == nil else { return }
+                  (episode.mediaStreams == nil || episode.mediaSources == nil || episode.overview == nil || episode.people == nil) else { return }
             Task {
                 let enriched = await vm.enrichedEpisode(for: episode)
                 if selectedEpisode?.id == enriched.id {
@@ -683,7 +683,7 @@ struct SeriesDetailView: View {
                     glassPanel(vm: vm).frame(maxWidth: 760, alignment: .leading).id(Self.pageTopAnchor)
                     actionButtonRow(vm: vm).frame(maxWidth: 760, alignment: .leading)
                     if !vm.seasons.isEmpty {
-                        seasonSection(vm: vm).padding(.top, 18).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
+                        seasonSection(vm: vm).padding(.top, 6).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     } else if vm.isLoadingSeasons {
                         seasonSectionSkeleton(vm: vm).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     }
@@ -704,6 +704,7 @@ struct SeriesDetailView: View {
                 actionButtonRow(vm: vm)
                 if !hasBelowFoldSections(vm: vm), let caption = techFacts().caption {
                     DetailFileCaption(caption: caption)
+                        .font(.caption2).foregroundStyle(.tertiary)
                         .padding(.horizontal, -metrics.rowInset)
                 }
             }
@@ -714,7 +715,7 @@ struct SeriesDetailView: View {
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
             ScrollViewReader { outerProxy in
-                VStack(alignment: .leading, spacing: 40) {
+                VStack(alignment: .leading, spacing: 22) {
                     // No synopsis block here any more (Sodalite#146). Three lines of it sit in the
                     // first viewport and the whole of it is behind More Details, so a third copy
                     // under the fold was the page saying the same thing twice with a focus stop
@@ -740,9 +741,9 @@ struct SeriesDetailView: View {
                     // reasoning. Here the season block is almost always first, so these carry the
                     // flag for the show that has no seasons yet.
                     let seasonBlockIsFirst = !vm.seasons.isEmpty || vm.isLoadingSeasons
-                    let hasCast = !(vm.item.people?.isEmpty ?? true)
+                    let hasCast = !((displayItem.people ?? vm.item.people) ?? []).isEmpty
 
-                    if let people = vm.item.people, !people.isEmpty {
+                    if let people = (displayItem.people ?? vm.item.people), !people.isEmpty {
                         let cast = jellyfinCastMembers(
                             from: people,
                             imageService: dependencies.jellyfinImageService,
@@ -789,6 +790,7 @@ struct SeriesDetailView: View {
                     // sections at all it moves into the first viewport, see `hasBelowFoldSections`.
                     if hasBelowFoldSections(vm: vm), let caption = techFacts().caption {
                         DetailFileCaption(caption: caption)
+                            .font(.caption2).foregroundStyle(.tertiary)
                             .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
                     }
                 }
@@ -846,17 +848,15 @@ struct SeriesDetailView: View {
                         Image("JellyfinMark").resizable().scaledToFit().frame(width: 22, height: 22)
                         Text(communityRating.formatted(.number.precision(.fractionLength(1))))
                     }
-                    .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
-                    .background(.black.opacity(0.48), in: Capsule())
+                    .foregroundStyle(.white)
                     .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
                 }
                 if let personalRating = displayItem.userData?.rating {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 5) {
                         Image(systemName: "star.fill").foregroundStyle(.yellow)
                         Text(Int(personalRating.rounded()).formatted())
                     }
-                    .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
-                    .background(.black.opacity(0.48), in: Capsule())
+                    .foregroundStyle(.white)
                     .accessibilityLabel("Meine Bewertung \(Int(personalRating.rounded())) von 10")
                 }
             }
@@ -891,11 +891,16 @@ struct SeriesDetailView: View {
 
     @ViewBuilder
     private func episodeLine(vm: DetailViewModel) -> some View {
-        if let line = episodeMetadataLine(vm: vm) {
-            Text(line)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+        let values = episodeMetadataValues()
+        HStack(spacing: 18) {
+            if let metadata = values.metadata {
+                Text(metadata).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            }
+            if let ageRating = values.ageRating {
+                Text(ageRating).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 5).strokeBorder(.white.opacity(0.45), lineWidth: 1))
+            }
         }
     }
 
@@ -946,7 +951,7 @@ struct SeriesDetailView: View {
     /// block counts while it is still loading: its skeleton holds the same room the real one will.
     private func hasBelowFoldSections(vm: DetailViewModel) -> Bool {
         !vm.seasons.isEmpty || vm.isLoadingSeasons
-            || !(vm.item.people?.isEmpty ?? true)
+            || !((displayItem.people ?? vm.item.people) ?? []).isEmpty
             || !vm.similarItems.isEmpty
             || !vm.catalogSimilar.isEmpty
     }
@@ -956,7 +961,7 @@ struct SeriesDetailView: View {
     }
 
     /// Runtime, premiere date and content rating for the episode currently shown in the panel.
-    private func episodeMetadataLine(vm: DetailViewModel) -> String? {
+    private func episodeMetadataValues() -> (metadata: String?, ageRating: String?) {
         var parts: [String] = []
         if let runtime = displayItem.runTimeTicks, runtime > 0 {
             parts.append(runtime.ticksToDisplay)
@@ -974,53 +979,51 @@ struct SeriesDetailView: View {
                 parts.append(formatter.string(from: date))
             } else { parts.append(String(rawDate.prefix(10))) }
         }
-        if let ageRating = displayItem.officialRating ?? viewModel?.item.officialRating, !ageRating.isEmpty {
-            parts.append(ageRating)
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        let ageRating = displayItem.officialRating ?? viewModel?.item.officialRating
+        return (parts.isEmpty ? nil : parts.joined(separator: "   "), ageRating?.isEmpty == false ? ageRating : nil)
     }
 
     // MARK: - Action Buttons
 
     private func actionButtonRow(vm: DetailViewModel) -> some View {
         #if os(tvOS)
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
-            InfuseDetailActionButton(title: vm.isPlayed ? "Als ungesehen markieren" : "Als gesehen markieren", symbol: "checkmark") {
-                if let episode = selectedEpisode { Task { await vm.setEpisodePlayed(episode, isPlayed: !vm.isPlayed(episode)) } }
-                else { isConfirmingPlayedChange = true }
-            }.focused($focusedAction, equals: .watched)
-            InfuseDetailActionButton(title: "Bewerten", symbol: "star") { isPresentingRatingPicker = true }
-                .focused($focusedAction, equals: .rating)
-            InfuseDetailActionButton(title: "Favorit", symbol: "text.badge.plus") {
-                if let episode = selectedEpisode { Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) } }
-                else { Task { await vm.toggleFavorite() } }
-            }.focused($focusedAction, equals: .favorite)
-            InfuseDetailActionButton(title: "Metadaten synchronisieren", symbol: "arrow.clockwise", isLoading: isRefreshingMetadata) {
-                guard !isRefreshingMetadata else { return }
-                isRefreshingMetadata = true
-                Task {
-                    let selectedID = selectedEpisode?.id
-                    await vm.refreshMetadata()
-                    if let selectedID, let refreshed = vm.episodes.first(where: { $0.id == selectedID }) {
-                        selectedEpisode = refreshed
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                InfuseDetailActionButton(title: vm.isPlayed ? "Als ungesehen markieren" : "Als gesehen markieren", symbol: "checkmark") {
+                    if let episode = selectedEpisode { Task { await vm.setEpisodePlayed(episode, isPlayed: !vm.isPlayed(episode)) } }
+                    else { isConfirmingPlayedChange = true }
+                }.focused($focusedAction, equals: .watched)
+                InfuseDetailActionButton(title: "Bewerten", symbol: "star") { isPresentingRatingPicker = true }
+                    .focused($focusedAction, equals: .rating)
+                InfuseDetailActionButton(title: "Favorit", symbol: "text.badge.plus") {
+                    if let episode = selectedEpisode { Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) } }
+                    else { Task { await vm.toggleFavorite() } }
+                }.focused($focusedAction, equals: .favorite)
+                InfuseDetailActionButton(title: "Metadaten synchronisieren", symbol: "arrow.clockwise", isLoading: isRefreshingMetadata) {
+                    guard !isRefreshingMetadata else { return }
+                    isRefreshingMetadata = true
+                    Task {
+                        let selectedID = selectedEpisode?.id
+                        await vm.refreshMetadata()
+                        if let selectedID, let refreshed = vm.episodes.first(where: { $0.id == selectedID }) { selectedEpisode = refreshed }
+                        isRefreshingMetadata = false
                     }
-                    isRefreshingMetadata = false
-                }
-            }.focused($focusedAction, equals: .sync)
-            InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
-                if let target = playTarget(vm: vm) { requestPlay(target, fromBeginning: false, fromPlayButton: true) }
-                else { pendingPlayRequest = true }
+                }.focused($focusedAction, equals: .sync)
             }
-            .gridCellColumns(2).focused($focusedAction, equals: .play)
-            InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
-                Task {
-                    if let trailer = await vm.loadTrailer() {
-                        playItem = trailer; playFromBeginning = true
-                        playOriginatedFromPlayButton = false; showPlayer = true
+            HStack(spacing: 12) {
+                InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
+                    if let target = playTarget(vm: vm) { requestPlay(target, fromBeginning: false, fromPlayButton: true) }
+                    else { pendingPlayRequest = true }
+                }.focused($focusedAction, equals: .play)
+                InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
+                    Task {
+                        if let trailer = await vm.loadTrailer() {
+                            playItem = trailer; playFromBeginning = true
+                            playOriginatedFromPlayButton = false; showPlayer = true
+                        }
                     }
-                }
+                }.focused($focusedAction, equals: .trailer)
             }
-            .gridCellColumns(2).focused($focusedAction, equals: .trailer)
         }
         #else
         VStack(alignment: .leading, spacing: 16) {
@@ -1610,7 +1613,7 @@ struct SeriesDetailView: View {
 
     private func seasonSection(vm: DetailViewModel) -> some View {
         // .focusSection (at the bottom) keeps up/down inside the season+episode block, else a far-right episode's up-swipe bypasses the season bar and lands on the overview textbox; the onMoveCommand redirect then snaps to the selected tab.
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 8) {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
@@ -1861,6 +1864,9 @@ struct SeriesDetailView: View {
                 }
             }
         }
+        .onChange(of: vm.episodes.map(\.id)) { _, _ in
+            selectInitialEpisodeIfNeeded(vm: vm)
+        }
         .focusSectionCompat()
     }
 
@@ -1996,8 +2002,7 @@ private struct InfuseDetailActionButton: View {
             .padding(.horizontal, prominent ? 22 : 0)
             .background(RoundedRectangle(cornerRadius: 13).fill(prominent ? Color(red: 1, green: 0.49, blue: 0) : Color.white.opacity(isFocused ? 0.22 : 0.10)))
             .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(isFocused ? Color.white.opacity(0.9) : Color.white.opacity(0.10), lineWidth: isFocused ? 2 : 1))
-            .scaleEffect(isFocused ? 1.035 : 1)
-        }
+                    }
         .buttonStyle(.plain).focusEffectDisabled().accessibilityLabel(Text(title))
     }
 }

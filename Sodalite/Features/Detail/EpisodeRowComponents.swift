@@ -231,12 +231,12 @@ struct EpisodeLandscapeCard: View {
 
                 // Personal Jellyfin rating belongs to this episode, not to its parent series.
                 if let rating = episode.userData?.rating {
-                    Label("\(Int(rating.rounded()))", systemImage: "star.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
-                        .background(.black.opacity(0.72), in: Capsule())
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill").foregroundStyle(.yellow)
+                        Text("\(Int(rating.rounded()))")
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(10)
                         .accessibilityLabel("Meine Bewertung \(Int(rating.rounded())) von 10")
@@ -249,8 +249,7 @@ struct EpisodeLandscapeCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     // No separator glyph: the accent colour is what sets the token off the title here.
-                    let token = EpisodeMetadataFormatter.seasonEpisode(season: nil,
-                                                                       episode: episode.indexNumber)
+                    let token = episode.indexNumber.map(String.init) ?? ""
                     if !token.isEmpty {
                         Text(verbatim: token)
                             .font(.caption)
