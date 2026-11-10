@@ -20,15 +20,12 @@ struct PosterBadgeOverlay: View {
                 }
             }
             if item.type == .series, let rating = dependencies.posterBadgeStore.personalSeriesRating(for: item) {
-                HStack(spacing: 3) {
+                HStack(spacing: 2) {
                     Image(systemName: "star.fill")
                     Text("\(rating)")
                 }
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: max(9, fontSize - 2), weight: .semibold))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 4)
-                .background(.black.opacity(0.72), in: Capsule())
                 .accessibilityLabel("Meine Serienbewertung \(rating) von 10")
             }
         }
