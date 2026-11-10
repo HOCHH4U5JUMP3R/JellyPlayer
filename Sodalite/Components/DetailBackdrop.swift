@@ -285,7 +285,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                 // Content and filler under ONE ground, so the page colour runs to the bottom edge
                 // instead of ending where the last row does.
                 VStack(alignment: .leading, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 40) {
+                    VStack(alignment: .leading, spacing: 20) {
                         content()
                     }
                     // Height of the real below-fold content. The trailing filler below makes every
