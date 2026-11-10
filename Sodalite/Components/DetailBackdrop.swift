@@ -81,17 +81,16 @@ struct DetailBackdrop: View {
             .overlay {
                 LinearGradient(
                     stops: [
-                        .init(color: .black.opacity(0.78), location: 0),
-                        .init(color: .black.opacity(0.62), location: 0.28),
-                        .init(color: .black.opacity(0.28), location: 0.52),
-                        .init(color: .black.opacity(0.04), location: 0.76),
+                        .init(color: Color(red: 0.12, green: 0.13, blue: 0.14).opacity(0.96), location: 0),
+                        .init(color: Color(red: 0.12, green: 0.13, blue: 0.14).opacity(0.82), location: 0.30),
+                        .init(color: Color(red: 0.12, green: 0.13, blue: 0.14).opacity(0.42), location: 0.54),
+                        .init(color: Color(red: 0.12, green: 0.13, blue: 0.14).opacity(0.10), location: 0.78),
                         .init(color: .clear, location: 1)
                     ],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    startPoint: .leading, endPoint: .trailing
                 )
             }
-            .overlay(Color.black.opacity(0.08))
+            .overlay(Color.black.opacity(0.16))
         }
     }
 }
@@ -254,7 +253,6 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                         .padding(.top, 20)
                         .padding(.leading, safeLeading + 42)
                         .padding(.trailing, safeTrailing)
-                        .frame(maxWidth: 900, alignment: .leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         // Keep the first page at its natural height. A viewport-sized frame here
                         // clipped the season's episode rail before it could be rendered.
@@ -634,7 +632,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
 
     private var gradientWithHero: some View {
         #if os(tvOS)
-        let heroHeight: CGFloat = 110
+        let heroHeight: CGFloat = 150
         #else
         let heroHeight: CGFloat = 200
         #endif

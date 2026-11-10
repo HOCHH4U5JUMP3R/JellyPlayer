@@ -95,6 +95,18 @@ final class DetailViewModel {
         return trailers?.first
     }
 
+    func refreshMetadata() async {
+        if let detail = try? await itemService.getItemDetail(userID: userID, itemID: item.id) {
+            await MainActor.run {
+                item = detail
+                isFavorite = detail.userData?.isFavorite ?? false
+                isPlayed = detail.userData?.played ?? false
+                hasFullDetail = true
+            }
+        }
+        await refreshSeasons()
+    }
+
     func loadFullDetail() async {
         // Episode deep-links arrive with the full episode in hand, enough to paint the first frame, so skip the loading gate and let seasons/cast/similar fade in (the episode path's "grey then everything at once" on slow CDNs). No next-up resolution runs here, so it's safe from the series-path repaint storm.
         isLoading = (initialEpisode == nil)

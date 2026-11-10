@@ -24,6 +24,7 @@ struct SeriesDetailView: View {
     /// Play launched from the glass-panel Play button vs an episode card; player-dismiss restores focus to the right control (else Down jumped past the seasons row to cast).
     @State private var playOriginatedFromPlayButton = false
     @State private var isShuffleLoading = false
+    @State private var isRefreshingMetadata = false
     /// Outer vertical ScrollView proxy; player-dismiss scrolls back to the episode row else the nil-flicker focus restore leaves the page stuck at the top.
     @State private var episodeRowScrollProxy: ScrollViewProxy?
     /// Whole-page scroll proxy, iOS only (see PageScrollProxyCapture). Captured outside DetailContentOverlay so it can reach the glass panel, which sits above the content block episodeRowScrollProxy covers.
@@ -156,6 +157,15 @@ struct SeriesDetailView: View {
 
     private var displayItem: JellyfinItem {
         selectedEpisode ?? viewModel?.item ?? item
+    }
+
+    private func selectInitialEpisodeIfNeeded(vm: DetailViewModel) {
+        guard selectedEpisode == nil else { return }
+        let candidate = vm.currentEpisodeID.flatMap { id in vm.episodes.first(where: { $0.id == id }) }
+            ?? vm.nextUpEpisode ?? vm.episodes.first
+        guard let candidate else { return }
+        selectedEpisode = candidate
+        episodeOrigin.openedFromStrip()
     }
 
     private var isShowingEpisode: Bool {
@@ -416,6 +426,12 @@ struct SeriesDetailView: View {
             // Open the animation gate once the cover's present transition has settled.
             deferOnMain(by: 0.35) { didSettleIn = true }
         }
+        .onChange(of: viewModel?.episodes.map(\.id) ?? []) { _, _ in
+            if let vm = viewModel { selectInitialEpisodeIfNeeded(vm: vm) }
+        }
+        .onChange(of: viewModel?.currentEpisodeID) { _, _ in
+            if let vm = viewModel { selectInitialEpisodeIfNeeded(vm: vm) }
+        }
         .onChange(of: viewModel?.isLoading) { _, _ in
             updateBackdropURL()
         }
@@ -618,26 +634,24 @@ struct SeriesDetailView: View {
             }
         }, primary: {
             #if os(tvOS)
-            // Keep the season selector and episode thumbnails in the same viewport as the hero,
-            // metadata and playback actions, as in the supplied Infuse reference.
             ScrollViewReader { outerProxy in
-                VStack(alignment: .leading, spacing: 24) {
-                    glassPanel(vm: vm)
-                        .id(Self.pageTopAnchor)
-                    actionButtonRow(vm: vm)
+                VStack(alignment: .leading, spacing: 16) {
+                    glassPanel(vm: vm).frame(maxWidth: 760, alignment: .leading).id(Self.pageTopAnchor)
+                    actionButtonRow(vm: vm).frame(maxWidth: 760, alignment: .leading)
                     if !vm.seasons.isEmpty {
-                        seasonSection(vm: vm)
-                            .padding(.top, 80)
-                            .id("episodeRow")
+                        seasonSection(vm: vm).padding(.top, 18).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     } else if vm.isLoadingSeasons {
-                        seasonSectionSkeleton(vm: vm)
-                            .id("episodeRow")
+                        seasonSectionSkeleton(vm: vm).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     }
                 }
                 .padding(.horizontal, metrics.rowInset)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .id("\(vm.item.id)-\(vm.isLoading)")
                 .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
-                .onAppear { episodeRowScrollProxy = outerProxy }
+                .onAppear {
+                    episodeRowScrollProxy = outerProxy
+                    selectInitialEpisodeIfNeeded(vm: vm)
+                }
             }
             #else
             VStack(alignment: .leading, spacing: 24) {
@@ -772,7 +786,8 @@ struct SeriesDetailView: View {
                 }
             }
 
-            let visibleGenres = displayItem.genres ?? vm.item.genres ?? []
+            let episodeGenres = displayItem.genres ?? []
+            let visibleGenres = episodeGenres.isEmpty ? (vm.item.genres ?? []) : episodeGenres
             if !visibleGenres.isEmpty {
                 Text(visibleGenres.joined(separator: "  ·  "))
                     .font(.subheadline)
@@ -781,26 +796,27 @@ struct SeriesDetailView: View {
             }
 
             // Community score and the Jellyfin user score are deliberately separate values.
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 if let communityRating = displayItem.communityRating {
-                    Label(String(format: "%.1f", communityRating), systemImage: "star.fill")
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .accessibilityLabel("Community-Bewertung \(String(format: "%.1f", communityRating))")
+                    HStack(spacing: 8) {
+                        Image("JellyfinMark").resizable().scaledToFit().frame(width: 22, height: 22)
+                        Text(communityRating.formatted(.number.precision(.fractionLength(1))))
+                    }
+                    .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(.black.opacity(0.48), in: Capsule())
+                    .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
                 }
-
                 if let personalRating = displayItem.userData?.rating {
-                    Label("Meine Bewertung  ·  \(Int(personalRating.rounded()))/10", systemImage: "star.fill")
-                        .foregroundStyle(.yellow)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(.ultraThinMaterial, in: Capsule())
+                    HStack(spacing: 8) {
+                        Image(systemName: "star.fill").foregroundStyle(.yellow)
+                        Text(Int(personalRating.rounded()).formatted())
+                    }
+                    .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(.black.opacity(0.48), in: Capsule())
+                    .accessibilityLabel("Meine Bewertung \(Int(personalRating.rounded())) von 10")
                 }
             }
-            .font(.subheadline)
-            .accessibilityElement(children: .combine)
+            .font(.subheadline.weight(.semibold))
 
             DetailHeroSynopsis(
                 text: displayOverview,
@@ -810,18 +826,7 @@ struct SeriesDetailView: View {
             .frame(maxWidth: 760, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        // No separate glass card: the information sits directly over the full-bleed artwork.
-        // A restrained, full-width scrim keeps text readable without boxing the detail page in.
         .padding(.vertical, 12)
-        .background {
-            LinearGradient(
-                colors: [.black.opacity(0.58), .black.opacity(0.30), .clear],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .padding(.horizontal, -metrics.rowInset)
-            .padding(.vertical, -12)
-        }
     }
 
     /// Season count as a metadata segment, and no segment at all when the server gave none: a row
@@ -912,16 +917,18 @@ struct SeriesDetailView: View {
         if let runtime = displayItem.runTimeTicks, runtime > 0 {
             parts.append(runtime.ticksToDisplay)
         }
-        if let rawDate = displayItem.premiereDate {
-            let iso = ISO8601DateFormatter()
-            if let date = iso.date(from: rawDate) {
+        if let rawDate = displayItem.premiereDate, rawDate.count >= 10 {
+            let parser = DateFormatter()
+            parser.locale = Locale(identifier: "en_US_POSIX")
+            parser.timeZone = TimeZone(secondsFromGMT: 0)
+            parser.dateFormat = "yyyy-MM-dd"
+            if let date = parser.date(from: String(rawDate.prefix(10))) {
                 let formatter = DateFormatter()
-                formatter.dateStyle = .medium
-                formatter.timeStyle = .none
+                formatter.locale = Locale.current
+                formatter.timeZone = .current
+                formatter.dateFormat = "dd.MM.yyyy"
                 parts.append(formatter.string(from: date))
-            } else if rawDate.count >= 10 {
-                parts.append(String(rawDate.prefix(10)))
-            }
+            } else { parts.append(String(rawDate.prefix(10))) }
         }
         if let ageRating = displayItem.officialRating, !ageRating.isEmpty {
             parts.append(ageRating)
@@ -931,37 +938,45 @@ struct SeriesDetailView: View {
 
     // MARK: - Action Buttons
 
-    /// Button row below the glass panel, outside it (Sodalite#15 round 6) so the plate stays a compact metadata card; each GlassActionButton carries its own material so the row needs no plate.
     private func actionButtonRow(vm: DetailViewModel) -> some View {
-        Group {
-            if isPhonePortrait {
-                VStack(spacing: 12) {
-                    primaryActionButton(vm: vm)
-                        .frame(maxWidth: .infinity)
-                    DetailActionRow(alignment: .center, balanced: true) {
-                        secondaryActionButtons(vm: vm)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Compact utility controls first; Play and Trailer form the prominent action row.
-                    DetailActionRow {
-                        secondaryActionButtons(vm: vm)
-                    }
-                    .collapsesActionButtonLabel()
-
-                    HStack(spacing: 14) {
-                        primaryActionButton(vm: vm)
-                            .frame(maxWidth: .infinity)
-                        if vm.hasLocalTrailer {
-                            trailerActionButton(vm: vm)
-                                .frame(maxWidth: .infinity)
-                        }
+        #if os(tvOS)
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+            InfuseDetailActionButton(title: vm.isPlayed ? "Als ungesehen markieren" : "Als gesehen markieren", symbol: "checkmark") {
+                if let episode = selectedEpisode { Task { await vm.setEpisodePlayed(episode, isPlayed: !vm.isPlayed(episode)) } }
+                else { isConfirmingPlayedChange = true }
+            }.focused($focusedAction, equals: .watched)
+            InfuseDetailActionButton(title: "Bewerten", symbol: "star") { isPresentingRatingPicker = true }
+                .focused($focusedAction, equals: .rating)
+            InfuseDetailActionButton(title: "Favorit", symbol: "text.badge.plus") {
+                if let episode = selectedEpisode { Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) } }
+                else { Task { await vm.toggleFavorite() } }
+            }.focused($focusedAction, equals: .favorite)
+            InfuseDetailActionButton(title: "Metadaten synchronisieren", symbol: "arrow.clockwise", isLoading: isRefreshingMetadata) {
+                guard !isRefreshingMetadata else { return }
+                isRefreshingMetadata = true
+                Task { await vm.refreshMetadata(); isRefreshingMetadata = false }
+            }.focused($focusedAction, equals: .sync)
+            InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
+                if let target = playTarget(vm: vm) { requestPlay(target, fromBeginning: false, fromPlayButton: true) }
+                else { pendingPlayRequest = true }
+            }
+            .gridCellColumns(2).focused($focusedAction, equals: .play)
+            InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
+                Task {
+                    if let trailer = await vm.loadTrailer() {
+                        playItem = trailer; playFromBeginning = true
+                        playOriginatedFromPlayButton = false; showPlayer = true
                     }
                 }
             }
+            .gridCellColumns(2).focused($focusedAction, equals: .trailer)
         }
+        #else
+        VStack(alignment: .leading, spacing: 16) {
+            DetailActionRow { secondaryActionButtons(vm: vm) }
+            primaryActionButton(vm: vm)
+        }
+        #endif
     }
 
     private func trailerActionButton(vm: DetailViewModel) -> some View {
@@ -984,10 +999,9 @@ struct SeriesDetailView: View {
 
     private func primaryActionButton(vm: DetailViewModel) -> some View {
         GlassActionButton(
-            title: playTitle(vm: vm),
+            title: "detail.play",
             systemImage: "play.fill",
             isProminent: true,
-            subtitle: playButtonSubtitle(vm: vm),
             progressFraction: playProgressFraction(vm: vm),
             // Spinner until a concrete play target: avoids the "Abspielen" → "Fortsetzen + S1, E5 · 12:34" repaint when getNextUp lands a few hundred ms after appear.
             isLoading: playTarget(vm: vm) == nil,
@@ -1910,4 +1924,29 @@ private struct SeriesPersonalRatingPicker: View {
     }
 }
 
+}
+
+
+private struct InfuseDetailActionButton: View {
+    let title: String
+    let symbol: String
+    var prominent = false
+    var isLoading = false
+    let action: () -> Void
+    @Environment(\.isFocused) private var isFocused
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                if isLoading { ProgressView().tint(.white) }
+                else { Image(systemName: symbol).font(.system(size: prominent ? 23 : 25, weight: .semibold)) }
+                if prominent { Text(title).font(.system(size: 22, weight: .semibold)).lineLimit(1); Spacer(minLength: 0) }
+            }
+            .foregroundStyle(.white).frame(maxWidth: .infinity).frame(height: 62)
+            .padding(.horizontal, prominent ? 22 : 0)
+            .background(RoundedRectangle(cornerRadius: 13).fill(prominent ? Color(red: 1, green: 0.49, blue: 0) : Color.white.opacity(isFocused ? 0.22 : 0.10)))
+            .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(isFocused ? Color.white.opacity(0.9) : Color.white.opacity(0.10), lineWidth: isFocused ? 2 : 1))
+            .scaleEffect(isFocused ? 1.035 : 1)
+        }
+        .buttonStyle(.plain).focusEffectDisabled().accessibilityLabel(Text(title))
+    }
 }

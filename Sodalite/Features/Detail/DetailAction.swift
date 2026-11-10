@@ -26,4 +26,5 @@ enum DetailAction: Hashable {
     case request
     case moreDetails
     case delete
+    case sync
 }
