@@ -1907,6 +1907,7 @@ struct SeriesDetailView: View {
                     .onAppear {
                         scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
                     }
+                    .focusSectionCompat()
                 }
             }
         }
