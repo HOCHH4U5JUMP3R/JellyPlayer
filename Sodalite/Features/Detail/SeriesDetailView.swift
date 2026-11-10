@@ -711,22 +711,23 @@ struct SeriesDetailView: View {
     // MARK: - Glass Panel
 
     private func glassPanel(vm: DetailViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Infuse-style hierarchy: keep the series identity visible above the selected episode.
+        VStack(alignment: .leading, spacing: 14) {
+            // The series logo remains in the artwork hero. In episode mode keep the parent show
+            // visible as a quiet eyebrow and give the selected episode the strongest hierarchy.
             if isShowingEpisode {
                 Text(vm.item.name)
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.78))
                     .lineLimit(1)
+
                 Text(episodeHeading(vm: vm))
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(isPhonePortrait ? .center : .leading)
                     .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
             }
 
-            // The selected episode owns its runtime, release date, age rating and media-format badges.
             DetailInfoRows(
                 item: vm.item,
                 hasFullDetail: vm.hasFullDetail
@@ -748,27 +749,37 @@ struct SeriesDetailView: View {
                 }
             }
 
-            // Genres are useful at a glance and follow the selected episode, falling back to series metadata.
             let visibleGenres = displayItem.genres ?? vm.item.genres ?? []
             if !visibleGenres.isEmpty {
-                Text(visibleGenres.joined(separator: " · "))
+                Text(visibleGenres.joined(separator: "  ·  "))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.78))
                     .lineLimit(2)
             }
 
-            // Community and personal ratings are separate Jellyfin values; personal rating always follows displayItem.
-            HStack(spacing: 18) {
+            // Community score and the Jellyfin user score are deliberately separate values.
+            HStack(spacing: 10) {
                 if let communityRating = displayItem.communityRating {
-                    Label(String(format: "%.1f", communityRating), systemImage: "star.circle")
-                        .foregroundStyle(.secondary)
+                    Label(String(format: "%.1f", communityRating), systemImage: "star.fill")
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .accessibilityLabel("Community-Bewertung \(String(format: "%.1f", communityRating))")
                 }
+
                 if let personalRating = displayItem.userData?.rating {
-                    Label("Meine Bewertung: \(Int(personalRating.rounded())) / 10", systemImage: "star.fill")
+                    Label("Meine Bewertung  ·  \(Int(personalRating.rounded()))/10", systemImage: "star.fill")
                         .foregroundStyle(.yellow)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
                 } else {
                     Label("Noch nicht bewertet", systemImage: "star")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.82))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
                 }
             }
             .font(.subheadline)
@@ -781,14 +792,18 @@ struct SeriesDetailView: View {
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        // The movie page's number, and the phone-portrait branch with it: the series panel was a
-        // flat 30 on every tier, so on a phone the two pages inset their text differently by 14 pt
-        // (Sodalite#146 round 3).
-        .padding(isPhonePortrait ? 16 : 30)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-        )
+        // No separate glass card: the information sits directly over the full-bleed artwork.
+        // A restrained, full-width scrim keeps text readable without boxing the detail page in.
+        .padding(.vertical, 12)
+        .background {
+            LinearGradient(
+                colors: [.black.opacity(0.58), .black.opacity(0.30), .clear],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .padding(.horizontal, -metrics.rowInset)
+            .padding(.vertical, -12)
+        }
     }
 
     /// Season count as a metadata segment, and no segment at all when the server gave none: a row
