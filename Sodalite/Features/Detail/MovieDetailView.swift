@@ -417,23 +417,20 @@ struct MovieDetailView: View {
     // MARK: - Glass Panel
 
     private func glassPanel(vm: DetailViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Title/logo lives in the hero slot (see DetailContentOverlay); panel opens into the metadata row.
+        VStack(alignment: .leading, spacing: 14) {
+            // The title/logo belongs to the artwork hero; an episode opened on its own also keeps
+            // its parent series visible as a quiet eyebrow.
             if vm.item.type == .episode, let series = vm.item.seriesName {
                 Text(episodeSubtitle(vm: vm, seriesName: series))
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.78))
+                    .lineLimit(1)
             }
 
-            // Metadata line with the tagline set against it; genres and studios moved into More
-            // Details (Sodalite#146 round 2).
             DetailInfoRows(
                 item: vm.item,
                 hasFullDetail: vm.hasFullDetail
             ) {
-                // Portrait puts the pills on a line of their own: the panel is one narrow column
-                // there, and four of them on the metadata line pushed it past the screen edge and
-                // dragged the studios line out with it (measured on the iPhone, 2026-09-14).
                 if isPhonePortrait {
                     VStack(alignment: .leading, spacing: 8) {
                         ItemMetadataRow(item: vm.item)
@@ -447,9 +444,41 @@ struct MovieDetailView: View {
                 }
             }
 
-            // Sodalite#146: the plot belongs in the viewport the viewer actually meets. The box
-            // below the fold keeps the full text; this is the teaser that decides whether they
-            // scroll to it.
+            if let genres = vm.item.genres, !genres.isEmpty {
+                Text(genres.joined(separator: "  ·  "))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.78))
+                    .lineLimit(2)
+            }
+
+            // Community score and the Jellyfin user score are shown side by side, never conflated.
+            HStack(spacing: 10) {
+                if let communityRating = vm.item.communityRating {
+                    Label(String(format: "%.1f", communityRating), systemImage: "star.fill")
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .accessibilityLabel("Community-Bewertung \(String(format: "%.1f", communityRating))")
+                }
+
+                if let personalRating = vm.item.userData?.rating {
+                    Label("Meine Bewertung  ·  \(Int(personalRating.rounded()))/10", systemImage: "star.fill")
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                } else {
+                    Label("Noch nicht bewertet", systemImage: "star")
+                        .foregroundStyle(.white.opacity(0.82))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+            }
+            .font(.subheadline)
+            .accessibilityElement(children: .combine)
+
             DetailHeroSynopsis(
                 text: vm.item.overview,
                 isPending: !vm.hasFullDetail,
@@ -457,11 +486,17 @@ struct MovieDetailView: View {
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(isPhonePortrait ? 16 : 30)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-        )
+        // Match the series page: metadata and ratings float directly over the full-bleed artwork.
+        .padding(.vertical, 12)
+        .background {
+            LinearGradient(
+                colors: [.black.opacity(0.58), .black.opacity(0.30), .clear],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .padding(.horizontal, -metrics.rowInset)
+            .padding(.vertical, -12)
+        }
     }
 
     /// Sodalite#145. Reads the version the page is showing, the same source id the tech strip below
