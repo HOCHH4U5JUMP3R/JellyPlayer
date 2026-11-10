@@ -21,6 +21,7 @@ struct MovieDetailView: View {
     @State private var trailerItem: JellyfinItem?
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
+    @State private var isPresentingRatingPicker = false
     @FocusState private var playButtonFocused: Bool
     /// Which control in the action row holds focus, nil while focus is anywhere else on the page.
     /// The secondaries leave the focus engine for that time, so an up-move out of the content can
@@ -251,6 +252,13 @@ struct MovieDetailView: View {
             }
             // Open the animation gate once the cover's present transition has settled.
             deferOnMain(by: 0.35) { didSettleIn = true }
+        }
+        .sheet(isPresented: $isPresentingRatingPicker) {
+            if let vm = viewModel {
+                PersonalRatingPicker(initialRating: vm.userRating) { rating in
+                    await vm.setUserRating(rating)
+                }
+            }
         }
         .menuPresentation(isPresented: $isPresentingMoreDetails, panel: .plain) {
             if let vm = viewModel {
@@ -610,6 +618,12 @@ struct MovieDetailView: View {
                 .focused($focusedAction, equals: .trailer)
             }
 
+            GlassActionButton(
+                title: "Bewerten",
+                systemImage: "star",
+                action: { isPresentingRatingPicker = true }
+            )
+
             if vm.item.type != .episode {
                 GlassActionButton(
                     title: vm.isFavorite ? "detail.unfavorite" : "detail.favorite",
@@ -745,5 +759,65 @@ struct MovieDetailView: View {
             member: member,
             sourceTMDBID: viewModel?.item.tmdbID ?? item.tmdbID
         )
+    }
+}
+
+
+/// tvOS-friendly personal rating picker. Selection previews while moving focus;
+/// the server is only changed after the explicit Save action.
+private struct PersonalRatingPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var selection: Int
+    let onSave: (Double?) async -> Void
+
+    init(initialRating: Double?, onSave: @escaping (Double?) async -> Void) {
+        _selection = State(initialValue: initialRating.map { min(10, max(1, Int($0.rounded()))) } ?? 0)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        VStack(spacing: 28) {
+            Text("Deine Bewertung")
+                .font(.title2.weight(.semibold))
+            HStack(spacing: 8) {
+                ForEach(1...10, id: \.self) { value in
+                    Button {
+                        selection = value
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: selection > 0 && value <= selection ? "star.fill" : "star")
+                                .font(.title2)
+                            Text("\(value)")
+                                .font(.caption)
+                        }
+                        .frame(minWidth: 48, minHeight: 72)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(value <= selection ? .yellow : .secondary)
+                }
+            }
+            Text(selection == 0 ? "Bitte 1 bis 10 Sterne auswählen" : "\(selection) von 10")
+                .font(.headline)
+            HStack(spacing: 20) {
+                Button("Abbrechen") { dismiss() }
+                Button("Bewertung entfernen", role: .destructive) {
+                    Task {
+                        await onSave(nil)
+                        dismiss()
+                    }
+                }
+                Button("Speichern") {
+                    Task {
+                        await onSave(Double(selection))
+                        dismiss()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selection == 0)
+            }
+        }
+        .padding(40)
+        .frame(minWidth: 760, minHeight: 300)
     }
 }

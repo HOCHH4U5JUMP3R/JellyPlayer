@@ -6,6 +6,7 @@ final class DetailViewModel {
     var item: JellyfinItem
     var isFavorite: Bool
     var isPlayed: Bool
+    var userRating: Double? { item.userData?.rating }
     /// Played overrides keyed by item/episode/season ID; live-updates the watched badge without mutating the immutable JellyfinItem (same "pass state to the card" pattern as isFocused/isCurrent).
     var playedOverrides: [String: Bool] = [:]
     /// Favorite overrides keyed by episode ID; same reason as playedOverrides, the heart badge has to update without mutating the item.
@@ -489,6 +490,19 @@ final class DetailViewModel {
             collectionItems = response.items
         } catch {
             // Leave collectionItems empty; the view shows its empty state.
+        }
+    }
+
+    func setUserRating(_ rating: Double?) async {
+        do {
+            try await itemService.setUserRating(userID: userID, itemID: item.id, rating: rating)
+            if let refreshed = try? await itemService.getItemDetail(userID: userID, itemID: item.id) {
+                item = refreshed
+            } else if let userData = item.userData {
+                item.userData = userData.with(rating: rating)
+            }
+        } catch {
+            // Keep the server snapshot unchanged when Jellyfin rejects the rating.
         }
     }
 
