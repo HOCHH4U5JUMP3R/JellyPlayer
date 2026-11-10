@@ -734,7 +734,9 @@ struct SeriesDetailView: View {
                     }
                 }
                 .onAppear {
+                    #if !os(tvOS)
                     episodeRowScrollProxy = outerProxy
+                    #endif
                 }
             }
         }
