@@ -432,7 +432,7 @@ struct UserItemData: Codable, Sendable, Equatable {
     /// ISO-8601 last-play timestamp; kept raw (model convention) and unparsed (recency ordering is server-side via SortBy=DatePlayed).
     let lastPlayedDate: String?
     /// Personal 0–10 rating stored in Jellyfin UserData (not CommunityRating).
-    let rating: Double?
+    var rating: Double? = nil
 
     enum CodingKeys: String, CodingKey {
         case playbackPositionTicks = "PlaybackPositionTicks"
