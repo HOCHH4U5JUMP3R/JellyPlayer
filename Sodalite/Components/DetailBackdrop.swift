@@ -224,20 +224,47 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                     Color.clear.frame(height: heroWindow)
                     gradientWithHero
                 } else {
-                    // First page one viewport tall, hero + primary bottom-aligned; the Spacer hands leftover space to the backdrop so the button row ends flush with the fold.
+                    #if os(tvOS)
+                    // Infuse-style 10-foot layout: keep the information column anchored at the
+                    // upper-left of the artwork instead of bottom-aligning it as a single card.
+                    // The open space to the right keeps the backdrop visible and gives the title,
+                    // metadata, ratings and controls a stable reading order.
+                    VStack(alignment: .leading, spacing: 0) {
+                        gradientWithHero
+                            .frame(maxWidth: 980, alignment: .leading)
+                            .padding(.top, 44)
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            primary()
+                        }
+                        .padding(.leading, safeLeading)
+                        .padding(.trailing, safeTrailing)
+                        .frame(maxWidth: 980, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, ScrollHintPolicy.primaryBottomInset(reservesHint: reservesScrollHint))
+                        .overlay(alignment: .bottom) {
+                            if reservesScrollHint {
+                                ScrollHintChevron(isVisible: showsScrollHint)
+                                    .padding(.bottom, 10)
+                            }
+                        }
+                        .background(Color.Theme.scrim)
+
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .containerRelativeFrame(.vertical)
+                    #else
+                    // iPad and iPhone landscape retain their existing viewport treatment.
                     VStack(alignment: .leading, spacing: 0) {
                         Spacer(minLength: 0)
                         gradientWithHero
                         VStack(alignment: .leading, spacing: 0) {
                             primary()
                         }
-                        // Inset the content past the island; the scrim (.frame + .background below)
-                        // stays full-width, so no gray strip / backdrop margin appears.
                         .padding(.leading, safeLeading)
                         .padding(.trailing, safeTrailing)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        // 24 pt matching the panel-to-buttons gap, widened on tvOS to a constant
-                        // band that holds the fold marker (Sodalite#53).
                         .padding(.bottom, ScrollHintPolicy.primaryBottomInset(reservesHint: reservesScrollHint))
                         .overlay(alignment: .bottom) {
                             if reservesScrollHint {
@@ -247,11 +274,8 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                         }
                         .background(Color.Theme.scrim)
                     }
-                    // iPhone landscape: do NOT force the first page to viewport height. In the short
-                    // landscape viewport the content overflows, the panel scrim bleeds past the fold and
-                    // overlaps the content-block scrim -> a doubled-up dark strip under the buttons that
-                    // scrolls with the content. Sizing the block to its content keeps the scrims contiguous.
                     .modifier(FirstPageViewportHeight(active: vSizeClass != .compact))
+                    #endif
                 }
 
                 // Content and filler under ONE ground, so the page colour runs to the bottom edge
