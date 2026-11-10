@@ -572,20 +572,44 @@ struct MovieDetailView: View {
                 VStack(spacing: 12) {
                     primaryActionButton(vm: vm)
                         .frame(maxWidth: .infinity)
-                    // Centered, and wrapping to a second line rather than scrolling.
                     DetailActionRow(alignment: .center, balanced: true) {
                         secondaryActionButtons(vm: vm)
                     }
                     .frame(maxWidth: .infinity)
                 }
             } else {
-                DetailActionRow {
-                    primaryActionButton(vm: vm)
-                    secondaryActionButtons(vm: vm)
-                        .focusSuppressed(focusedAction == nil)
+                VStack(alignment: .leading, spacing: 16) {
+                    // Compact, icon-first utility actions sit above the two main playback choices.
+                    DetailActionRow {
+                        secondaryActionButtons(vm: vm)
+                    }
+                    .collapsesActionButtonLabel()
+
+                    HStack(spacing: 14) {
+                        primaryActionButton(vm: vm)
+                        if vm.hasLocalTrailer {
+                            trailerActionButton(vm: vm)
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private func trailerActionButton(vm: DetailViewModel) -> some View {
+        GlassActionButton(
+            title: "detail.trailer",
+            systemImage: "play.rectangle",
+            action: {
+                Task {
+                    if let trailer = await vm.loadTrailer() {
+                        trailerItem = trailer
+                        showTrailer = true
+                    }
+                }
+            }
+        )
+        .focused($focusedAction, equals: .trailer)
     }
 
     private func primaryActionButton(vm: DetailViewModel) -> some View {
@@ -635,22 +659,6 @@ struct MovieDetailView: View {
                     }
                 )
                 .focused($focusedAction, equals: .replay)
-            }
-
-            if vm.hasLocalTrailer {
-                GlassActionButton(
-                    title: "detail.trailer",
-                    systemImage: "play.rectangle",
-                    action: {
-                        Task {
-                            if let trailer = await vm.loadTrailer() {
-                                trailerItem = trailer
-                                showTrailer = true
-                            }
-                        }
-                    }
-                )
-                .focused($focusedAction, equals: .trailer)
             }
 
             GlassActionButton(

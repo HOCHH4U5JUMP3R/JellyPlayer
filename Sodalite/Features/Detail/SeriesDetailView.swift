@@ -920,21 +920,46 @@ struct SeriesDetailView: View {
                 VStack(spacing: 12) {
                     primaryActionButton(vm: vm)
                         .frame(maxWidth: .infinity)
-                    // Centered, and wrapping to a second line rather than scrolling: a button-heavy
-                    // series has more actions than one portrait line holds.
                     DetailActionRow(alignment: .center, balanced: true) {
                         secondaryActionButtons(vm: vm)
                     }
                     .frame(maxWidth: .infinity)
                 }
             } else {
-                DetailActionRow {
-                    primaryActionButton(vm: vm)
-                    secondaryActionButtons(vm: vm)
-                        .focusSuppressed(focusedAction == nil)
+                VStack(alignment: .leading, spacing: 16) {
+                    // Compact utility controls first; Play and Trailer form the prominent action row.
+                    DetailActionRow {
+                        secondaryActionButtons(vm: vm)
+                    }
+                    .collapsesActionButtonLabel()
+
+                    HStack(spacing: 14) {
+                        primaryActionButton(vm: vm)
+                        if !isShowingEpisode && vm.hasLocalTrailer {
+                            trailerActionButton(vm: vm)
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private func trailerActionButton(vm: DetailViewModel) -> some View {
+        GlassActionButton(
+            title: "detail.trailer",
+            systemImage: "play.rectangle",
+            action: {
+                Task {
+                    if let trailer = await vm.loadTrailer() {
+                        playItem = trailer
+                        playFromBeginning = true
+                        playOriginatedFromPlayButton = false
+                        showPlayer = true
+                    }
+                }
+            }
+        )
+        .focused($focusedAction, equals: .trailer)
     }
 
     private func primaryActionButton(vm: DetailViewModel) -> some View {
@@ -1082,24 +1107,6 @@ struct SeriesDetailView: View {
                 action: { isPresentingRatingPicker = true }
             )
             .focused($focusedAction, equals: .rating)
-
-            if !isShowingEpisode && vm.hasLocalTrailer {
-                GlassActionButton(
-                    title: "detail.trailer",
-                    systemImage: "play.rectangle",
-                    action: {
-                        Task {
-                            if let trailer = await vm.loadTrailer() {
-                                playItem = trailer
-                                playFromBeginning = true
-                                playOriginatedFromPlayButton = false
-                                showPlayer = true
-                            }
-                        }
-                    }
-                )
-                .focused($focusedAction, equals: .trailer)
-            }
 
             if !isShowingEpisode {
                 GlassActionButton(
