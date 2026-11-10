@@ -706,6 +706,7 @@ struct SeriesDetailView: View {
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
+                        .id("castRow")
                         .onFocusMoveUp(active: true) {
                             if let selectedID = selectedEpisode?.id, vm.episodes.contains(where: { $0.id == selectedID }) {
                                 episodeAim.focusLeft(selectedID)
@@ -720,6 +721,13 @@ struct SeriesDetailView: View {
                             }
                         }
                         .onChange(of: focusedCastID) { _, newID in
+                            guard newID != nil else { return }
+                            // Keep the cast row inside the same backdrop and move the page to it
+                            // deliberately; relying on tvOS focus auto-scroll snaps an entire
+                            // viewport when the first portrait gains focus.
+                            withAnimation(.easeInOut(duration: 0.55)) {
+                                outerProxy.scrollTo("castRow", anchor: .bottom)
+                            }
                             aimFirstCastEntry(at: newID, in: cast)
                         }
                     }
@@ -1859,12 +1867,11 @@ struct SeriesDetailView: View {
                                 .id(episode.id)
                             }
                         }
-                        .padding(.horizontal, metrics.rowInset)
                         .padding(.vertical, 8)
                         .scrollTargetLayout()
                     }
-                    .contentMargins(.horizontal, 0, for: .scrollContent)
-                    .scrollTargetBehavior(.viewAligned)
+                    .contentMargins(.horizontal, metrics.rowInset, for: .scrollContent)
+                    .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                     .scrollPosition($episodeRowPosition)
                     .onChange(of: vm.selectedSeasonID) { _, _ in
                         // Back to the row's own start, NOT scrollTo(first, anchor: .leading): that parks the
@@ -2040,7 +2047,7 @@ private struct InfuseDetailActionButtonStyle: ButtonStyle {
     @Environment(\.isFocused) private var isFocused
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(RoundedRectangle(cornerRadius: 13).fill(isProminent ? Color(red: 1, green: 0.49, blue: 0) : Color.white.opacity(isFocused ? 0.28 : 0.10)))
+            .background(RoundedRectangle(cornerRadius: 13).fill(isProminent ? (isFocused ? Color(red: 0.24, green: 0.58, blue: 1.0) : Color(red: 0.10, green: 0.38, blue: 0.78)) : Color.white.opacity(isFocused ? 0.28 : 0.10)))
             .contentShape(RoundedRectangle(cornerRadius: 13))
             .animation(.easeOut(duration: 0.12), value: isFocused)
             .animation(nil, value: configuration.isPressed)
@@ -2066,7 +2073,7 @@ private struct InfuseDetailActionButton: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, alignment: .center)
             .frame(height: 62)
-            .background(RoundedRectangle(cornerRadius: 13).fill(prominent ? Color(red: 1, green: 0.49, blue: 0) : Color.white.opacity(0.10)))
+
         }
         .buttonStyle(InfuseDetailActionButtonStyle(isProminent: prominent))
         .focusEffectDisabled(true)
