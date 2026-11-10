@@ -232,7 +232,7 @@ struct EpisodeLandscapeCard: View {
                 // Personal Jellyfin rating belongs to this episode, not to its parent series.
                 if let rating = episode.userData?.rating {
                     HStack(spacing: 4) {
-                        Image(systemName: "star.fill").foregroundStyle(.yellow)
+                        Image(systemName: "star.fill").foregroundStyle(.white)
                         Text("\(Int(rating.rounded()))")
                     }
                     .font(.caption2.weight(.semibold))

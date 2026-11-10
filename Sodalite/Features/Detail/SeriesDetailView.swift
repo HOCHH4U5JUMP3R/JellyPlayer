@@ -679,11 +679,11 @@ struct SeriesDetailView: View {
         }, primary: {
             #if os(tvOS)
             ScrollViewReader { outerProxy in
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
                     glassPanel(vm: vm).frame(maxWidth: 760, alignment: .leading).id(Self.pageTopAnchor)
                     actionButtonRow(vm: vm).frame(maxWidth: 760, alignment: .leading)
                     if !vm.seasons.isEmpty {
-                        seasonSection(vm: vm).padding(.top, 6).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
+                        seasonSection(vm: vm).padding(.top, 0).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     } else if vm.isLoadingSeasons {
                         seasonSectionSkeleton(vm: vm).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     }
@@ -715,7 +715,7 @@ struct SeriesDetailView: View {
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
             ScrollViewReader { outerProxy in
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 16) {
                     // No synopsis block here any more (Sodalite#146). Three lines of it sit in the
                     // first viewport and the whole of it is behind More Details, so a third copy
                     // under the fold was the page saying the same thing twice with a focus stop
@@ -754,7 +754,15 @@ struct SeriesDetailView: View {
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
-                        .onFocusMoveUp(active: !seasonBlockIsFirst) { playButtonFocused = true }
+                        .onFocusMoveUp(active: true) {
+                            if let lastEpisode = vm.episodes.last {
+                                pendingEpisodeFocus = lastEpisode.id
+                            } else if seasonBlockIsFirst {
+                                focusedSeasonID = vm.selectedSeasonID
+                            } else {
+                                playButtonFocused = true
+                            }
+                        }
                         .onChange(of: focusedCastID) { _, newID in
                             aimFirstCastEntry(at: newID, in: cast)
                         }
@@ -853,7 +861,7 @@ struct SeriesDetailView: View {
                 }
                 if let personalRating = displayItem.userData?.rating {
                     HStack(spacing: 5) {
-                        Image(systemName: "star.fill").foregroundStyle(.yellow)
+                        Image(systemName: "star.fill").foregroundStyle(.white)
                         Text(Int(personalRating.rounded()).formatted())
                     }
                     .foregroundStyle(.white)
@@ -897,9 +905,9 @@ struct SeriesDetailView: View {
                 Text(metadata).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
             if let ageRating = values.ageRating {
-                Text(ageRating).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 7).padding(.vertical, 3)
-                    .background(RoundedRectangle(cornerRadius: 5).strokeBorder(.white.opacity(0.45), lineWidth: 1))
+                Text(ageRating).font(.caption).foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary.opacity(0.5), lineWidth: 1))
             }
         }
     }
@@ -1658,8 +1666,8 @@ struct SeriesDetailView: View {
                         }
                     }
                     // Focus scale 1.05 needs vertical slack or the halo clips against the scroll-view edges.
-                    .padding(.horizontal, metrics.rowInset)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 0)
+                    .padding(.vertical, 8)
                 }
                 .onChange(of: focusedSeasonID) { oldID, newID in
                     // Force focus back to the current season on entry from above (oldID nil), return from the episode row (episodesHadFocus), or fall-through.
@@ -1742,7 +1750,7 @@ struct SeriesDetailView: View {
             #if os(tvOS)
             Color.clear
                 .frame(maxWidth: .infinity)
-                .frame(height: 24)
+                .frame(height: 8)
                 .focusable()
                 .focused($focusBridgeActive)
                 .onChange(of: focusBridgeActive) { _, active in
@@ -1812,8 +1820,8 @@ struct SeriesDetailView: View {
                                 .id(episode.id)
                             }
                         }
-                        .padding(.horizontal, metrics.rowInset)
-                        .padding(.vertical, 16)
+                        .padding(.horizontal, 0)
+                        .padding(.vertical, 8)
                     }
                     .scrollPosition($episodeRowPosition)
                     .onChange(of: vm.selectedSeasonID) { _, _ in
@@ -1993,16 +2001,22 @@ private struct InfuseDetailActionButton: View {
     @Environment(\.isFocused) private var isFocused
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 if isLoading { ProgressView().tint(.white) }
                 else { Image(systemName: symbol).font(.system(size: prominent ? 23 : 25, weight: .semibold)) }
-                if prominent { Text(title).font(.system(size: 22, weight: .semibold)).lineLimit(1); Spacer(minLength: 0) }
+                if prominent || title == "Trailer" {
+                    Text(title).font(.system(size: 22, weight: .semibold)).lineLimit(1)
+                }
             }
-            .foregroundStyle(.white).frame(maxWidth: .infinity).frame(height: 62)
-            .padding(.horizontal, prominent ? 22 : 0)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(height: 62)
             .background(RoundedRectangle(cornerRadius: 13).fill(prominent ? Color(red: 1, green: 0.49, blue: 0) : Color.white.opacity(isFocused ? 0.22 : 0.10)))
             .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(isFocused ? Color.white.opacity(0.9) : Color.white.opacity(0.10), lineWidth: isFocused ? 2 : 1))
-                    }
-        .buttonStyle(.plain).focusEffectDisabled().accessibilityLabel(Text(title))
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled(true)
+        .scaleEffect(1)
+        .accessibilityLabel(Text(title))
     }
 }
