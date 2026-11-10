@@ -2073,7 +2073,7 @@ private struct InfuseDetailActionButton: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, alignment: .center)
             .frame(height: 62)
-            .background(RoundedRectangle(cornerRadius: 13).fill(prominent ? Color(red: 0.10, green: 0.38, blue: 0.78) : Color.white.opacity(0.10)))
+
         }
         .buttonStyle(InfuseDetailActionButtonStyle(isProminent: prominent))
         .focusEffectDisabled(true)
