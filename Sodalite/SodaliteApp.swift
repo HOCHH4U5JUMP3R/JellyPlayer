@@ -55,10 +55,10 @@ struct SodaliteApp: App {
 
         // Cloud sync: attach after the container is fully built, then register
         // for the silent CloudKit pushes that drive near-real-time propagation.
-        dependencies.attachCloudSync()
-        Task { @MainActor in
-            UIApplication.shared.registerForRemoteNotifications()
-        }
+        //dependencies.attachCloudSync()
+        //Task { @MainActor in
+        //    UIApplication.shared.registerForRemoteNotifications()
+        //}
 
         // Wire AetherEngine diagnostics into LogTap on EVERY build, App Store included: a playback bug
         // reported after 1.0 is only cheap to fix if the reporter can read the engine's own lines out of
