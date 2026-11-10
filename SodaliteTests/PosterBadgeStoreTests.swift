@@ -113,6 +113,30 @@ struct PosterBadgeStoreTests {
         #expect(store.badges(for: try Self.item(id: "s1", type: "Series")).isEmpty)
     }
 
+    @Test("series rating averages whole-season ratings, not all episodes equally")
+    func seriesRatingUsesSeasonAverages() throws {
+        func episode(_ id: String, _ season: Int, _ rating: Double?) throws -> JellyfinItem {
+            var object: [String: Any] = ["Id": id, "Name": id, "Type": "Episode", "ParentIndexNumber": season]
+            if let rating { object["UserData"] = ["Rating": rating] }
+            return try JSONDecoder().decode(JellyfinItem.self, from: JSONSerialization.data(withJSONObject: object))
+        }
+        let episodes = [
+            try episode("s1e1", 1, 8), try episode("s1e2", 1, 8),
+            try episode("s1e3", 1, 9), try episode("s2e1", 2, 5),
+            try episode("s2e2", 2, nil)
+        ]
+        // Season 1 rounds 8.33 to 8, season 2 is 5; show average rounds 6.5 to 7.
+        #expect(PosterBadgeStore.averagePersonalRating(for: episodes) == 7)
+    }
+
+    @Test("unrated episodes do not dilute the average and wholly unrated shows have no badge")
+    func unratedEpisodesAreIgnored() throws {
+        let object: [String: Any] = ["Id": "e1", "Name": "e1", "Type": "Episode", "ParentIndexNumber": 1, "UserData": ["Rating": 9]]
+        let rated = try JSONDecoder().decode(JellyfinItem.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(PosterBadgeStore.averagePersonalRating(for: [rated]) == 9)
+        #expect(PosterBadgeStore.averagePersonalRating(for: []) == nil)
+    }
+
     // MARK: - Batching
 
     @Test("a row of movies costs one request, not one per card")

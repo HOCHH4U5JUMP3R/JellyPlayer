@@ -687,7 +687,13 @@ struct SeriesDetailView: View {
                         seasonSectionSkeleton(vm: vm).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     }
                     // Keep cast in the same continuous tvOS scroll content as the season and episode rows.
-                    if let people = displayItem.people ?? vm.item.people, !people.isEmpty {
+                    let episodePeople = displayItem.people
+                    let seriesPeople = vm.item.people ?? []
+                    let castPeople = episodePeople?.filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) } ?? []
+                    let people = castPeople.isEmpty
+                        ? seriesPeople.filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
+                        : castPeople
+                    if !people.isEmpty {
                         let cast = jellyfinCastMembers(
                             from: people,
                             imageService: dependencies.jellyfinImageService,
@@ -699,8 +705,14 @@ struct SeriesDetailView: View {
                             onSelect: { handlePersonTap($0) }
                         )
                         .onFocusMoveUp(active: true) {
-                            if let lastEpisode = vm.episodes.last {
-                                pendingEpisodeFocus = lastEpisode.id
+                            if let selectedID = selectedEpisode?.id, vm.episodes.contains(where: { $0.id == selectedID }) {
+                                episodeAim.focusLeft(selectedID)
+                                pendingEpisodeFocus = selectedID
+                            } else if let currentID = focusedEpisodeID, vm.episodes.contains(where: { $0.id == currentID }) {
+                                episodeAim.focusLeft(currentID)
+                                pendingEpisodeFocus = currentID
+                            } else if let target = episodeEntryTarget(vm: vm) {
+                                pendingEpisodeFocus = target
                             } else {
                                 focusedSeasonID = vm.selectedSeasonID
                             }
@@ -1815,6 +1827,7 @@ struct SeriesDetailView: View {
                                         episodeCard(episode, vm: vm, playTargetID: playTargetID)
                                     }
                                     .buttonStyle(EpisodeCardButtonStyle())
+                                    .focusEffectDisabled(true)
                                     .focused($focusedEpisodeID, equals: episode.id)
                                     // Prime the season-bar target before the up-move resolves, else tvOS's geographic picker skips the bar (far-right episode outside the tabs' span) and lands on the overview above.
                                     #if os(tvOS)
@@ -2035,8 +2048,7 @@ private struct InfuseDetailActionButton: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, alignment: .center)
             .frame(height: 62)
-            .background(RoundedRectangle(cornerRadius: 13).fill(prominent ? Color(red: 1, green: 0.49, blue: 0) : Color.white.opacity(isFocused ? 0.22 : 0.10)))
-            .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(isFocused ? Color.white.opacity(0.9) : Color.white.opacity(0.10), lineWidth: isFocused ? 2 : 1))
+            .background(RoundedRectangle(cornerRadius: 13).fill(prominent ? Color(red: 1, green: 0.49, blue: 0) : Color.white.opacity(isFocused ? 0.28 : 0.10)))
         }
         .buttonStyle(.plain)
         .focusEffectDisabled(true)

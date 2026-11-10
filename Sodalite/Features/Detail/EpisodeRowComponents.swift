@@ -39,6 +39,7 @@ struct SeasonTab: View {
                 }
         }
         .buttonStyle(SeasonTabButtonStyle())
+        .focusEffectDisabled(true)
         .focused(focusedID, equals: id)
     }
 

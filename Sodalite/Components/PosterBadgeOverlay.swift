@@ -14,8 +14,22 @@ struct PosterBadgeOverlay: View {
     var body: some View {
         if dependencies.appearancePreferences.showPosterBadges {
             let pills = dependencies.posterBadgeStore.badges(for: item).pills
-            if !pills.isEmpty {
-                PosterBadgePills(pills: pills, fontSize: fontSize)
+            VStack(alignment: .leading, spacing: 4) {
+                if !pills.isEmpty {
+                    PosterBadgePills(pills: pills, fontSize: fontSize)
+                }
+                if item.type == .series, let rating = dependencies.posterBadgeStore.personalSeriesRating(for: item) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "star.fill")
+                        Text("\\(rating)")
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.72), in: Capsule())
+                    .accessibilityLabel("Meine Serienbewertung \\(rating) von 10")
+                }
             }
         }
     }
