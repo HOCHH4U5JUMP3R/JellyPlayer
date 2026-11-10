@@ -771,7 +771,7 @@ private struct PersonalRatingPicker: View {
     let onSave: (Double?) async -> Void
 
     init(initialRating: Double?, onSave: @escaping (Double?) async -> Void) {
-        _selection = State(initialValue: min(10, max(1, Int((initialRating ?? 8).rounded()))))
+        _selection = State(initialValue: initialRating.map { min(10, max(1, Int($0.rounded())) } ?? 0)
         self.onSave = onSave
     }
 
@@ -785,7 +785,7 @@ private struct PersonalRatingPicker: View {
                         selection = value
                     } label: {
                         VStack(spacing: 8) {
-                            Image(systemName: value <= selection ? "star.fill" : "star")
+                            Image(systemName: selection > 0 && value <= selection ? "star.fill" : "star")
                                 .font(.title2)
                             Text("\(value)")
                                 .font(.caption)
@@ -797,7 +797,7 @@ private struct PersonalRatingPicker: View {
                     .tint(value <= selection ? .yellow : .secondary)
                 }
             }
-            Text("\(selection) von 10")
+            Text(selection == 0 ? "Bitte 1 bis 10 Sterne auswählen" : "\(selection) von 10")
                 .font(.headline)
             HStack(spacing: 20) {
                 Button("Abbrechen") { dismiss() }
@@ -814,6 +814,7 @@ private struct PersonalRatingPicker: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(selection == 0)
             }
         }
         .padding(40)
