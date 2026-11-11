@@ -8,6 +8,8 @@ struct SeasonTab: View {
     let id: String
     let name: String
     let isSelected: Bool
+    /// Scrob's rounded personal season rating, delivered as Jellyfin UserData.Rating.
+    var personalRating: Int? = nil
     var imageURL: URL? = nil
     var focusedID: FocusState<String?>.Binding
     let action: () -> Void
@@ -47,6 +49,17 @@ struct SeasonTab: View {
                                 isFocused ? appearanceTheme.palette.focus.color : (isSelected ? Color.Theme.panelEdge : .clear),
                                 lineWidth: isFocused ? 3 : 1
                             )
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if let personalRating {
+                            PersonalRatingMark(
+                                rating: personalRating,
+                                fontSize: PosterBadgeMetrics.fontSize(posterWidth: 150, scale: 1)
+                                    * (0.13 / 0.06) * 0.90,
+                                accessibilityLabel: "Meine Staffelbewertung \(personalRating) von 10",
+                                inset: 8
+                            )
+                        }
                     }
                 }
 
