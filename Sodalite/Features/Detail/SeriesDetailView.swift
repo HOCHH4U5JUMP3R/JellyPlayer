@@ -66,15 +66,9 @@ struct SeriesDetailView: View {
     }
 
     private var metrics: LayoutMetrics { LayoutMetrics.current(hSizeClass) }
-    /// On tvOS, keep the episode strip to four complete 360pt cards in the 10-foot viewport.
-    /// The wider gap also prevents a fifth card from peeking in at the trailing edge.
-    private var episodeRowItemSpacing: CGFloat {
-        #if os(tvOS)
-        108
-        #else
-        hSizeClass == .compact ? metrics.itemSpacing : 24
-        #endif
-    }
+    /// tvOS shows five complete episode cards at once; a swipe advances exactly one card.
+    private let tvEpisodeCardSpacing: CGFloat = 16
+    private let tvEpisodeRowHeight: CGFloat = 270
     /// iPhone portrait: full-width primary action over a centered secondary row.
     private var isPhonePortrait: Bool {
         #if os(iOS)
@@ -843,7 +837,8 @@ struct SeriesDetailView: View {
                             imageURLProvider: { vm.posterURL(for: $0) },
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster,
-                            focusedID: $focusedSimilarID
+                            focusedID: $focusedSimilarID,
+                            inset: 0
                         )
                         .onChange(of: focusedSimilarID) { _, newID in
                             guard let newID, !similarEntryAimed else { return }
@@ -1668,10 +1663,16 @@ struct SeriesDetailView: View {
     }
 
     /// One card, built once, so the row and the long-press preview cannot drift apart.
-    private func episodeCard(_ episode: JellyfinItem, vm: DetailViewModel, playTargetID: String?) -> some View {
+    private func episodeCard(
+        _ episode: JellyfinItem,
+        vm: DetailViewModel,
+        playTargetID: String?,
+        cardSizeOverride: CGSize? = nil
+    ) -> some View {
         EpisodeLandscapeCard(
             episode: episode,
             imageURL: dependencies.jellyfinImageService.episodeThumbnailURL(for: episode),
+            cardSizeOverride: cardSizeOverride,
             isPlayTarget: playTargetID == episode.id,
             isFocused: focusedEpisodeID == episode.id,
             isPlayed: vm.isPlayed(episode),
@@ -1707,6 +1708,7 @@ struct SeriesDetailView: View {
                                 id: season.id,
                                 name: season.name,
                                 isSelected: vm.selectedSeasonID == season.id,
+                                imageURL: dependencies.jellyfinImageService.posterURL(for: season),
                                 focusedID: $focusedSeasonID,
                                 action: {
                                     // Don't reset the hero to series root here: flipping the short episode panel to the taller series panel while focus is on the season bar makes tvOS follow the tab and scroll the page down. "Serie anzeigen" resets the hero explicitly.
