@@ -108,6 +108,8 @@ struct SeriesDetailView: View {
     /// movie page: the first entry lands on the first card, after that the row remembers.
     @FocusState private var focusedCastID: String?
     @State private var rememberedCastFocusID: String?
+    /// First-entry guard for the iOS cast row; tvOS uses rememberedCastFocusID and the outer scroll proxy.
+    @State private var castEntryAimed = false
     @FocusState private var focusedSimilarID: String?
     @State private var rememberedSimilarFocusID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
