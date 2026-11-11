@@ -96,8 +96,10 @@ struct SeriesDetailView: View {
     /// Last focused region in the season+episode block; the focus bridge reads it to tell which direction a cross-row jump came from without inspecting @FocusState (already nil mid-transition).
     @State private var lastFocusedArea: FocusArea = .none
     private enum FocusArea { case none, season, episode }
+    private enum EpisodeFocusAlignment { case center, leading, trailing }
     /// Bridge season→episode writes the target episode id here; the episode-row ScrollViewReader scrolls it into the LazyHStack then writes focusedEpisodeID, since a focusedEpisodeID write for an unrendered card is a silent no-op (right-side-takes-two-clicks case).
     @State private var pendingEpisodeFocus: String?
+    @State private var pendingEpisodeFocusAlignment: EpisodeFocusAlignment = .center
     /// Bridge episode→season synopsis. Plain @State for the same reason as pendingEpisodeFocus: the box owns its own @FocusState and defers the write itself.
     @State private var pendingSeasonOverviewFocus = false
     /// Which card the episode row aims at, so a return from above lands there instead of scrolling the row back to the start. Fed by the way OUT of the row and by the player's in-session item switches; see EpisodeRowAim for why it is never fed on the way in.
@@ -114,6 +116,8 @@ struct SeriesDetailView: View {
     @State private var rememberedSimilarFocusID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
+    /// IDs visible in the episode viewport; used to restore focus without changing its saved horizontal offset.
+    @State private var visibleEpisodeIDs: [String] = []
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
     @State private var didSettleIn = false
 
@@ -666,7 +670,8 @@ struct SeriesDetailView: View {
         DetailContentOverlay(
             heroImageURL: backdropURL,
             heroPosterURL: vm.heroPosterURL(for: vm.item),
-            primaryTopInset: 6,
+            primaryTopInset: 0,
+            tvHeroHeight: 126,
             hero: {
             // Infuse-style text title: keep the series name visible while the episode line follows focus.
             VStack(alignment: .leading, spacing: 8) {
@@ -711,22 +716,13 @@ struct SeriesDetailView: View {
                         MediaCastRow(
                             members: cast,
                             inset: 0,
+                            titleFont: .headline,
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
                         .id("castRow")
                         .onFocusMoveUp(active: true) {
-                            if let selectedID = selectedEpisode?.id, vm.episodes.contains(where: { $0.id == selectedID }) {
-                                episodeAim.focusLeft(selectedID)
-                                pendingEpisodeFocus = selectedID
-                            } else if let currentID = focusedEpisodeID, vm.episodes.contains(where: { $0.id == currentID }) {
-                                episodeAim.focusLeft(currentID)
-                                pendingEpisodeFocus = currentID
-                            } else if let target = episodeEntryTarget(vm: vm) {
-                                pendingEpisodeFocus = target
-                            } else {
-                                focusedSeasonID = vm.selectedSeasonID
-                            }
+                            restoreEpisodeFocus(vm: vm)
                         }
                         .onChange(of: focusedCastID) { oldID, newID in
                             guard let newID else { return }
@@ -769,8 +765,11 @@ struct SeriesDetailView: View {
                 actionButtonRow(vm: vm)
                 if !hasBelowFoldSections(vm: vm), let caption = techFacts().caption {
                     DetailFileCaption(caption: caption)
-                        .font(.caption2).foregroundStyle(.tertiary)
-                        .padding(.horizontal, -metrics.rowInset)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.top, 24)
+                        .padding(.trailing, metrics.rowInset)
                 }
             }
             .padding(.horizontal, metrics.rowInset)
@@ -847,7 +846,8 @@ struct SeriesDetailView: View {
                             focusedID: $focusedSimilarID,
                             // Below-fold content starts at the safe-area edge; the cast row sits
                             // inside the primary column's additional 42pt leading inset.
-                            inset: metrics.rowInset + 42
+                            inset: metrics.rowInset + 42,
+                            titleFont: .headline
                         )
                         .onChange(of: focusedSimilarID) { oldID, newID in
                             guard let newID else { return }
@@ -862,11 +862,7 @@ struct SeriesDetailView: View {
                             rememberedSimilarFocusID = newID
                         }
                         .onFocusMoveUp(active: !hasCast) {
-                            if let target = episodeEntryTarget(vm: vm) {
-                                pendingEpisodeFocus = target
-                            } else {
-                                focusedSeasonID = vm.selectedSeasonID
-                            }
+                            restoreEpisodeFocus(vm: vm)
                         }
                     }
 
@@ -889,7 +885,11 @@ struct SeriesDetailView: View {
                     // sections at all it moves into the first viewport, see `hasBelowFoldSections`.
                     if hasBelowFoldSections(vm: vm), let caption = techFacts().caption {
                         DetailFileCaption(caption: caption)
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.top, 24)
+                            .padding(.trailing, metrics.rowInset)
                             .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
                     }
                 }
@@ -1707,6 +1707,36 @@ struct SeriesDetailView: View {
         episodeAim.target(in: vm.episodes.map(\.id), currentEpisodeID: vm.currentEpisodeID)
     }
 
+    /// Re-enter the row in place when the remembered card is still visible; scroll only for an off-screen target.
+    private func restoreEpisodeFocus(vm: DetailViewModel) {
+        guard let target = episodeEntryTarget(vm: vm) else {
+            focusedSeasonID = vm.selectedSeasonID
+            return
+        }
+        if visibleEpisodeIDs.contains(target) {
+            focusedEpisodeID = target
+        } else {
+            pendingEpisodeFocusAlignment = .center
+            pendingEpisodeFocus = target
+        }
+    }
+
+    /// Handle horizontal Siri Remote moves by focus index. A visible neighbour receives focus in place;
+    /// scrolling happens only when the next card is outside the viewport, one card at a time.
+    private func moveEpisodeFocus(from id: String, delta: Int, vm: DetailViewModel) {
+        let ids = vm.episodes.map(\.id)
+        guard let index = ids.firstIndex(of: id) else { return }
+        let nextIndex = index + delta
+        guard ids.indices.contains(nextIndex) else { return }
+        let target = ids[nextIndex]
+        guard !visibleEpisodeIDs.contains(target) else {
+            focusedEpisodeID = target
+            return
+        }
+        pendingEpisodeFocusAlignment = delta > 0 ? .trailing : .leading
+        pendingEpisodeFocus = target
+    }
+
     /// Up out of the episode row. It used to go straight to the season bar, which skipped the season synopsis sitting between the two (reachable downwards, unreachable upwards). Now the synopsis takes the first stop when there is one, and its own up-move carries on to the season bar.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
         if seasonOverview(vm: vm) != nil {
@@ -1746,8 +1776,15 @@ struct SeriesDetailView: View {
                         .focused($focusedEpisodeID, equals: episode.id)
                         #if os(tvOS)
                         .onMoveCommand { direction in
-                            if direction == .up {
+                            switch direction {
+                            case .up:
                                 focusUpFromEpisodeRow(vm: vm)
+                            case .left:
+                                moveEpisodeFocus(from: episode.id, delta: -1, vm: vm)
+                            case .right:
+                                moveEpisodeFocus(from: episode.id, delta: 1, vm: vm)
+                            default:
+                                break
                             }
                         }
                         #endif
@@ -1769,6 +1806,9 @@ struct SeriesDetailView: View {
         // Snap to complete episode cards. Without view alignment the row can stop between cards.
         .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
         .scrollPosition($episodeRowPosition)
+        .onScrollTargetVisibilityChange(idType: String.self) { ids in
+            visibleEpisodeIDs = ids
+        }
         .onChange(of: vm.selectedSeasonID) { _, _ in
             episodeRowPosition.scrollTo(edge: .leading)
             deferOnMain(by: 0.15) {
@@ -1796,9 +1836,16 @@ struct SeriesDetailView: View {
         }
         .onChange(of: pendingEpisodeFocus) { _, target in
             guard let target else { return }
-            withAnimation(.easeInOut(duration: 0.2)) {
-                episodeProxy.scrollTo(target, anchor: .center)
+            let anchor: UnitPoint
+            switch pendingEpisodeFocusAlignment {
+            case .center: anchor = .center
+            case .leading: anchor = .leading
+            case .trailing: anchor = .trailing
             }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                episodeProxy.scrollTo(target, anchor: anchor)
+            }
+            pendingEpisodeFocusAlignment = .center
             deferOnMain {
                 focusedEpisodeID = target
                 pendingEpisodeFocus = nil
