@@ -5,6 +5,9 @@ struct FocusableCard<Content: View>: View {
     let action: () -> Void
     var highlightsOnPress = false
     var exposesButtonSemantics = false
+    /// Optional parent-owned focus memory for rows that restore a specific card.
+    var externalFocus: FocusState<String?>.Binding? = nil
+    var focusID: String? = nil
     @ViewBuilder let content: (_ isFocused: Bool) -> Content
 
     @FocusState private var isFocused: Bool
@@ -21,12 +24,22 @@ struct FocusableCard<Content: View>: View {
         }
     }
 
+    @ViewBuilder
     private var baseCard: some View {
-        content(isHighlighted)
-            .focusable()
-            .focused($isFocused)
-            .stableTap(isFocused: isFocused) { action() }
-            .focusResponse(.card, isFocused: isHighlighted)
+        if let externalFocus, let focusID {
+            content(isHighlighted)
+                .focusable()
+                .focused($isFocused)
+                .focused(externalFocus, equals: focusID)
+                .stableTap(isFocused: isFocused) { action() }
+                .focusResponse(.card, isFocused: isHighlighted)
+        } else {
+            content(isHighlighted)
+                .focusable()
+                .focused($isFocused)
+                .stableTap(isFocused: isFocused) { action() }
+                .focusResponse(.card, isFocused: isHighlighted)
+        }
     }
 
     @ViewBuilder

@@ -13,6 +13,8 @@ struct HorizontalMediaRow: View {
     /// Sodalite#66. The row paints show-level art rather than each item's own still, so the cards
     /// skip the spoiler blur (Continue Watching set to Backdrop or Thumb).
     var showsSeriesArtwork: Bool = false
+    /// Optional focus binding used by detail pages to aim first entry and remember the last card.
+    var focusedID: FocusState<String?>.Binding? = nil
     /// Overrides the tier's row inset so the row can line up with a host screen that insets differently.
     var inset: CGFloat? = nil
 
@@ -45,9 +47,11 @@ struct HorizontalMediaRow: View {
                           vertical: metrics.rowVerticalPadding) {
                 LazyHStack(spacing: metrics.itemSpacing) {
                     ForEach(items) { item in
-                        FocusableCard {
-                            onItemSelected?(item)
-                        } content: { isFocused in
+                        FocusableCard(
+                            action: { onItemSelected?(item) },
+                            externalFocus: focusedID,
+                            focusID: item.id
+                        ) { isFocused in
                             MediaCard(
                                 item: item,
                                 imageURL: imageURLProvider(item),

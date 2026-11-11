@@ -105,6 +105,8 @@ struct SeriesDetailView: View {
     /// movie page: the first entry lands on the first card, after that the row remembers.
     @FocusState private var focusedCastID: String?
     @State private var castEntryAimed = false
+    @FocusState private var focusedSimilarID: String?
+    @State private var similarEntryAimed = false
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
@@ -432,7 +434,7 @@ struct SeriesDetailView: View {
         // It also explains why the defect came and went. A push racing the first focus evaluation is
         // either redundant or a move, depending on which lands first, and that is decided by how fast
         // the detail fetch returns.
-        .defaultFocus($focusedAction, .play)
+        .defaultFocus($playButtonFocused, true)
         
     }
 
@@ -725,10 +727,21 @@ struct SeriesDetailView: View {
                             // Keep the cast row inside the same backdrop and move the page to it
                             // deliberately; relying on tvOS focus auto-scroll snaps an entire
                             // viewport when the first portrait gains focus.
-                            withAnimation(.easeInOut(duration: 0.55)) {
-                                outerProxy.scrollTo("castRow", anchor: .bottom)
+                            if !castEntryAimed, let first = cast.first?.id {
+                                castEntryAimed = true
+                                // Correct the horizontal target BEFORE scrolling the outer page;
+                                // otherwise tvOS parks the portrait strip at its geometric midpoint.
+                                DispatchQueue.main.async {
+                                    focusedCastID = first
+                                    withAnimation(.easeInOut(duration: 0.55)) {
+                                        outerProxy.scrollTo("castRow", anchor: .bottom)
+                                    }
+                                }
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.55)) {
+                                    outerProxy.scrollTo("castRow", anchor: .bottom)
+                                }
                             }
-                            aimFirstCastEntry(at: newID, in: cast)
                         }
                     }
                 }
@@ -820,8 +833,15 @@ struct SeriesDetailView: View {
                             items: vm.similarItems,
                             imageURLProvider: { vm.posterURL(for: $0) },
                             onItemSelected: { navigateToItem = $0 },
-                            cardStyle: .poster
+                            cardStyle: .poster,
+                            focusedID: $focusedSimilarID
                         )
+                        .onChange(of: focusedSimilarID) { _, newID in
+                            guard let newID, !similarEntryAimed else { return }
+                            similarEntryAimed = true
+                            guard let first = vm.similarItems.first?.id, newID != first else { return }
+                            DispatchQueue.main.async { focusedSimilarID = first }
+                        }
                         .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast) { playButtonFocused = true }
                     }
 
@@ -1049,7 +1069,7 @@ struct SeriesDetailView: View {
                 }.focused($focusedAction, equals: .watched)
                 InfuseDetailActionButton(title: "Bewerten", symbol: "star") { isPresentingRatingPicker = true }
                     .focused($focusedAction, equals: .rating)
-                InfuseDetailActionButton(title: "Favorit", symbol: "heart") {
+                InfuseDetailActionButton(title: "Favorit", symbol: "text.badge.plus") {
                     if let episode = selectedEpisode { Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) } }
                     else { Task { await vm.toggleFavorite() } }
                 }.focused($focusedAction, equals: .favorite)
@@ -1828,7 +1848,7 @@ struct SeriesDetailView: View {
                 let playTargetID = playTarget(vm: vm)?.id
                 ScrollViewReader { episodeProxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : max(metrics.itemSpacing, 124)) {
+                        LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : 24) {
                             ForEach(vm.episodes) { episode in
                                 VStack(alignment: .leading, spacing: 10) {
                                     Button {
@@ -1870,8 +1890,7 @@ struct SeriesDetailView: View {
                         .padding(.vertical, 8)
                         .scrollTargetLayout()
                     }
-                    // The containing detail column already owns the horizontal inset.
-                    // A second content inset made the first episode visibly double-indented.
+                    .contentMargins(.horizontal, metrics.rowInset, for: .scrollContent)
                     .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                     .scrollPosition($episodeRowPosition)
                     .onChange(of: vm.selectedSeasonID) { _, _ in
@@ -1961,7 +1980,7 @@ struct SeriesDetailView: View {
         let seasonCount = vm.seasons.first(where: { $0.id == vm.selectedSeasonID })?.childCount
         let count = min(max(seasonCount ?? 6, 3), 10)
         return ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : max(metrics.itemSpacing, 124)) {
+            LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : 24) {
                 ForEach(0..<count, id: \.self) { _ in
                     EpisodeSkeletonCard()
                 }
