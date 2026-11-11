@@ -668,7 +668,8 @@ struct SeriesDetailView: View {
         DetailContentOverlay(
             heroImageURL: backdropURL,
             heroPosterURL: vm.heroPosterURL(for: vm.item),
-            primaryTopInset: 6,
+            primaryTopInset: 0,
+            tvHeroHeight: 126,
             hero: {
             // Infuse-style text title: keep the series name visible while the episode line follows focus.
             VStack(alignment: .leading, spacing: 8) {
