@@ -65,6 +65,8 @@ struct MediaCastRow: View {
     let members: [CastMember]
     /// Overrides the tier's row inset so the row can line up with a host screen that insets differently.
     var inset: CGFloat? = nil
+    /// Detail pages can use a compact heading; other callers keep the existing title size.
+    var titleFont: Font = .title3
     /// tvOS: which card holds focus, so a host can aim the row's first entry at its first card
     /// (Sodalite#146 round 2). Left nil the row behaves exactly as it did, which is what every
     /// caller outside the detail pages wants.
@@ -79,7 +81,7 @@ struct MediaCastRow: View {
         VStack(alignment: .leading, spacing: 12) {
             if let title {
                 Text(title)
-                    .font(.title3)
+                    .font(titleFont)
                     .fontWeight(.semibold)
                     .padding(.horizontal, rowInset)
             }
