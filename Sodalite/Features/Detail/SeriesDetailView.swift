@@ -806,7 +806,9 @@ struct SeriesDetailView: View {
                     // reasoning. Here the season block is almost always first, so these carry the
                     // flag for the show that has no seasons yet.
                     let seasonBlockIsFirst = !vm.seasons.isEmpty || vm.isLoadingSeasons
-                    let hasCast = !((displayItem.people ?? vm.item.people) ?? []).isEmpty
+                    let episodeCast = (displayItem.people ?? []).filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
+                    let seriesCast = (vm.item.people ?? []).filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
+                    let hasCast = !(episodeCast.isEmpty ? seriesCast : episodeCast).isEmpty
 
                     #if !os(tvOS)
                     if let people = (displayItem.people ?? vm.item.people), !people.isEmpty {
