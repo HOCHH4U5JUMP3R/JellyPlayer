@@ -15,18 +15,18 @@ struct HorizontalMediaRow: View {
     var showsSeriesArtwork: Bool = false
     /// Optional focus binding used by detail pages to aim first entry and remember the last card.
     var focusedID: FocusState<String?>.Binding? = nil
-    /// Overrides the tier's row inset so the row can line up with a host screen that insets differently.
+    /// Overrides the default row inset. Pass 0 when this row is already inside an inset parent column.
     var inset: CGFloat? = nil
 
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.shellPaysLeadingInset) private var shellPaysLeading
     private var metrics: LayoutMetrics { LayoutMetrics.current(hSizeClass) }
     private var rowInset: CGFloat { inset ?? metrics.rowInset }
-    /// With the sidebar beside the content (Sodalite#140) the rail and its gap ARE the left margin.
-    /// `inset` overrides the tier but not the shell: a host screen that insets differently still
-    /// has to start where every other row on the same TV starts.
+    /// An explicit inset belongs to the host content column and therefore overrides both the
+    /// tier default and the shell's usual leading inset. Without an override, preserve shell layout.
     private var leadingInset: CGFloat {
-        shellPaysLeading ? metrics.rowLeading(shellPaysLeading: true) : rowInset
+        if inset != nil { return rowInset }
+        return shellPaysLeading ? metrics.rowLeading(shellPaysLeading: true) : rowInset
     }
 
     var body: some View {
