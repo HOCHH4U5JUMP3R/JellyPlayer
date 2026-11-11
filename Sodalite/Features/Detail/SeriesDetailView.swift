@@ -845,7 +845,9 @@ struct SeriesDetailView: View {
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster,
                             focusedID: $focusedSimilarID,
-                            inset: metrics.rowInset
+                            // Below-fold content starts at the safe-area edge; the cast row sits
+                            // inside the primary column's additional 42pt leading inset.
+                            inset: metrics.rowInset + 42
                         )
                         .onChange(of: focusedSimilarID) { oldID, newID in
                             guard let newID else { return }
