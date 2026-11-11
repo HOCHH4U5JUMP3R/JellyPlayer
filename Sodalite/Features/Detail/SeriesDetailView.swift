@@ -1765,7 +1765,7 @@ struct SeriesDetailView: View {
                                 // the fifth card enters. Resolve the destination by episode index,
                                 // then apply it after the focus engine's current pass. A newer
                                 // remote move invalidates this deferred write.
-                                let ids = vm.episodes.map(\\.id)
+                                let ids = vm.episodes.map(\.id)
                                 guard let index = ids.firstIndex(of: episode.id) else { return }
                                 let delta = direction == .right ? 1 : -1
                                 let nextIndex = index + delta
