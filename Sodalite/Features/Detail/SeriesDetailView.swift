@@ -703,45 +703,7 @@ struct SeriesDetailView: View {
                     } else if vm.isLoadingSeasons {
                         seasonSectionSkeleton(vm: vm).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     }
-                    // Keep cast in the same continuous tvOS scroll content as the season and episode rows.
-                    let episodePeople = displayItem.people
-                    let seriesPeople = vm.item.people ?? []
-                    let castPeople = episodePeople?.filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) } ?? []
-                    let people = castPeople.isEmpty
-                        ? seriesPeople.filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
-                        : castPeople
-                    if !people.isEmpty {
-                        let cast = jellyfinCastMembers(
-                            from: people,
-                            imageService: dependencies.jellyfinImageService,
-                            imageWidth: metrics.castImageWidth
-                        )
-                        MediaCastRow(
-                            members: cast,
-                            inset: 0,
-                            titleFont: .headline,
-                            focusedID: $focusedCastID,
-                            onSelect: { handlePersonTap($0) }
-                        )
-                        .id("castRow")
-                        .onFocusMoveUp(active: true) {
-                            restoreEpisodeFocus(vm: vm)
-                        }
-                        .onChange(of: focusedCastID) { oldID, newID in
-                            guard let newID else { return }
-                            let remembered = rememberedCastFocusID.flatMap { id in
-                                cast.contains(where: { $0.id == id }) ? id : nil
-                            }
-                            let target = remembered ?? cast.first?.id
-                            if oldID == nil, let target, newID != target {
-                                // Restore only the row's horizontal focus. The outer page is left
-                                // to tvOS so it does not fight the focus engine with a second scroll.
-                                DispatchQueue.main.async { focusedCastID = target }
-                                return
-                            }
-                            rememberedCastFocusID = newID
-                        }
-                    }
+
                 }
                 .padding(.horizontal, metrics.rowInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -803,7 +765,39 @@ struct SeriesDetailView: View {
                     let seriesCast = (vm.item.people ?? []).filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
                     let hasCast = !(episodeCast.isEmpty ? seriesCast : episodeCast).isEmpty
 
-                    #if !os(tvOS)
+                    #if os(tvOS)
+                    if hasCast {
+                        let people = episodeCast.isEmpty ? seriesCast : episodeCast
+                        let cast = jellyfinCastMembers(
+                            from: people,
+                            imageService: dependencies.jellyfinImageService,
+                            imageWidth: metrics.castImageWidth
+                        )
+                        MediaCastRow(
+                            members: cast,
+                            inset: metrics.rowInset,
+                            titleFont: .headline,
+                            focusedID: $focusedCastID,
+                            onSelect: { handlePersonTap($0) }
+                        )
+                        .id("castRow")
+                        .onFocusMoveUp(active: true) {
+                            restoreEpisodeFocus(vm: vm)
+                        }
+                        .onChange(of: focusedCastID) { oldID, newID in
+                            guard let newID else { return }
+                            let remembered = rememberedCastFocusID.flatMap { id in
+                                cast.contains(where: { $0.id == id }) ? id : nil
+                            }
+                            let target = remembered ?? cast.first?.id
+                            if oldID == nil, let target, newID != target {
+                                DispatchQueue.main.async { focusedCastID = target }
+                                return
+                            }
+                            rememberedCastFocusID = newID
+                        }
+                    }
+                    #else
                     if let people = (displayItem.people ?? vm.item.people), !people.isEmpty {
                         let cast = jellyfinCastMembers(
                             from: people,
@@ -838,9 +832,8 @@ struct SeriesDetailView: View {
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster,
                             focusedID: $focusedSimilarID,
-                            // Below-fold content starts at the safe-area edge; the cast row sits
-                            // inside the primary column's additional 42pt leading inset.
-                            inset: metrics.rowInset + 42,
+                            // Cast and Similar share this below-fold column and therefore the same inset.
+                            inset: metrics.rowInset,
                             titleFont: .headline
                         )
                         .onChange(of: focusedSimilarID) { oldID, newID in
