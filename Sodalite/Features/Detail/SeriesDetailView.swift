@@ -1904,10 +1904,9 @@ struct SeriesDetailView: View {
                     .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                     .scrollPosition($episodeRowPosition)
                     .onChange(of: vm.selectedSeasonID) { _, _ in
-                        // Back to the row's own start, NOT scrollTo(first, anchor: .leading): that parks the
-                        // first card's leading edge on the viewport edge, which eats the row inset and leaves
-                        // the card flush against the screen edge (Vincent, 2026-08-17). The inset is padding
-                        // on the LazyHStack, so only an edge scroll keeps it.
+                        // Back to the row's own start, NOT scrollTo(first, anchor: .leading):
+                        // the episode ScrollView inherits the detail column's horizontal inset, and
+                        // an edge scroll preserves that alignment when switching seasons.
                         episodeRowPosition.scrollTo(edge: .leading)
                         deferOnMain(by: 0.15) {
                             scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
