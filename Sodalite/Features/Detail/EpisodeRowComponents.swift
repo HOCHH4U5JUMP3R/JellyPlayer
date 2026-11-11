@@ -8,6 +8,7 @@ struct SeasonTab: View {
     let id: String
     let name: String
     let isSelected: Bool
+    var imageURL: URL? = nil
     var focusedID: FocusState<String?>.Binding
     let action: () -> Void
 
@@ -15,38 +16,49 @@ struct SeasonTab: View {
 
     var body: some View {
         Button { action() } label: {
-            Text(name)
-                .font(.subheadline)
-                .fontWeight(isSelected ? .bold : .regular)
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(tabBackground)
-                )
-                // A resting edge on the selected tab, so the bar says which season is showing even
-                // where its fill is too quiet to draw its own shape (Sodalite#146 round 4). The
-                // QUIET edge, not the pills' `hairline`: those float over whatever the scraper
-                // found, this sits below the fold on a ground the app draws itself. The fill stays
-                // `restFill` for the same reason it always was, the focus lift here goes to white
-                // rather than to the tint.
-                .overlay {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.Theme.panelEdge, lineWidth: 1)
-                    }
+            ZStack(alignment: .bottomLeading) {
+                AsyncCachedImage(url: imageURL) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.Theme.surface)
+                        .overlay {
+                            Image(systemName: "tv")
+                                .font(.system(size: 30, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                        }
                 }
+                .frame(width: 116, height: 174)
+                .clipped()
+
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.82)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+
+                Text(name)
+                    .font(.caption.weight(isSelected ? .bold : .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .padding(10)
+            }
+            .frame(width: 116, height: 174)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(
+                        isFocused ? Color.Theme.focusFill : (isSelected ? Color.Theme.panelEdge : .clear),
+                        lineWidth: isFocused ? 3 : 1
+                    )
+            }
+            .scaleEffect(isFocused ? 1.05 : 1)
+            .animation(.easeOut(duration: 0.16), value: isFocused)
         }
-        .buttonStyle(SeasonTabButtonStyle())
+        .buttonStyle(.plain)
         .focusEffectDisabled(true)
         .focused(focusedID, equals: id)
-    }
-
-    private var tabBackground: Color {
-        if isFocused { return Color.Theme.focusFill }
-        if isSelected { return Color.Theme.restFill }
-        return .clear
     }
 }
 
@@ -79,11 +91,12 @@ struct SeasonTabButtonStyle: ButtonStyle {
 /// Loading placeholder mirroring EpisodeLandscapeCard's 360x202 thumbnail + caption lines, with one sweeping highlight.
 struct EpisodeSkeletonCard: View {
     @State private var shimmer = false
+    var cardSizeOverride: CGSize? = nil
 
     @Environment(\.dependencies) private var dependencies
     @Environment(\.horizontalSizeClass) private var hSizeClass
     private var cardSize: CGSize {
-        LayoutMetrics.current(hSizeClass)
+        cardSizeOverride ?? LayoutMetrics.current(hSizeClass)
             .tileSize(cardScale: dependencies.appearancePreferences.cardScale)
     }
 
@@ -143,6 +156,7 @@ struct EpisodeSkeletonCard: View {
 struct EpisodeLandscapeCard: View {
     let episode: JellyfinItem
     let imageURL: URL?
+    var cardSizeOverride: CGSize? = nil
 
     /// The episode the page's Play button acts on, resolved by the page's own playTarget so the ring and the button cannot claim different cards.
     var isPlayTarget: Bool = false
@@ -164,7 +178,7 @@ struct EpisodeLandscapeCard: View {
     @Environment(\.dependencies) private var dependencies
     @Environment(\.horizontalSizeClass) private var hSizeClass
     private var cardSize: CGSize {
-        LayoutMetrics.current(hSizeClass)
+        cardSizeOverride ?? LayoutMetrics.current(hSizeClass)
             .tileSize(cardScale: dependencies.appearancePreferences.cardScale)
     }
 
