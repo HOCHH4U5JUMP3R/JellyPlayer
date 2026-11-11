@@ -886,7 +886,7 @@ struct SeriesDetailView: View {
     // MARK: - Glass Panel
 
     private func glassPanel(vm: DetailViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             // The title and episode heading live in the artwork hero, matching the reference layout.
 
             DetailInfoRows(
@@ -970,9 +970,9 @@ struct SeriesDetailView: View {
     @ViewBuilder
     private func episodeLine(vm: DetailViewModel) -> some View {
         let values = episodeMetadataValues()
-        HStack(spacing: 18) {
+        HStack(spacing: 12) {
             if let metadata = values.metadata {
-                Text(metadata).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                Text(metadata).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             if let ageRating = values.ageRating {
                 Text(ageRating).font(.caption).foregroundStyle(.white.opacity(0.9))
@@ -1745,7 +1745,8 @@ struct SeriesDetailView: View {
             .padding(.vertical, 8)
             .scrollTargetLayout()
         }
-        .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+        // Let tvOS's focus engine drive horizontal movement. View-aligned snapping competed
+        // with focus-driven scrolling and could cause reverse/extra-card jumps.
         .scrollPosition($episodeRowPosition)
         .onChange(of: vm.selectedSeasonID) { _, _ in
             episodeRowPosition.scrollTo(edge: .leading)
@@ -1760,11 +1761,16 @@ struct SeriesDetailView: View {
                 DispatchQueue.main.async { playButtonFocused = true }
                 return
             }
-            if newID != nil && !episodeRedirectDone {
-                episodeRedirectDone = true
-                if let target = episodeEntryTarget(vm: vm), newID != target {
-                    focusedEpisodeID = target
+            if let newID {
+                if !episodeRedirectDone {
+                    episodeRedirectDone = true
+                    if let target = episodeEntryTarget(vm: vm), newID != target {
+                        focusedEpisodeID = target
+                        return
+                    }
                 }
+                // Remember the actual focused card only after the entry redirect has settled.
+                episodeAim.focusLeft(newID)
             }
         }
         .onChange(of: pendingEpisodeFocus) { _, target in
@@ -1997,7 +2003,7 @@ struct SeriesDetailView: View {
                     ForEach(0..<6, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.Theme.surface)
-                            .frame(width: 116, height: 174)
+                            .frame(width: 150, height: 225)
                     }
                 }
                 .padding(.horizontal, 0)
