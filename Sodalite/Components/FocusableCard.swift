@@ -29,17 +29,23 @@ struct FocusableCard<Content: View>: View {
         if let externalFocus, let focusID {
             content(isHighlighted)
                 .focusable()
-                .focused($isFocused)
                 .focused(externalFocus, equals: focusID)
-                .stableTap(isFocused: isFocused) { action() }
+                .stableTap(isFocused: isCardFocused) { action() }
                 .focusResponse(.card, isFocused: isHighlighted)
         } else {
             content(isHighlighted)
                 .focusable()
                 .focused($isFocused)
-                .stableTap(isFocused: isFocused) { action() }
+                .stableTap(isFocused: isCardFocused) { action() }
                 .focusResponse(.card, isFocused: isHighlighted)
         }
+    }
+
+    private var isCardFocused: Bool {
+        if let externalFocus, let focusID {
+            return externalFocus.wrappedValue == focusID
+        }
+        return isFocused
     }
 
     @ViewBuilder
@@ -63,9 +69,9 @@ struct FocusableCard<Content: View>: View {
 
     private var isHighlighted: Bool {
         #if os(iOS)
-        isFocused || (highlightsOnPress && isPressed)
+        isCardFocused || (highlightsOnPress && isPressed)
         #else
-        isFocused
+        isCardFocused
         #endif
     }
 }
