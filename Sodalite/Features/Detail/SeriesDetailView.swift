@@ -838,7 +838,7 @@ struct SeriesDetailView: View {
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster,
                             focusedID: $focusedSimilarID,
-                            inset: 0
+                            inset: metrics.rowInset
                         )
                         .onChange(of: focusedSimilarID) { _, newID in
                             guard let newID, !similarEntryAimed else { return }
@@ -886,7 +886,7 @@ struct SeriesDetailView: View {
     // MARK: - Glass Panel
 
     private func glassPanel(vm: DetailViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             // The title and episode heading live in the artwork hero, matching the reference layout.
 
             DetailInfoRows(
@@ -970,9 +970,9 @@ struct SeriesDetailView: View {
     @ViewBuilder
     private func episodeLine(vm: DetailViewModel) -> some View {
         let values = episodeMetadataValues()
-        HStack(spacing: 18) {
+        HStack(spacing: 12) {
             if let metadata = values.metadata {
-                Text(metadata).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                Text(metadata).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             if let ageRating = values.ageRating {
                 Text(ageRating).font(.caption).foregroundStyle(.white.opacity(0.9))
@@ -1745,7 +1745,8 @@ struct SeriesDetailView: View {
             .padding(.vertical, 8)
             .scrollTargetLayout()
         }
-        .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+        // Let tvOS's focus engine drive horizontal movement. View-aligned snapping competed
+        // with focus-driven scrolling and could cause reverse/extra-card jumps.
         .scrollPosition($episodeRowPosition)
         .onChange(of: vm.selectedSeasonID) { _, _ in
             episodeRowPosition.scrollTo(edge: .leading)
