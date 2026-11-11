@@ -1761,11 +1761,16 @@ struct SeriesDetailView: View {
                 DispatchQueue.main.async { playButtonFocused = true }
                 return
             }
-            if newID != nil && !episodeRedirectDone {
-                episodeRedirectDone = true
-                if let target = episodeEntryTarget(vm: vm), newID != target {
-                    focusedEpisodeID = target
+            if let newID {
+                if !episodeRedirectDone {
+                    episodeRedirectDone = true
+                    if let target = episodeEntryTarget(vm: vm), newID != target {
+                        focusedEpisodeID = target
+                        return
+                    }
                 }
+                // Remember the actual focused card only after the entry redirect has settled.
+                episodeAim.focusLeft(newID)
             }
         }
         .onChange(of: pendingEpisodeFocus) { _, target in
