@@ -105,6 +105,8 @@ struct SeriesDetailView: View {
     /// movie page: the first entry lands on the first card, after that the row remembers.
     @FocusState private var focusedCastID: String?
     @State private var castEntryAimed = false
+    @FocusState private var focusedSimilarID: String?
+    @State private var similarEntryAimed = false
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
@@ -725,10 +727,21 @@ struct SeriesDetailView: View {
                             // Keep the cast row inside the same backdrop and move the page to it
                             // deliberately; relying on tvOS focus auto-scroll snaps an entire
                             // viewport when the first portrait gains focus.
-                            withAnimation(.easeInOut(duration: 0.55)) {
-                                outerProxy.scrollTo("castRow", anchor: .bottom)
+                            if !castEntryAimed, let first = cast.first?.id {
+                                castEntryAimed = true
+                                // Correct the horizontal target BEFORE scrolling the outer page;
+                                // otherwise tvOS parks the portrait strip at its geometric midpoint.
+                                DispatchQueue.main.async {
+                                    focusedCastID = first
+                                    withAnimation(.easeInOut(duration: 0.55)) {
+                                        outerProxy.scrollTo("castRow", anchor: .bottom)
+                                    }
+                                }
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.55)) {
+                                    outerProxy.scrollTo("castRow", anchor: .bottom)
+                                }
                             }
-                            aimFirstCastEntry(at: newID, in: cast)
                         }
                     }
                 }
@@ -820,8 +833,15 @@ struct SeriesDetailView: View {
                             items: vm.similarItems,
                             imageURLProvider: { vm.posterURL(for: $0) },
                             onItemSelected: { navigateToItem = $0 },
-                            cardStyle: .poster
+                            cardStyle: .poster,
+                            focusedID: $focusedSimilarID
                         )
+                        .onChange(of: focusedSimilarID) { _, newID in
+                            guard let newID, !similarEntryAimed else { return }
+                            similarEntryAimed = true
+                            guard let first = vm.similarItems.first?.id, newID != first else { return }
+                            DispatchQueue.main.async { focusedSimilarID = first }
+                        }
                         .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast) { playButtonFocused = true }
                     }
 

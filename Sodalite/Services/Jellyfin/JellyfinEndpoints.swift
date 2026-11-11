@@ -119,7 +119,7 @@ enum JellyfinEndpoint: APIEndpoint {
         case .itemDetail(let userID, let itemID):
             "/Users/\(userID)/Items/\(itemID)"
         case .localTrailers(let userID, let itemID):
-            "/Users/\(userID)/Items/\(itemID)/LocalTrailers"
+            "/Items/\(itemID)/LocalTrailers"
         case .resumeItems(let userID, _, _):
             "/Users/\(userID)/Items/Resume"
         case .nextUp:
