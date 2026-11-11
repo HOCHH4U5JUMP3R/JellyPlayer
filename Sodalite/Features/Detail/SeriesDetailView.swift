@@ -838,7 +838,7 @@ struct SeriesDetailView: View {
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster,
                             focusedID: $focusedSimilarID,
-                            inset: metrics.rowInset
+                            inset: 0
                         )
                         .onChange(of: focusedSimilarID) { _, newID in
                             guard let newID, !similarEntryAimed else { return }
@@ -2003,7 +2003,7 @@ struct SeriesDetailView: View {
                     ForEach(0..<6, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.Theme.surface)
-                            .frame(width: 116, height: 174)
+                            .frame(width: 150, height: 225)
                     }
                 }
                 .padding(.horizontal, 0)
