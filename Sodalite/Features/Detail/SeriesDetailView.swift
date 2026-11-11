@@ -1807,6 +1807,7 @@ struct SeriesDetailView: View {
             visibleEpisodeIDs = ids
         }
         .onChange(of: vm.selectedSeasonID) { _, _ in
+            episodeMoveGeneration += 1
             episodeRowPosition.scrollTo(edge: .leading)
             deferOnMain(by: 0.15) {
                 scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
