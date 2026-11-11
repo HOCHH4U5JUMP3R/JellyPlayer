@@ -96,10 +96,8 @@ struct SeriesDetailView: View {
     /// Last focused region in the season+episode block; the focus bridge reads it to tell which direction a cross-row jump came from without inspecting @FocusState (already nil mid-transition).
     @State private var lastFocusedArea: FocusArea = .none
     private enum FocusArea { case none, season, episode }
-    private enum EpisodeFocusAlignment { case center, leading, trailing }
     /// Bridge season→episode writes the target episode id here; the episode-row ScrollViewReader scrolls it into the LazyHStack then writes focusedEpisodeID, since a focusedEpisodeID write for an unrendered card is a silent no-op (right-side-takes-two-clicks case).
     @State private var pendingEpisodeFocus: String?
-    @State private var pendingEpisodeFocusAlignment: EpisodeFocusAlignment = .center
     /// Bridge episode→season synopsis. Plain @State for the same reason as pendingEpisodeFocus: the box owns its own @FocusState and defers the write itself.
     @State private var pendingSeasonOverviewFocus = false
     /// Which card the episode row aims at, so a return from above lands there instead of scrolling the row back to the start. Fed by the way OUT of the row and by the player's in-session item switches; see EpisodeRowAim for why it is never fed on the way in.
@@ -731,21 +729,12 @@ struct SeriesDetailView: View {
                             }
                             let target = remembered ?? cast.first?.id
                             if oldID == nil, let target, newID != target {
-                                // Restore the previously focused portrait before moving the page.
-                                DispatchQueue.main.async {
-                                    focusedCastID = target
-                                    withAnimation(.easeInOut(duration: 0.55)) {
-                                        outerProxy.scrollTo("castRow", anchor: .bottom)
-                                    }
-                                }
+                                // Restore only the row's horizontal focus. The outer page is left
+                                // to tvOS so it does not fight the focus engine with a second scroll.
+                                DispatchQueue.main.async { focusedCastID = target }
                                 return
                             }
                             rememberedCastFocusID = newID
-                            if oldID == nil {
-                                withAnimation(.easeInOut(duration: 0.55)) {
-                                    outerProxy.scrollTo("castRow", anchor: .bottom)
-                                }
-                            }
                         }
                     }
                 }
@@ -1716,25 +1705,8 @@ struct SeriesDetailView: View {
         if visibleEpisodeIDs.contains(target) {
             focusedEpisodeID = target
         } else {
-            pendingEpisodeFocusAlignment = .center
             pendingEpisodeFocus = target
         }
-    }
-
-    /// Handle horizontal Siri Remote moves by focus index. A visible neighbour receives focus in place;
-    /// scrolling happens only when the next card is outside the viewport, one card at a time.
-    private func moveEpisodeFocus(from id: String, delta: Int, vm: DetailViewModel) {
-        let ids = vm.episodes.map(\.id)
-        guard let index = ids.firstIndex(of: id) else { return }
-        let nextIndex = index + delta
-        guard ids.indices.contains(nextIndex) else { return }
-        let target = ids[nextIndex]
-        guard !visibleEpisodeIDs.contains(target) else {
-            focusedEpisodeID = target
-            return
-        }
-        pendingEpisodeFocusAlignment = delta > 0 ? .trailing : .leading
-        pendingEpisodeFocus = target
     }
 
     /// Up out of the episode row. It used to go straight to the season bar, which skipped the season synopsis sitting between the two (reachable downwards, unreachable upwards). Now the synopsis takes the first stop when there is one, and its own up-move carries on to the season bar.
@@ -1776,15 +1748,12 @@ struct SeriesDetailView: View {
                         .focused($focusedEpisodeID, equals: episode.id)
                         #if os(tvOS)
                         .onMoveCommand { direction in
-                            switch direction {
-                            case .up:
+                            // Horizontal movement belongs to tvOS's focus engine. Manually
+                            // changing @FocusState here races the native move and can enqueue a
+                            // stale scroll (notably 4 → 5 → 4). Only vertical navigation needs
+                            // an explicit bridge.
+                            if direction == .up {
                                 focusUpFromEpisodeRow(vm: vm)
-                            case .left:
-                                moveEpisodeFocus(from: episode.id, delta: -1, vm: vm)
-                            case .right:
-                                moveEpisodeFocus(from: episode.id, delta: 1, vm: vm)
-                            default:
-                                break
                             }
                         }
                         #endif
@@ -1815,13 +1784,22 @@ struct SeriesDetailView: View {
                 scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
             }
         }
-        .onChange(of: focusedEpisodeID) { _, newID in
+        .onChange(of: focusedEpisodeID) { oldID, newID in
             if pendingPlayFocusAfterMenu, newID != nil {
                 pendingPlayFocusAfterMenu = false
                 playButtonFocused = false
                 DispatchQueue.main.async { playButtonFocused = true }
                 return
             }
+
+            // Capture the card as focus leaves the episode row. While moving horizontally,
+            // update the memory to the new focused card. On re-entry (oldID == nil), never
+            // overwrite the remembered card with a transient focus-engine landing position.
+            if let oldID, newID == nil {
+                episodeAim.focusLeft(oldID)
+                return
+            }
+
             if let newID {
                 if !episodeRedirectDone {
                     episodeRedirectDone = true
@@ -1830,22 +1808,16 @@ struct SeriesDetailView: View {
                         return
                     }
                 }
-                // Remember the actual focused card only after the entry redirect has settled.
-                episodeAim.focusLeft(newID)
+                if oldID != nil {
+                    episodeAim.focusLeft(newID)
+                }
             }
         }
         .onChange(of: pendingEpisodeFocus) { _, target in
             guard let target else { return }
-            let anchor: UnitPoint
-            switch pendingEpisodeFocusAlignment {
-            case .center: anchor = .center
-            case .leading: anchor = .leading
-            case .trailing: anchor = .trailing
-            }
             withAnimation(.easeInOut(duration: 0.2)) {
-                episodeProxy.scrollTo(target, anchor: anchor)
+                episodeProxy.scrollTo(target, anchor: .center)
             }
-            pendingEpisodeFocusAlignment = .center
             deferOnMain {
                 focusedEpisodeID = target
                 pendingEpisodeFocus = nil
@@ -1872,6 +1844,7 @@ struct SeriesDetailView: View {
                                 id: season.id,
                                 name: season.name,
                                 isSelected: vm.selectedSeasonID == season.id,
+                                personalRating: season.userData?.rating.map { Int($0.rounded()) },
                                 imageURL: dependencies.jellyfinImageService.posterURL(for: season),
                                 focusedID: $focusedSeasonID,
                                 action: {
