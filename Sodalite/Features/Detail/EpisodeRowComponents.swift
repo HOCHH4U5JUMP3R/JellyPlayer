@@ -32,6 +32,13 @@ struct SeasonTab: View {
                     .frame(width: 150, height: 225)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.82)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay {
                         RoundedRectangle(cornerRadius: 12)
                             .strokeBorder(
@@ -39,13 +46,6 @@ struct SeasonTab: View {
                                 lineWidth: isFocused ? 3 : 1
                             )
                     }
-
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.82)],
-                        startPoint: .center,
-                        endPoint: .bottom
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
                 Text(name)
