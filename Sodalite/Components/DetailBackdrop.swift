@@ -104,6 +104,8 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     /// `DetailBackdrop` owns the artwork). Same two URLs that surface passes to the backdrop.
     var heroImageURL: URL? = nil
     var heroPosterURL: URL? = nil
+    /// Gap between the hero title and the primary information column.
+    var primaryTopInset: CGFloat = 20
     @ViewBuilder let hero: () -> Hero
     @ViewBuilder let primary: () -> Primary
     @ViewBuilder let content: () -> Content
@@ -208,12 +210,14 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     init(
         heroImageURL: URL? = nil,
         heroPosterURL: URL? = nil,
+        primaryTopInset: CGFloat = 20,
         @ViewBuilder hero: @escaping () -> Hero = { EmptyView() },
         @ViewBuilder primary: @escaping () -> Primary,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.heroImageURL = heroImageURL
         self.heroPosterURL = heroPosterURL
+        self.primaryTopInset = primaryTopInset
         self.hero = hero
         self.primary = primary
         self.content = content
@@ -250,7 +254,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                         VStack(alignment: .leading, spacing: 0) {
                             primary()
                         }
-                        .padding(.top, 20)
+                        .padding(.top, primaryTopInset)
                         .padding(.leading, safeLeading + 42)
                         .padding(.trailing, safeTrailing)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -731,12 +735,14 @@ extension DetailContentOverlay where Primary == EmptyView {
     init(
         heroImageURL: URL? = nil,
         heroPosterURL: URL? = nil,
+        primaryTopInset: CGFloat = 20,
         @ViewBuilder hero: @escaping () -> Hero = { EmptyView() },
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.init(
             heroImageURL: heroImageURL,
             heroPosterURL: heroPosterURL,
+            primaryTopInset: primaryTopInset,
             hero: hero,
             primary: { EmptyView() },
             content: content
