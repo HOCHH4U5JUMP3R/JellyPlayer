@@ -1985,7 +1985,7 @@ struct SeriesDetailView: View {
     @ViewBuilder
     /// Whole-section placeholder while getSeasons is in flight: skeleton season tabs above the episode skeleton row. Mirrors seasonSection's ScrollView/spacing/padding so the swap doesn't shift layout.
     private func seasonSectionSkeleton(vm: DetailViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 8) {
             // Same horizontal ScrollView as the real season bar, and not just for the swap: six
             // fixed 110pt tabs measure 742pt with the insets, so a bare HStack reports that width
             // to the page even when the viewport proposes 402. The content column then takes 742,
@@ -2013,7 +2013,7 @@ struct SeriesDetailView: View {
     @ViewBuilder
     private func episodeSkeletonRow(vm: DetailViewModel) -> some View {
         let seasonCount = vm.seasons.first(where: { $0.id == vm.selectedSeasonID })?.childCount
-        let count = min(max(seasonCount ?? 6, 3), 10)
+        let count = min(max(seasonCount ?? 6, 5), 10)
         #if os(tvOS)
         GeometryReader { geometry in
             let cardWidth = (geometry.size.width - tvEpisodeCardSpacing * 4) / 5
