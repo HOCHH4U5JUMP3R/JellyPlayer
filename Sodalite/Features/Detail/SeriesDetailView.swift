@@ -114,8 +114,18 @@ struct SeriesDetailView: View {
     @State private var rememberedSimilarFocusID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
-    /// IDs visible in the episode viewport; used to restore focus without changing its saved horizontal offset.
+    /// Snapshot taken as focus leaves the episode row. Scrolling Cast/Similar must never become
+    /// the new horizontal position of the episode rail.
+    @State private var rememberedEpisodeRowPosition = ScrollPosition()
+    /// Current viewport targets, used to avoid scrolling when the next card is already visible.
     @State private var visibleEpisodeIDs: [String] = []
+    /// Invalidates deferred left/right focus writes when another remote move arrives first.
+    @State private var episodeMoveGeneration = 0
+    /// One-step viewport history: an immediate opposite move restores the exact position from
+    /// before the previous card transition (e.g. 4 → 5 → 4).
+    @State private var lastEpisodeMoveFromID: String?
+    @State private var lastEpisodeMoveToID: String?
+    @State private var lastEpisodeMovePosition: ScrollPosition?
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
     @State private var didSettleIn = false
 
@@ -698,45 +708,7 @@ struct SeriesDetailView: View {
                     } else if vm.isLoadingSeasons {
                         seasonSectionSkeleton(vm: vm).frame(maxWidth: .infinity, alignment: .leading).id("episodeRow")
                     }
-                    // Keep cast in the same continuous tvOS scroll content as the season and episode rows.
-                    let episodePeople = displayItem.people
-                    let seriesPeople = vm.item.people ?? []
-                    let castPeople = episodePeople?.filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) } ?? []
-                    let people = castPeople.isEmpty
-                        ? seriesPeople.filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
-                        : castPeople
-                    if !people.isEmpty {
-                        let cast = jellyfinCastMembers(
-                            from: people,
-                            imageService: dependencies.jellyfinImageService,
-                            imageWidth: metrics.castImageWidth
-                        )
-                        MediaCastRow(
-                            members: cast,
-                            inset: 0,
-                            titleFont: .headline,
-                            focusedID: $focusedCastID,
-                            onSelect: { handlePersonTap($0) }
-                        )
-                        .id("castRow")
-                        .onFocusMoveUp(active: true) {
-                            restoreEpisodeFocus(vm: vm)
-                        }
-                        .onChange(of: focusedCastID) { oldID, newID in
-                            guard let newID else { return }
-                            let remembered = rememberedCastFocusID.flatMap { id in
-                                cast.contains(where: { $0.id == id }) ? id : nil
-                            }
-                            let target = remembered ?? cast.first?.id
-                            if oldID == nil, let target, newID != target {
-                                // Restore only the row's horizontal focus. The outer page is left
-                                // to tvOS so it does not fight the focus engine with a second scroll.
-                                DispatchQueue.main.async { focusedCastID = target }
-                                return
-                            }
-                            rememberedCastFocusID = newID
-                        }
-                    }
+
                 }
                 .padding(.horizontal, metrics.rowInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -798,7 +770,39 @@ struct SeriesDetailView: View {
                     let seriesCast = (vm.item.people ?? []).filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
                     let hasCast = !(episodeCast.isEmpty ? seriesCast : episodeCast).isEmpty
 
-                    #if !os(tvOS)
+                    #if os(tvOS)
+                    if hasCast {
+                        let people = episodeCast.isEmpty ? seriesCast : episodeCast
+                        let cast = jellyfinCastMembers(
+                            from: people,
+                            imageService: dependencies.jellyfinImageService,
+                            imageWidth: metrics.castImageWidth
+                        )
+                        MediaCastRow(
+                            members: cast,
+                            inset: metrics.rowInset,
+                            titleFont: .headline,
+                            focusedID: $focusedCastID,
+                            onSelect: { handlePersonTap($0) }
+                        )
+                        .id("castRow")
+                        .onFocusMoveUp(active: true) {
+                            restoreEpisodeFocus(vm: vm)
+                        }
+                        .onChange(of: focusedCastID) { oldID, newID in
+                            guard let newID else { return }
+                            let remembered = rememberedCastFocusID.flatMap { id in
+                                cast.contains(where: { $0.id == id }) ? id : nil
+                            }
+                            let target = remembered ?? cast.first?.id
+                            if oldID == nil, let target, newID != target {
+                                DispatchQueue.main.async { focusedCastID = target }
+                                return
+                            }
+                            rememberedCastFocusID = newID
+                        }
+                    }
+                    #else
                     if let people = (displayItem.people ?? vm.item.people), !people.isEmpty {
                         let cast = jellyfinCastMembers(
                             from: people,
@@ -833,9 +837,8 @@ struct SeriesDetailView: View {
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster,
                             focusedID: $focusedSimilarID,
-                            // Below-fold content starts at the safe-area edge; the cast row sits
-                            // inside the primary column's additional 42pt leading inset.
-                            inset: metrics.rowInset + 42,
+                            // Cast and Similar share this below-fold column and therefore the same inset.
+                            inset: metrics.rowInset,
                             titleFont: .headline
                         )
                         .onChange(of: focusedSimilarID) { oldID, newID in
@@ -1696,16 +1699,20 @@ struct SeriesDetailView: View {
         episodeAim.target(in: vm.episodes.map(\.id), currentEpisodeID: vm.currentEpisodeID)
     }
 
-    /// Re-enter the row in place when the remembered card is still visible; scroll only for an off-screen target.
+    /// Restore the exact horizontal rail position captured when the viewer left Episodes.
+    /// Do not center the remembered card: that changes the rail's offset after browsing Cast or Similar.
     private func restoreEpisodeFocus(vm: DetailViewModel) {
         guard let target = episodeEntryTarget(vm: vm) else {
             focusedSeasonID = vm.selectedSeasonID
             return
         }
-        if visibleEpisodeIDs.contains(target) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            episodeRowPosition = rememberedEpisodeRowPosition
+        }
+        DispatchQueue.main.async {
             focusedEpisodeID = target
-        } else {
-            pendingEpisodeFocus = target
         }
     }
 
@@ -1748,12 +1755,63 @@ struct SeriesDetailView: View {
                         .focused($focusedEpisodeID, equals: episode.id)
                         #if os(tvOS)
                         .onMoveCommand { direction in
-                            // Horizontal movement belongs to tvOS's focus engine. Manually
-                            // changing @FocusState here races the native move and can enqueue a
-                            // stale scroll (notably 4 → 5 → 4). Only vertical navigation needs
-                            // an explicit bridge.
-                            if direction == .up {
+                            switch direction {
+                            case .up:
                                 focusUpFromEpisodeRow(vm: vm)
+                            case .left, .right:
+                                // tvOS can choose a second card after the viewport shifts while
+                                // the fifth card enters. Resolve the destination by episode index,
+                                // then apply it after the focus engine's current pass. A newer
+                                // remote move invalidates this deferred write.
+                                let ids = vm.episodes.map(\.id)
+                                guard let index = ids.firstIndex(of: episode.id) else { return }
+                                let delta: Int
+                                let anchor: UnitPoint
+                                switch direction {
+                                case .right:
+                                    delta = 1
+                                    anchor = .trailing
+                                case .left:
+                                    delta = -1
+                                    anchor = .leading
+                                default:
+                                    return
+                                }
+                                let nextIndex = index + delta
+                                guard ids.indices.contains(nextIndex) else { return }
+                                let target = ids[nextIndex]
+                                let positionBeforeMove = episodeRowPosition
+                                let isImmediateReverse =
+                                    lastEpisodeMoveFromID == target && lastEpisodeMoveToID == episode.id
+                                let positionToRestore = isImmediateReverse ? lastEpisodeMovePosition : nil
+                                if isImmediateReverse {
+                                    lastEpisodeMoveFromID = nil
+                                    lastEpisodeMoveToID = nil
+                                    lastEpisodeMovePosition = nil
+                                } else {
+                                    lastEpisodeMoveFromID = episode.id
+                                    lastEpisodeMoveToID = target
+                                    lastEpisodeMovePosition = positionBeforeMove
+                                }
+                                episodeMoveGeneration += 1
+                                let generation = episodeMoveGeneration
+                                DispatchQueue.main.async {
+                                    guard generation == episodeMoveGeneration else { return }
+                                    var transaction = Transaction()
+                                    transaction.disablesAnimations = true
+                                    withTransaction(transaction) {
+                                        if let positionToRestore {
+                                            // Undo the previous viewport shift instead of leaving
+                                            // the old card in the middle of the newly shifted rail.
+                                            episodeRowPosition = positionToRestore
+                                        } else if !visibleEpisodeIDs.contains(target) {
+                                            episodeRowPosition.scrollTo(id: target, anchor: anchor)
+                                        }
+                                    }
+                                    focusedEpisodeID = target
+                                }
+                            default:
+                                break
                             }
                         }
                         #endif
@@ -1779,6 +1837,10 @@ struct SeriesDetailView: View {
             visibleEpisodeIDs = ids
         }
         .onChange(of: vm.selectedSeasonID) { _, _ in
+            episodeMoveGeneration += 1
+            lastEpisodeMoveFromID = nil
+            lastEpisodeMoveToID = nil
+            lastEpisodeMovePosition = nil
             episodeRowPosition.scrollTo(edge: .leading)
             deferOnMain(by: 0.15) {
                 scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
@@ -1797,6 +1859,11 @@ struct SeriesDetailView: View {
             // overwrite the remembered card with a transient focus-engine landing position.
             if let oldID, newID == nil {
                 episodeAim.focusLeft(oldID)
+                rememberedEpisodeRowPosition = episodeRowPosition
+                lastEpisodeMoveFromID = nil
+                lastEpisodeMoveToID = nil
+                lastEpisodeMovePosition = nil
+                episodeMoveGeneration += 1
                 return
             }
 
@@ -1844,7 +1911,7 @@ struct SeriesDetailView: View {
                                 id: season.id,
                                 name: season.name,
                                 isSelected: vm.selectedSeasonID == season.id,
-                                personalRating: season.userData?.rating.map { Int($0.rounded()) },
+                                personalRating: vm.personalSeasonRating(for: season),
                                 imageURL: dependencies.jellyfinImageService.posterURL(for: season),
                                 focusedID: $focusedSeasonID,
                                 action: {
