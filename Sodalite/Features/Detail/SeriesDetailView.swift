@@ -117,6 +117,8 @@ struct SeriesDetailView: View {
     /// Snapshot taken as focus leaves the episode row. Scrolling Cast/Similar must never become
     /// the new horizontal position of the episode rail.
     @State private var rememberedEpisodeRowPosition = ScrollPosition()
+    /// Current viewport targets, used to avoid scrolling when the next card is already visible.
+    @State private var visibleEpisodeIDs: [String] = []
     /// Invalidates deferred left/right focus writes when another remote move arrives first.
     @State private var episodeMoveGeneration = 0
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
@@ -1808,6 +1810,9 @@ struct SeriesDetailView: View {
         // Snap to complete episode cards. Without view alignment the row can stop between cards.
         .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
         .scrollPosition($episodeRowPosition)
+        .onScrollTargetVisibilityChange(idType: String.self) { ids in
+            visibleEpisodeIDs = ids
+        }
         .onChange(of: vm.selectedSeasonID) { _, _ in
             episodeRowPosition.scrollTo(edge: .leading)
             deferOnMain(by: 0.15) {
