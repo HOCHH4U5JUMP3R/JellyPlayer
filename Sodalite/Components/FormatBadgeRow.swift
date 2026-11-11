@@ -15,14 +15,17 @@ import SwiftUI
 /// the poster corners read, so a card and the page it opens can never disagree about a title.
 struct FormatBadgeRow: View {
     let pills: [String]
+    var font: Font = .caption
+    var horizontalPadding: CGFloat = 8
+    var verticalPadding: CGFloat = 3
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(pills, id: \.self) { pill in
                 Text(pill)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .font(font)
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.vertical, verticalPadding)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
                             .stroke(.secondary.opacity(0.5), lineWidth: 1)
