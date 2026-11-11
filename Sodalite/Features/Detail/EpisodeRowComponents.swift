@@ -51,11 +51,11 @@ struct SeasonTab: View {
                 }
 
                 Text(name)
-                    .font(.caption2.weight(.regular))
+                    .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(Color.gray.opacity(isSelected ? 0.9 : 0.72))
                     .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(width: 150, alignment: .leading)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 150, alignment: .center)
             }
         }
         .buttonStyle(SeasonTabButtonStyle())
