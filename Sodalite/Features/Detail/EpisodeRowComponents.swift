@@ -16,43 +16,45 @@ struct SeasonTab: View {
 
     var body: some View {
         Button { action() } label: {
-            ZStack(alignment: .bottomLeading) {
-                AsyncCachedImage(url: imageURL) { image in
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.Theme.surface)
-                        .overlay {
-                            Image(systemName: "tv")
-                                .font(.system(size: 30, weight: .medium))
-                                .foregroundStyle(.tertiary)
-                        }
-                }
-                .frame(width: 150, height: 225)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(
-                            isFocused ? Color.Theme.focusFill : (isSelected ? Color.Theme.panelEdge : .clear),
-                            lineWidth: isFocused ? 3 : 1
-                        )
+            VStack(alignment: .leading, spacing: 4) {
+                ZStack(alignment: .bottomLeading) {
+                    AsyncCachedImage(url: imageURL) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.Theme.surface)
+                            .overlay {
+                                Image(systemName: "tv")
+                                    .font(.system(size: 30, weight: .medium))
+                                    .foregroundStyle(.tertiary)
+                            }
+                    }
+                    .frame(width: 150, height: 225)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(
+                                isFocused ? Color.Theme.focusFill : (isSelected ? Color.Theme.panelEdge : .clear),
+                                lineWidth: isFocused ? 3 : 1
+                            )
+                    }
+
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.82)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.82)],
-                    startPoint: .center,
-                    endPoint: .bottom
-                )
-
+                Text(name)
+                    .font(.subheadline.weight(isSelected ? .bold : .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(width: 150, alignment: .leading)
             }
-            Text(name)
-                .font(.subheadline.weight(isSelected ? .bold : .medium))
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(width: 150, alignment: .leading)
-            .padding(.top, 4)
         }
         .buttonStyle(.plain)
         .focusEffectDisabled(true)
