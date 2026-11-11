@@ -14,6 +14,8 @@ struct SeasonTab: View {
 
     private var isFocused: Bool { focusedID.wrappedValue == id }
 
+    @Environment(\.appearanceTheme) private var appearanceTheme
+
     var body: some View {
         Button { action() } label: {
             VStack(alignment: .leading, spacing: 4) {
@@ -42,7 +44,7 @@ struct SeasonTab: View {
                     .overlay {
                         RoundedRectangle(cornerRadius: 12)
                             .strokeBorder(
-                                isFocused ? Color.Theme.focusFill : (isSelected ? Color.Theme.panelEdge : .clear),
+                                isFocused ? appearanceTheme.palette.focus.color : (isSelected ? Color.Theme.panelEdge : .clear),
                                 lineWidth: isFocused ? 3 : 1
                             )
                     }
