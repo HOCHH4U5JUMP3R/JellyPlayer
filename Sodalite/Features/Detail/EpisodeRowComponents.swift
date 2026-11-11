@@ -49,15 +49,16 @@ struct SeasonTab: View {
                 }
 
                 Text(name)
-                    .font(.subheadline.weight(isSelected ? .bold : .medium))
-                    .foregroundStyle(.primary)
+                    .font(.caption2.weight(.regular))
+                    .foregroundStyle(Color.gray.opacity(isSelected ? 0.9 : 0.72))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(width: 150, alignment: .leading)
             }
         }
-        .buttonStyle(.plain)
-        .focusEffectDisabled(true)
+        .buttonStyle(SeasonTabButtonStyle())
+        .focusEffectDisabled()
+        .hoverEffectDisabled()
         .focused(focusedID, equals: id)
     }
 }
@@ -74,14 +75,10 @@ struct EpisodeCardButtonStyle: ButtonStyle {
 }
 
 struct SeasonTabButtonStyle: ButtonStyle {
-    @Environment(\.isFocused) private var isFocused
-
     func makeBody(configuration: Configuration) -> some View {
-        // Asymmetric stroke: 50ms fade-in delay, 0 fade-out. A residual wrong-tab transition slipping past the onMoveCommand prime never shows the stroke, the 50ms window lets the DispatchQueue fallback land focus on the right tab first. 50ms is sub-perceptual.
+        // No tvOS lift, scale, tint fill or pressed overlay. The poster's own thin focus stroke
+        // is the only visual state; the label below it remains neutral gray.
         configuration.label
-            // Not `.focusStroke`: this stroke carries its own asymmetric timing, which the shared
-            // modifier has no place for. The width is the same 3.
-            .background(isFocused ? Color.Theme.focusFill.opacity(0.22) : .clear, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
