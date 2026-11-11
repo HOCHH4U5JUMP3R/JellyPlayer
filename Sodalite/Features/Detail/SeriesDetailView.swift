@@ -763,8 +763,11 @@ struct SeriesDetailView: View {
                 actionButtonRow(vm: vm)
                 if !hasBelowFoldSections(vm: vm), let caption = techFacts().caption {
                     DetailFileCaption(caption: caption)
-                        .font(.caption2).foregroundStyle(.tertiary)
-                        .padding(.horizontal, -metrics.rowInset)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.top, 24)
+                        .padding(.trailing, metrics.rowInset)
                 }
             }
             .padding(.horizontal, metrics.rowInset)
@@ -880,7 +883,11 @@ struct SeriesDetailView: View {
                     // sections at all it moves into the first viewport, see `hasBelowFoldSections`.
                     if hasBelowFoldSections(vm: vm), let caption = techFacts().caption {
                         DetailFileCaption(caption: caption)
-                            .font(.caption2).foregroundStyle(.tertiary)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.top, 24)
+                            .padding(.trailing, metrics.rowInset)
                             .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
                     }
                 }
