@@ -42,6 +42,19 @@ final class DetailViewModel {
         selectedSeasonID.flatMap { id in seasons.first(where: { $0.id == id }) }
     }
 
+    /// Scrob's season score is the average of the personally rated episodes in that season,
+    /// rounded to a whole star on Jellyfin's 1–10 scale. Jellyfin does not expose a season
+    /// UserData.Rating, so this must be derived from the episode UserData values.
+    func personalSeasonRating(for season: JellyfinItem) -> Int? {
+        let seasonEpisodes = episodesCache[season.id]
+            ?? (selectedSeasonID == season.id ? episodes : [])
+        let ratings = seasonEpisodes.compactMap { $0.userData?.rating }
+            .filter { $0.isFinite && (1...10).contains($0) }
+        guard !ratings.isEmpty else { return nil }
+        let average = ratings.reduce(0, +) / Double(ratings.count)
+        return Int(average.rounded())
+    }
+
     private let itemService: JellyfinItemServiceProtocol
     private let libraryService: JellyfinLibraryServiceProtocol?
     private let playbackService: JellyfinPlaybackServiceProtocol?
