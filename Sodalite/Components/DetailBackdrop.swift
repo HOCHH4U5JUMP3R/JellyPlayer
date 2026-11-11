@@ -106,6 +106,8 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     var heroPosterURL: URL? = nil
     /// Gap between the hero title and the primary information column.
     var primaryTopInset: CGFloat = 20
+    /// Height of the tvOS title area, configurable for compact detail headers.
+    var tvHeroHeight: CGFloat = 150
     @ViewBuilder let hero: () -> Hero
     @ViewBuilder let primary: () -> Primary
     @ViewBuilder let content: () -> Content
@@ -211,6 +213,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
         heroImageURL: URL? = nil,
         heroPosterURL: URL? = nil,
         primaryTopInset: CGFloat = 20,
+        tvHeroHeight: CGFloat = 150,
         @ViewBuilder hero: @escaping () -> Hero = { EmptyView() },
         @ViewBuilder primary: @escaping () -> Primary,
         @ViewBuilder content: @escaping () -> Content
@@ -218,6 +221,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
         self.heroImageURL = heroImageURL
         self.heroPosterURL = heroPosterURL
         self.primaryTopInset = primaryTopInset
+        self.tvHeroHeight = tvHeroHeight
         self.hero = hero
         self.primary = primary
         self.content = content
@@ -636,7 +640,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
 
     private var gradientWithHero: some View {
         #if os(tvOS)
-        let heroHeight: CGFloat = 150
+        let heroHeight = tvHeroHeight
         #else
         let heroHeight: CGFloat = 200
         #endif
@@ -736,6 +740,7 @@ extension DetailContentOverlay where Primary == EmptyView {
         heroImageURL: URL? = nil,
         heroPosterURL: URL? = nil,
         primaryTopInset: CGFloat = 20,
+        tvHeroHeight: CGFloat = 150,
         @ViewBuilder hero: @escaping () -> Hero = { EmptyView() },
         @ViewBuilder content: @escaping () -> Content
     ) {
@@ -743,6 +748,7 @@ extension DetailContentOverlay where Primary == EmptyView {
             heroImageURL: heroImageURL,
             heroPosterURL: heroPosterURL,
             primaryTopInset: primaryTopInset,
+            tvHeroHeight: tvHeroHeight,
             hero: hero,
             primary: { EmptyView() },
             content: content
