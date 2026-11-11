@@ -1709,22 +1709,6 @@ struct SeriesDetailView: View {
         }
     }
 
-    /// Handle horizontal Siri Remote moves by focus index. A visible neighbour receives focus in place;
-    /// scrolling happens only when the next card is outside the viewport, one card at a time.
-    private func moveEpisodeFocus(from id: String, delta: Int, vm: DetailViewModel) {
-        let ids = vm.episodes.map(\.id)
-        guard let index = ids.firstIndex(of: id) else { return }
-        let nextIndex = index + delta
-        guard ids.indices.contains(nextIndex) else { return }
-        let target = ids[nextIndex]
-        guard !visibleEpisodeIDs.contains(target) else {
-            focusedEpisodeID = target
-            return
-        }
-        pendingEpisodeFocusAlignment = delta > 0 ? .trailing : .leading
-        pendingEpisodeFocus = target
-    }
-
     /// Up out of the episode row. It used to go straight to the season bar, which skipped the season synopsis sitting between the two (reachable downwards, unreachable upwards). Now the synopsis takes the first stop when there is one, and its own up-move carries on to the season bar.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
         if seasonOverview(vm: vm) != nil {
