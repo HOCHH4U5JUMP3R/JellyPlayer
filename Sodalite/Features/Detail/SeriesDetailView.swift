@@ -1997,11 +1997,11 @@ struct SeriesDetailView: View {
                     ForEach(0..<6, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.Theme.surface)
-                            .frame(width: 110, height: 52)
+                            .frame(width: 116, height: 174)
                     }
                 }
-                .padding(.horizontal, metrics.rowInset)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 0)
+                .padding(.vertical, 8)
             }
 
             episodeSkeletonRow(vm: vm)
@@ -2009,11 +2009,28 @@ struct SeriesDetailView: View {
         .allowsHitTesting(false)
     }
 
-    /// Shimmer row at the real 360x202 card footprint so the layout doesn't jump on episode-land. Card count from the season's childCount, clamped to a sane span.
+    /// Skeleton mirrors the same five-card tvOS geometry as the loaded episode row.
+    @ViewBuilder
     private func episodeSkeletonRow(vm: DetailViewModel) -> some View {
         let seasonCount = vm.seasons.first(where: { $0.id == vm.selectedSeasonID })?.childCount
         let count = min(max(seasonCount ?? 6, 3), 10)
-        return ScrollView(.horizontal, showsIndicators: false) {
+        #if os(tvOS)
+        GeometryReader { geometry in
+            let cardWidth = (geometry.size.width - tvEpisodeCardSpacing * 4) / 5
+            let cardSize = CGSize(width: cardWidth, height: cardWidth * 202 / 360)
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: tvEpisodeCardSpacing) {
+                    ForEach(0..<count, id: \.self) { _ in
+                        EpisodeSkeletonCard(cardSizeOverride: cardSize)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            .allowsHitTesting(false)
+        }
+        .frame(height: tvEpisodeRowHeight)
+        #else
+        ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : 24) {
                 ForEach(0..<count, id: \.self) { _ in
                     EpisodeSkeletonCard()
@@ -2023,6 +2040,7 @@ struct SeriesDetailView: View {
             .padding(.vertical, 16)
         }
         .allowsHitTesting(false)
+        #endif
     }
 
     /// Brings the glass panel (now in episode mode) into view. Inert on tvOS, where pageScrollProxy stays nil and the focus engine does the scrolling.
