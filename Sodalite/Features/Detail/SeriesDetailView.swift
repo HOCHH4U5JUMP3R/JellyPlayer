@@ -121,6 +121,11 @@ struct SeriesDetailView: View {
     @State private var visibleEpisodeIDs: [String] = []
     /// Invalidates deferred left/right focus writes when another remote move arrives first.
     @State private var episodeMoveGeneration = 0
+    /// One-step viewport history: an immediate opposite move restores the exact position from
+    /// before the previous card transition (e.g. 4 → 5 → 4).
+    @State private var lastEpisodeMoveFromID: String?
+    @State private var lastEpisodeMoveToID: String?
+    @State private var lastEpisodeMovePosition: ScrollPosition?
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
     @State private var didSettleIn = false
 
@@ -1775,18 +1780,32 @@ struct SeriesDetailView: View {
                                 let nextIndex = index + delta
                                 guard ids.indices.contains(nextIndex) else { return }
                                 let target = ids[nextIndex]
+                                let positionBeforeMove = episodeRowPosition
+                                let isImmediateReverse =
+                                    lastEpisodeMoveFromID == target && lastEpisodeMoveToID == episode.id
+                                let positionToRestore = isImmediateReverse ? lastEpisodeMovePosition : nil
+                                if isImmediateReverse {
+                                    lastEpisodeMoveFromID = nil
+                                    lastEpisodeMoveToID = nil
+                                    lastEpisodeMovePosition = nil
+                                } else {
+                                    lastEpisodeMoveFromID = episode.id
+                                    lastEpisodeMoveToID = target
+                                    lastEpisodeMovePosition = positionBeforeMove
+                                }
                                 episodeMoveGeneration += 1
                                 let generation = episodeMoveGeneration
                                 DispatchQueue.main.async {
                                     guard generation == episodeMoveGeneration else { return }
-                                    if !visibleEpisodeIDs.contains(target) {
-                                        var transaction = Transaction()
-                                        transaction.disablesAnimations = true
-                                        withTransaction(transaction) {
-                                            episodeRowPosition.scrollTo(
-                                                id: target,
-                                                anchor: anchor
-                                            )
+                                    var transaction = Transaction()
+                                    transaction.disablesAnimations = true
+                                    withTransaction(transaction) {
+                                        if let positionToRestore {
+                                            // Undo the previous viewport shift instead of leaving
+                                            // the old card in the middle of the newly shifted rail.
+                                            episodeRowPosition = positionToRestore
+                                        } else if !visibleEpisodeIDs.contains(target) {
+                                            episodeRowPosition.scrollTo(id: target, anchor: anchor)
                                         }
                                     }
                                     focusedEpisodeID = target
@@ -1819,6 +1838,9 @@ struct SeriesDetailView: View {
         }
         .onChange(of: vm.selectedSeasonID) { _, _ in
             episodeMoveGeneration += 1
+            lastEpisodeMoveFromID = nil
+            lastEpisodeMoveToID = nil
+            lastEpisodeMovePosition = nil
             episodeRowPosition.scrollTo(edge: .leading)
             deferOnMain(by: 0.15) {
                 scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
@@ -1838,6 +1860,9 @@ struct SeriesDetailView: View {
             if let oldID, newID == nil {
                 episodeAim.focusLeft(oldID)
                 rememberedEpisodeRowPosition = episodeRowPosition
+                lastEpisodeMoveFromID = nil
+                lastEpisodeMoveToID = nil
+                lastEpisodeMovePosition = nil
                 episodeMoveGeneration += 1
                 return
             }
