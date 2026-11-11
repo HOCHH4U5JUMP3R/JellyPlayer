@@ -432,7 +432,7 @@ struct SeriesDetailView: View {
         // It also explains why the defect came and went. A push racing the first focus evaluation is
         // either redundant or a move, depending on which lands first, and that is decided by how fast
         // the detail fetch returns.
-        .defaultFocus($playButtonFocused, true)
+        .defaultFocus($focusedAction, .play)
         
     }
 
@@ -1049,7 +1049,7 @@ struct SeriesDetailView: View {
                 }.focused($focusedAction, equals: .watched)
                 InfuseDetailActionButton(title: "Bewerten", symbol: "star") { isPresentingRatingPicker = true }
                     .focused($focusedAction, equals: .rating)
-                InfuseDetailActionButton(title: "Favorit", symbol: "text.badge.plus") {
+                InfuseDetailActionButton(title: "Favorit", symbol: "heart") {
                     if let episode = selectedEpisode { Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) } }
                     else { Task { await vm.toggleFavorite() } }
                 }.focused($focusedAction, equals: .favorite)
@@ -1828,7 +1828,7 @@ struct SeriesDetailView: View {
                 let playTargetID = playTarget(vm: vm)?.id
                 ScrollViewReader { episodeProxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : 24) {
+                        LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : max(metrics.itemSpacing, 124)) {
                             ForEach(vm.episodes) { episode in
                                 VStack(alignment: .leading, spacing: 10) {
                                     Button {
@@ -1870,7 +1870,8 @@ struct SeriesDetailView: View {
                         .padding(.vertical, 8)
                         .scrollTargetLayout()
                     }
-                    .contentMargins(.horizontal, metrics.rowInset, for: .scrollContent)
+                    // The containing detail column already owns the horizontal inset.
+                    // A second content inset made the first episode visibly double-indented.
                     .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                     .scrollPosition($episodeRowPosition)
                     .onChange(of: vm.selectedSeasonID) { _, _ in
@@ -1960,7 +1961,7 @@ struct SeriesDetailView: View {
         let seasonCount = vm.seasons.first(where: { $0.id == vm.selectedSeasonID })?.childCount
         let count = min(max(seasonCount ?? 6, 3), 10)
         return ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : 24) {
+            LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : max(metrics.itemSpacing, 124)) {
                 ForEach(0..<count, id: \.self) { _ in
                     EpisodeSkeletonCard()
                 }

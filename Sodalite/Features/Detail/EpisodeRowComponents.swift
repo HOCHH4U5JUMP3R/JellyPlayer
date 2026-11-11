@@ -290,7 +290,7 @@ struct EpisodeLandscapeCard: View {
     private var strokeStyle: AnyShapeStyle {
         switch stroke {
         case .focused: return AnyShapeStyle(appearanceTheme.palette.focus.color)
-        case .playTarget: return AnyShapeStyle(Color.Theme.success.opacity(0.8))
+        case .playTarget: return AnyShapeStyle(appearanceTheme.palette.focus.color.opacity(0.9))
         case .none: return AnyShapeStyle(Color.clear)
         }
     }
