@@ -17,6 +17,8 @@ struct HorizontalMediaRow: View {
     var focusedID: FocusState<String?>.Binding? = nil
     /// Overrides the default row inset. Pass 0 when this row is already inside an inset parent column.
     var inset: CGFloat? = nil
+    /// Detail pages can use a compact heading; other callers keep the existing title size.
+    var titleFont: Font = .title3
 
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.shellPaysLeadingInset) private var shellPaysLeading
@@ -38,7 +40,7 @@ struct HorizontalMediaRow: View {
                     Text(title)
                 }
             }
-            .font(.title3)
+            .font(titleFont)
             .fontWeight(.semibold)
             .padding(.leading, leadingInset)
             .padding(.trailing, rowInset)
