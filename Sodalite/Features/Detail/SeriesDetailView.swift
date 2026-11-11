@@ -114,8 +114,11 @@ struct SeriesDetailView: View {
     @State private var rememberedSimilarFocusID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
-    /// IDs visible in the episode viewport; used to restore focus without changing its saved horizontal offset.
-    @State private var visibleEpisodeIDs: [String] = []
+    /// Snapshot taken as focus leaves the episode row. Scrolling Cast/Similar must never become
+    /// the new horizontal position of the episode rail.
+    @State private var rememberedEpisodeRowPosition = ScrollPosition()
+    /// Invalidates deferred left/right focus writes when another remote move arrives first.
+    @State private var episodeMoveGeneration = 0
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
     @State private var didSettleIn = false
 
@@ -1696,16 +1699,20 @@ struct SeriesDetailView: View {
         episodeAim.target(in: vm.episodes.map(\.id), currentEpisodeID: vm.currentEpisodeID)
     }
 
-    /// Re-enter the row in place when the remembered card is still visible; scroll only for an off-screen target.
+    /// Restore the exact horizontal rail position captured when the viewer left Episodes.
+    /// Do not center the remembered card: that changes the rail's offset after browsing Cast or Similar.
     private func restoreEpisodeFocus(vm: DetailViewModel) {
         guard let target = episodeEntryTarget(vm: vm) else {
             focusedSeasonID = vm.selectedSeasonID
             return
         }
-        if visibleEpisodeIDs.contains(target) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            episodeRowPosition = rememberedEpisodeRowPosition
+        }
+        DispatchQueue.main.async {
             focusedEpisodeID = target
-        } else {
-            pendingEpisodeFocus = target
         }
     }
 
@@ -1748,12 +1755,38 @@ struct SeriesDetailView: View {
                         .focused($focusedEpisodeID, equals: episode.id)
                         #if os(tvOS)
                         .onMoveCommand { direction in
-                            // Horizontal movement belongs to tvOS's focus engine. Manually
-                            // changing @FocusState here races the native move and can enqueue a
-                            // stale scroll (notably 4 → 5 → 4). Only vertical navigation needs
-                            // an explicit bridge.
-                            if direction == .up {
+                            switch direction {
+                            case .up:
                                 focusUpFromEpisodeRow(vm: vm)
+                            case .left, .right:
+                                // tvOS can choose a second card after the viewport shifts while
+                                // the fifth card enters. Resolve the destination by episode index,
+                                // then apply it after the focus engine's current pass. A newer
+                                // remote move invalidates this deferred write.
+                                let ids = vm.episodes.map(\\.id)
+                                guard let index = ids.firstIndex(of: episode.id) else { return }
+                                let delta = direction == .right ? 1 : -1
+                                let nextIndex = index + delta
+                                guard ids.indices.contains(nextIndex) else { return }
+                                let target = ids[nextIndex]
+                                episodeMoveGeneration += 1
+                                let generation = episodeMoveGeneration
+                                DispatchQueue.main.async {
+                                    guard generation == episodeMoveGeneration else { return }
+                                    if !visibleEpisodeIDs.contains(target) {
+                                        var transaction = Transaction()
+                                        transaction.disablesAnimations = true
+                                        withTransaction(transaction) {
+                                            episodeRowPosition.scrollTo(
+                                                id: target,
+                                                anchor: direction == .right ? .trailing : .leading
+                                            )
+                                        }
+                                    }
+                                    focusedEpisodeID = target
+                                }
+                            default:
+                                break
                             }
                         }
                         #endif
@@ -1775,9 +1808,6 @@ struct SeriesDetailView: View {
         // Snap to complete episode cards. Without view alignment the row can stop between cards.
         .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
         .scrollPosition($episodeRowPosition)
-        .onScrollTargetVisibilityChange(idType: String.self) { ids in
-            visibleEpisodeIDs = ids
-        }
         .onChange(of: vm.selectedSeasonID) { _, _ in
             episodeRowPosition.scrollTo(edge: .leading)
             deferOnMain(by: 0.15) {
@@ -1797,6 +1827,8 @@ struct SeriesDetailView: View {
             // overwrite the remembered card with a transient focus-engine landing position.
             if let oldID, newID == nil {
                 episodeAim.focusLeft(oldID)
+                rememberedEpisodeRowPosition = episodeRowPosition
+                episodeMoveGeneration += 1
                 return
             }
 
@@ -1844,7 +1876,7 @@ struct SeriesDetailView: View {
                                 id: season.id,
                                 name: season.name,
                                 isSelected: vm.selectedSeasonID == season.id,
-                                personalRating: season.userData?.rating.map { Int($0.rounded()) },
+                                personalRating: vm.personalSeasonRating(for: season),
                                 imageURL: dependencies.jellyfinImageService.posterURL(for: season),
                                 focusedID: $focusedSeasonID,
                                 action: {
