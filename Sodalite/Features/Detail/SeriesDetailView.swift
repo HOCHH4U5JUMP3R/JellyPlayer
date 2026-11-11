@@ -107,9 +107,11 @@ struct SeriesDetailView: View {
     /// Which cast card holds focus, for the row's entry aim (Sodalite#146 round 2). Same rule as the
     /// movie page: the first entry lands on the first card, after that the row remembers.
     @FocusState private var focusedCastID: String?
+    @State private var rememberedCastFocusID: String?
+    /// First-entry guard for the iOS cast row; tvOS uses rememberedCastFocusID and the outer scroll proxy.
     @State private var castEntryAimed = false
     @FocusState private var focusedSimilarID: String?
-    @State private var similarEntryAimed = false
+    @State private var rememberedSimilarFocusID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
@@ -664,6 +666,7 @@ struct SeriesDetailView: View {
         DetailContentOverlay(
             heroImageURL: backdropURL,
             heroPosterURL: vm.heroPosterURL(for: vm.item),
+            primaryTopInset: 6,
             hero: {
             // Infuse-style text title: keep the series name visible while the episode line follows focus.
             VStack(alignment: .leading, spacing: 8) {
@@ -725,22 +728,24 @@ struct SeriesDetailView: View {
                                 focusedSeasonID = vm.selectedSeasonID
                             }
                         }
-                        .onChange(of: focusedCastID) { _, newID in
-                            guard newID != nil else { return }
-                            // Keep the cast row inside the same backdrop and move the page to it
-                            // deliberately; relying on tvOS focus auto-scroll snaps an entire
-                            // viewport when the first portrait gains focus.
-                            if !castEntryAimed, let first = cast.first?.id {
-                                castEntryAimed = true
-                                // Correct the horizontal target BEFORE scrolling the outer page;
-                                // otherwise tvOS parks the portrait strip at its geometric midpoint.
+                        .onChange(of: focusedCastID) { oldID, newID in
+                            guard let newID else { return }
+                            let remembered = rememberedCastFocusID.flatMap { id in
+                                cast.contains(where: { $0.id == id }) ? id : nil
+                            }
+                            let target = remembered ?? cast.first?.id
+                            if oldID == nil, let target, newID != target {
+                                // Restore the previously focused portrait before moving the page.
                                 DispatchQueue.main.async {
-                                    focusedCastID = first
+                                    focusedCastID = target
                                     withAnimation(.easeInOut(duration: 0.55)) {
                                         outerProxy.scrollTo("castRow", anchor: .bottom)
                                     }
                                 }
-                            } else {
+                                return
+                            }
+                            rememberedCastFocusID = newID
+                            if oldID == nil {
                                 withAnimation(.easeInOut(duration: 0.55)) {
                                     outerProxy.scrollTo("castRow", anchor: .bottom)
                                 }
@@ -801,7 +806,9 @@ struct SeriesDetailView: View {
                     // reasoning. Here the season block is almost always first, so these carry the
                     // flag for the show that has no seasons yet.
                     let seasonBlockIsFirst = !vm.seasons.isEmpty || vm.isLoadingSeasons
-                    let hasCast = !((displayItem.people ?? vm.item.people) ?? []).isEmpty
+                    let episodeCast = (displayItem.people ?? []).filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
+                    let seriesCast = (vm.item.people ?? []).filter { ["actor", "gueststar"].contains(($0.type ?? "").lowercased()) }
+                    let hasCast = !(episodeCast.isEmpty ? seriesCast : episodeCast).isEmpty
 
                     #if !os(tvOS)
                     if let people = (displayItem.people ?? vm.item.people), !people.isEmpty {
@@ -838,15 +845,29 @@ struct SeriesDetailView: View {
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster,
                             focusedID: $focusedSimilarID,
-                            inset: 0
+                            // Below-fold content starts at the safe-area edge; the cast row sits
+                            // inside the primary column's additional 42pt leading inset.
+                            inset: metrics.rowInset + 42
                         )
-                        .onChange(of: focusedSimilarID) { _, newID in
-                            guard let newID, !similarEntryAimed else { return }
-                            similarEntryAimed = true
-                            guard let first = vm.similarItems.first?.id, newID != first else { return }
-                            DispatchQueue.main.async { focusedSimilarID = first }
+                        .onChange(of: focusedSimilarID) { oldID, newID in
+                            guard let newID else { return }
+                            let remembered = rememberedSimilarFocusID.flatMap { id in
+                                vm.similarItems.contains(where: { $0.id == id }) ? id : nil
+                            }
+                            let target = remembered ?? vm.similarItems.first?.id
+                            if oldID == nil, let target, newID != target {
+                                DispatchQueue.main.async { focusedSimilarID = target }
+                                return
+                            }
+                            rememberedSimilarFocusID = newID
                         }
-                        .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast) { playButtonFocused = true }
+                        .onFocusMoveUp(active: !hasCast) {
+                            if let target = episodeEntryTarget(vm: vm) {
+                                pendingEpisodeFocus = target
+                            } else {
+                                focusedSeasonID = vm.selectedSeasonID
+                            }
+                        }
                     }
 
                     // Same split the search screen teaches: what the server has on top, what it
@@ -970,13 +991,13 @@ struct SeriesDetailView: View {
     @ViewBuilder
     private func episodeLine(vm: DetailViewModel) -> some View {
         let values = episodeMetadataValues()
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             if let metadata = values.metadata {
-                Text(metadata).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(metadata).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
             if let ageRating = values.ageRating {
-                Text(ageRating).font(.caption).foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 8).padding(.vertical, 3)
+                Text(ageRating).font(.caption2).foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary.opacity(0.5), lineWidth: 1))
             }
         }
@@ -986,7 +1007,7 @@ struct SeriesDetailView: View {
     private func episodeBadges() -> some View {
         let pills = formatBadgePills()
         if !pills.isEmpty {
-            FormatBadgeRow(pills: pills)
+            FormatBadgeRow(pills: pills, font: .caption2, horizontalPadding: 6, verticalPadding: 2)
         }
     }
 
@@ -1745,8 +1766,8 @@ struct SeriesDetailView: View {
             .padding(.vertical, 8)
             .scrollTargetLayout()
         }
-        // Let tvOS's focus engine drive horizontal movement. View-aligned snapping competed
-        // with focus-driven scrolling and could cause reverse/extra-card jumps.
+        // Snap to complete episode cards. Without view alignment the row can stop between cards.
+        .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
         .scrollPosition($episodeRowPosition)
         .onChange(of: vm.selectedSeasonID) { _, _ in
             episodeRowPosition.scrollTo(edge: .leading)
