@@ -1760,7 +1760,18 @@ struct SeriesDetailView: View {
                                 // remote move invalidates this deferred write.
                                 let ids = vm.episodes.map(\.id)
                                 guard let index = ids.firstIndex(of: episode.id) else { return }
-                                let delta = direction == .right ? 1 : -1
+                                let delta: Int
+                                let anchor: UnitPoint
+                                switch direction {
+                                case .right:
+                                    delta = 1
+                                    anchor = .trailing
+                                case .left:
+                                    delta = -1
+                                    anchor = .leading
+                                default:
+                                    return
+                                }
                                 let nextIndex = index + delta
                                 guard ids.indices.contains(nextIndex) else { return }
                                 let target = ids[nextIndex]
@@ -1774,7 +1785,7 @@ struct SeriesDetailView: View {
                                         withTransaction(transaction) {
                                             episodeRowPosition.scrollTo(
                                                 id: target,
-                                                anchor: direction == .right ? .trailing : .leading
+                                                anchor: anchor
                                             )
                                         }
                                     }
