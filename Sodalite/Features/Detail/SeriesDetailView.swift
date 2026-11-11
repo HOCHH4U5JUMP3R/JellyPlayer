@@ -66,6 +66,15 @@ struct SeriesDetailView: View {
     }
 
     private var metrics: LayoutMetrics { LayoutMetrics.current(hSizeClass) }
+    /// On tvOS, keep the episode strip to four complete 360pt cards in the 10-foot viewport.
+    /// The wider gap also prevents a fifth card from peeking in at the trailing edge.
+    private var episodeRowItemSpacing: CGFloat {
+        #if os(tvOS)
+        108
+        #else
+        hSizeClass == .compact ? metrics.itemSpacing : 24
+        #endif
+    }
     /// iPhone portrait: full-width primary action over a centered secondary row.
     private var isPhonePortrait: Bool {
         #if os(iOS)
@@ -1069,7 +1078,7 @@ struct SeriesDetailView: View {
                 }.focused($focusedAction, equals: .watched)
                 InfuseDetailActionButton(title: "Bewerten", symbol: "star") { isPresentingRatingPicker = true }
                     .focused($focusedAction, equals: .rating)
-                InfuseDetailActionButton(title: "Favorit", symbol: "text.badge.plus") {
+                InfuseDetailActionButton(title: "Favorit", symbol: "heart") {
                     if let episode = selectedEpisode { Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) } }
                     else { Task { await vm.toggleFavorite() } }
                 }.focused($focusedAction, equals: .favorite)
@@ -1088,7 +1097,9 @@ struct SeriesDetailView: View {
                 InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
                     if let target = playTarget(vm: vm) { requestPlay(target, fromBeginning: false, fromPlayButton: true) }
                     else { pendingPlayRequest = true }
-                }.focused($focusedAction, equals: .play)
+                }
+                .focused($focusedAction, equals: .play)
+                .focused($playButtonFocused)
                 InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
                     Task {
                         if let trailer = await vm.loadTrailer() {
@@ -1848,7 +1859,7 @@ struct SeriesDetailView: View {
                 let playTargetID = playTarget(vm: vm)?.id
                 ScrollViewReader { episodeProxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : 24) {
+                        LazyHStack(spacing: episodeRowItemSpacing) {
                             ForEach(vm.episodes) { episode in
                                 VStack(alignment: .leading, spacing: 10) {
                                     Button {
@@ -1890,14 +1901,12 @@ struct SeriesDetailView: View {
                         .padding(.vertical, 8)
                         .scrollTargetLayout()
                     }
-                    .contentMargins(.horizontal, metrics.rowInset, for: .scrollContent)
                     .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                     .scrollPosition($episodeRowPosition)
                     .onChange(of: vm.selectedSeasonID) { _, _ in
-                        // Back to the row's own start, NOT scrollTo(first, anchor: .leading): that parks the
-                        // first card's leading edge on the viewport edge, which eats the row inset and leaves
-                        // the card flush against the screen edge (Vincent, 2026-08-17). The inset is padding
-                        // on the LazyHStack, so only an edge scroll keeps it.
+                        // Back to the row's own start, NOT scrollTo(first, anchor: .leading):
+                        // the episode ScrollView inherits the detail column's horizontal inset, and
+                        // an edge scroll preserves that alignment when switching seasons.
                         episodeRowPosition.scrollTo(edge: .leading)
                         deferOnMain(by: 0.15) {
                             scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
