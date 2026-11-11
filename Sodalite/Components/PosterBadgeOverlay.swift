@@ -1,5 +1,25 @@
 import SwiftUI
 
+/// Shared personal-rating mark for poster and season artwork. The caller supplies a size based on
+/// the artwork width so season covers use the same visual treatment at a proportionally smaller size.
+struct PersonalRatingMark: View {
+    let rating: Int
+    let fontSize: CGFloat
+    let accessibilityLabel: String
+    var inset: CGFloat = 0
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "star.fill")
+            Text("\(rating)")
+        }
+        .font(.system(size: fontSize, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(inset)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
 /// The pills in a card's top-left corner (Sodalite#79).
 ///
 /// A leaf on purpose: it, not `MediaCard`, reads the badge store, so a batch of enrichment landing
@@ -20,13 +40,11 @@ struct PosterBadgeOverlay: View {
                 }
             }
             if item.type == .series, let rating = dependencies.posterBadgeStore.personalSeriesRating(for: item) {
-                HStack(spacing: 2) {
-                    Image(systemName: "star.fill")
-                    Text("\(rating)")
-                }
-                .font(.system(size: fontSize * (0.13 / 0.06) * 0.90, weight: .semibold))
-                .foregroundStyle(.white)
-                .accessibilityLabel("Meine Serienbewertung \(rating) von 10")
+                PersonalRatingMark(
+                    rating: rating,
+                    fontSize: fontSize * (0.13 / 0.06) * 0.90,
+                    accessibilityLabel: "Meine Serienbewertung \(rating) von 10"
+                )
             }
         }
     }
