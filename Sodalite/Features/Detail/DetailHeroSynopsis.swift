@@ -48,7 +48,8 @@ struct DetailHeroSynopsis: View {
         return SpoilerReveal.isHidden(spoilerItem, dependencies: dependencies, appState: appState)
     }
 
-    var body: some View {
+    @ViewBuilder
+    private var synopsisText: some View {
         if let text, !text.isEmpty {
             Text(text)
                 .font(.body)
@@ -57,26 +58,30 @@ struct DetailHeroSynopsis: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .spoilerVeil(isHidden: isSpoilerHidden, style: .text)
-                #if !os(tvOS)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if expandsInPlace, !isSpoilerHidden {
-                        withAnimation(.easeInOut(duration: 0.25)) { isExpanded.toggle() }
-                    } else {
-                        onTap?()
-                    }
-                }
-                #endif
                 .onChange(of: text) { isExpanded = false }
                 .onChange(of: isSpoilerHidden) { if $1 { isExpanded = false } }
         } else {
-            // Keep the same reserved footprint even when the settled item has no overview. On
-            // episode pages the selected item changes in place; collapsing this branch made the
-            // hero, buttons and content below it jump between episodes.
             Text(verbatim: " ")
                 .font(.body)
                 .lineLimit(lineCount, reservesSpace: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    var body: some View {
+        #if os(tvOS)
+        Button { onTap?() } label: { synopsisText }
+            .buttonStyle(.plain)
+        #else
+        synopsisText
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if expandsInPlace, !isSpoilerHidden {
+                    withAnimation(.easeInOut(duration: 0.25)) { isExpanded.toggle() }
+                } else {
+                    onTap?()
+                }
+            }
+        #endif
     }
 }

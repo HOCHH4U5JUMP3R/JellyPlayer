@@ -725,7 +725,7 @@ struct SeriesDetailView: View {
             .padding(.horizontal, metrics.rowInset)
             // Keyed on item + load state only, NOT genre count: on an instant-paint episode deep-link the series genres land post-paint, flipping the count rebuilt the panel and broke scroll-to-top back to Play. Genres fill in via in-place diff.
             .id("\(vm.item.id)-\(vm.isLoading)")
-            .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
+            /* episode changes update in place; do not animate the entire column */
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
             VStack(alignment: .leading, spacing: 12) {
@@ -839,7 +839,7 @@ struct SeriesDetailView: View {
                         let minutes = Int((Double(runtime) / 600_000_000).rounded())
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
                             Text(minutes.formatted())
-                                .font(.system(size: 20, weight: .medium, design: .rounded))
+                                .font(.system(size: 30, weight: .semibold, design: .rounded))
                             Text("MIN.")
                                 .font(.system(size: 13, weight: .semibold))
                                 .tracking(1)
@@ -848,8 +848,8 @@ struct SeriesDetailView: View {
                     }
                     if let date = formattedDisplayDate() {
                         Text(date)
-                            .font(.system(size: 19, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.82))
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.92))
                     }
                     if let officialRating = displayItem.officialRating ?? vm.item.officialRating {
                         Text(officialRating)
@@ -858,20 +858,25 @@ struct SeriesDetailView: View {
                     }
                     let pills = formatBadgePills()
                     if !pills.isEmpty {
-                        FormatBadgeRow(pills: pills)
+                        FormatBadgeRow(pills: pills, prominent: true)
                     }
                 }
                 .foregroundStyle(.white)
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(height: 32, alignment: .leading)
 
                 let episodeGenres = displayItem.genres ?? []
                 let visibleGenres = episodeGenres.isEmpty ? (vm.item.genres ?? []) : episodeGenres
-                if !visibleGenres.isEmpty {
-                    Text(visibleGenres.joined(separator: "  ·  "))
-                        .font(.system(size: 20, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.86))
-                        .lineLimit(2)
+                Group {
+                    if !visibleGenres.isEmpty {
+                        Text(visibleGenres.joined(separator: "  ·  "))
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.62))
+                            .lineLimit(1)
+                    } else {
+                        Color.clear
+                    }
                 }
+                .frame(height: 26, alignment: .leading)
 
                 HStack(spacing: 16) {
                     if let communityRating = displayItem.communityRating ?? vm.item.communityRating {
@@ -896,6 +901,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .font(.system(size: 21, weight: .semibold, design: .rounded))
+                .frame(height: 30, alignment: .leading)
 
                 heroSynopsis
             } else {
@@ -1780,7 +1786,7 @@ struct SeriesDetailView: View {
     }
 
     /// One card, built once, so the row and the long-press preview cannot drift apart.
-    private func episodeCard(_ episode: JellyfinItem, vm: DetailViewModel, playTargetID: String?) -> some View {
+    private func episodeCard(_ episode: JellyfinItem, vm: DetailViewModel, playTargetID: String?, cardSize: CGSize? = nil) -> some View {
         EpisodeLandscapeCard(
             episode: episode,
             imageURL: dependencies.jellyfinImageService.episodeThumbnailURL(for: episode),
@@ -1789,7 +1795,8 @@ struct SeriesDetailView: View {
             isPlayed: vm.isPlayed(episode),
             isFavorite: vm.isFavorite(episode),
             personalRating: vm.rating(of: episode),
-            justMarkedPlayed: vm.wasMarkedPlayedInSession(episode)
+            justMarkedPlayed: vm.wasMarkedPlayedInSession(episode),
+            sizeOverride: cardSize
         )
     }
 
@@ -1939,14 +1946,18 @@ struct SeriesDetailView: View {
                 // Resolved once for the row: the ring reads the same target the Play button acts on, so the two cannot name different episodes.
                 let playTargetID = playTarget(vm: vm)?.id
                 ScrollViewReader { episodeProxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : 24) {
+                    GeometryReader { geometry in
+                        let railSpacing: CGFloat = 16
+                        let cardWidth = max(120, (geometry.size.width - railSpacing * 4) / 5)
+                        let railCardSize = CGSize(width: cardWidth, height: cardWidth * 9 / 16)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHStack(spacing: railSpacing) {
                             ForEach(vm.episodes) { episode in
                                 VStack(alignment: .leading, spacing: 10) {
                                     Button {
                                         requestPlay(episode, fromBeginning: false, fromPlayButton: false)
                                     } label: {
-                                        episodeCard(episode, vm: vm, playTargetID: playTargetID)
+                                        episodeCard(episode, vm: vm, playTargetID: playTargetID, cardSize: railCardSize)
                                     }
                                     .buttonStyle(EpisodeCardButtonStyle())
                                     .focused($focusedEpisodeID, equals: episode.id)
@@ -1973,9 +1984,9 @@ struct SeriesDetailView: View {
                         }
                         // Reserve room for the tvOS focus lift so the top edge and focus ring stay
                         // inside the horizontal ScrollView's clipping bounds.
-                        .padding(.vertical, 32)
-                    }
-                    .scrollPosition($episodeRowPosition)
+                            .padding(.vertical, 32)
+                        }
+                        .scrollPosition($episodeRowPosition)
                     .onChange(of: vm.selectedSeasonID) { _, _ in
                         // Back to the row's own start, NOT scrollTo(first, anchor: .leading): that parks the
                         // first card's leading edge on the viewport edge, which eats the row inset and leaves
@@ -2033,6 +2044,8 @@ struct SeriesDetailView: View {
                     .onAppear {
                         scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
                     }
+                    }
+                    .frame(height: 220)
                 }
             }
         }
@@ -2147,15 +2160,19 @@ struct SeriesDetailView: View {
     private func episodeSkeletonRow(vm: DetailViewModel) -> some View {
         let seasonCount = vm.seasons.first(where: { $0.id == vm.selectedSeasonID })?.childCount
         let count = min(max(seasonCount ?? 6, 3), 10)
-        return ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: hSizeClass == .compact ? metrics.itemSpacing : 24) {
-                ForEach(0..<count, id: \.self) { _ in
-                    EpisodeSkeletonCard()
+        return GeometryReader { geometry in
+            let spacing: CGFloat = 16
+            let width = max(120, (geometry.size.width - spacing * 4) / 5)
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: spacing) {
+                    ForEach(0..<count, id: \.self) { _ in
+                        EpisodeSkeletonCard(sizeOverride: CGSize(width: width, height: width * 9 / 16))
+                    }
                 }
+                .padding(.vertical, 32)
             }
-            .padding(.horizontal, metrics.rowInset)
-            .padding(.vertical, 16)
         }
+        .frame(height: 220)
         .allowsHitTesting(false)
     }
 

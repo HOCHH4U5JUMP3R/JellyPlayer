@@ -115,8 +115,9 @@ struct EpisodeSkeletonCard: View {
 
     @Environment(\.dependencies) private var dependencies
     @Environment(\.horizontalSizeClass) private var hSizeClass
+    var sizeOverride: CGSize? = nil
     private var cardSize: CGSize {
-        LayoutMetrics.current(hSizeClass)
+        sizeOverride ?? LayoutMetrics.current(hSizeClass)
             .tileSize(cardScale: dependencies.appearancePreferences.cardScale)
     }
 
@@ -145,15 +146,6 @@ struct EpisodeSkeletonCard: View {
             }
             .frame(width: cardSize.width, alignment: .leading)
 
-            // Synopsis placeholder at EpisodeSynopsisBox's three-line height so the row keeps its height on swap.
-            Text(" ")
-                .font(.caption)
-                .lineLimit(3, reservesSpace: true)
-                .frame(width: synopsisWidth, alignment: .topLeading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.Theme.surface))
-                .overlay(shimmerOverlay.clipShape(RoundedRectangle(cornerRadius: 12)))
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: false)) {
@@ -195,6 +187,7 @@ struct EpisodeLandscapeCard: View {
     /// The viewer's own mark-watched from this session, which is a different fact from `isPlayed`
     /// and the only one that may hide the resume indicator (`DetailViewModel.wasMarkedPlayedInSession`).
     var justMarkedPlayed: Bool = false
+    var sizeOverride: CGSize? = nil
 
     @Environment(\.appearanceTheme) private var appearanceTheme
     @Environment(\.dependencies) private var dependencies
@@ -204,7 +197,7 @@ struct EpisodeLandscapeCard: View {
         dependencies.spoilerPolicy(userID: appState.activeUser?.id)
     }
     private var cardSize: CGSize {
-        LayoutMetrics.current(hSizeClass)
+        sizeOverride ?? LayoutMetrics.current(hSizeClass)
             .tileSize(cardScale: dependencies.appearancePreferences.cardScale)
     }
 
