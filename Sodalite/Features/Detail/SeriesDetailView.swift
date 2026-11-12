@@ -1005,7 +1005,7 @@ struct SeriesDetailView: View {
             isPending: overviewMayStillLand || isShowingEpisode,
             spoilerItem: displayItem,
             onTap: openMoreDetails,
-            onMoveDown: { focusedAction = .watched },
+            focusedAction: $focusedAction,
             expandsInPlace: isPhonePortrait
         )
     }
@@ -1954,7 +1954,7 @@ struct SeriesDetailView: View {
         // .focusSection (at the bottom) keeps up/down inside the season+episode block, else a far-right episode's up-swipe bypasses the season bar and lands on the overview textbox; the onMoveCommand redirect then snaps to the selected tab.
         let sectionSpacing: CGFloat
         #if os(tvOS)
-        sectionSpacing = 20
+        sectionSpacing = 32
         #else
         sectionSpacing = 20
         #endif
@@ -2001,7 +2001,9 @@ struct SeriesDetailView: View {
                         }
                         // Focus scale 1.05 needs vertical slack or the halo clips against the scroll-view edges.
                         .padding(.top, 8)
-                        .padding(.bottom, 8)
+                        // The season poster grows visually by 5% while focused; reserve
+                        // enough real layout space so the episode rail cannot paint over it.
+                        .padding(.bottom, 32)
                     }
                     .scrollClipDisabled()
                     .onChange(of: focusedSeasonID) { oldID, newID in
@@ -2269,7 +2271,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .padding(.top, 8)
-                .padding(.bottom, 0)
+                .padding(.bottom, 32)
             }
             .scrollClipDisabled()
 
