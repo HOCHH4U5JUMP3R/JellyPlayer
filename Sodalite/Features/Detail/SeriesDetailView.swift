@@ -41,6 +41,7 @@ struct SeriesDetailView: View {
     /// Play launched from the glass-panel Play button vs an episode card; player-dismiss restores focus to the right control (else Down jumped past the seasons row to cast).
     @State private var playOriginatedFromPlayButton = false
     @State private var isShuffleLoading = false
+    @State private var isRefreshingMetadata = false
     /// Outer vertical ScrollView proxy; player-dismiss scrolls back to the episode row else the nil-flicker focus restore leaves the page stuck at the top.
     @State private var episodeRowScrollProxy: ScrollViewProxy?
     /// Whole-page scroll proxy, iOS only (see PageScrollProxyCapture). Captured outside DetailContentOverlay so it can reach the glass panel, which sits above the content block episodeRowScrollProxy covers.
@@ -658,8 +659,21 @@ struct SeriesDetailView: View {
             heroTallImageURL: tallBackdropURL,
             portraitHero: true,
             hero: {
-            // Series logo, both modes (episode has none); observes the VM so it appears once an episode deep-link's series stub loads imageTags, no scroll needed.
-            DetailHeroLogo(viewModel: vm)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(vm.item.name)
+                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                if isShowingEpisode {
+                    Text(episodeHeading(vm: vm))
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
         }, primary: {
             // Glass panel + action buttons as the bottom-aligned first-page block (Sodalite#15 round 6), kept one unit so the id-rebuild and episode crossfade cover both.
             VStack(alignment: .leading, spacing: 24) {
@@ -683,7 +697,7 @@ struct SeriesDetailView: View {
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
             ScrollViewReader { outerProxy in
-                VStack(alignment: .leading, spacing: 40) {
+                VStack(alignment: .leading, spacing: 12) {
                     // No synopsis block here any more (Sodalite#146). Three lines of it sit in the
                     // first viewport and the whole of it is behind More Details, so a third copy
                     // under the fold was the page saying the same thing twice with a focus stop
@@ -845,9 +859,47 @@ struct SeriesDetailView: View {
                 }
             }
 
-            // Sodalite#146: series synopsis in the series state, the episode's own in episode state,
-            // which is what displayItem/displayOverview already resolve for the box below the fold.
-            // The upright iPhone has it under the buttons instead.
+            #if os(tvOS)
+            let episodeGenres = displayItem.genres ?? []
+            let visibleGenres = episodeGenres.isEmpty ? (vm.item.genres ?? []) : episodeGenres
+            if let date = formattedDisplayDate() {
+                Text(date)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+            if !visibleGenres.isEmpty {
+                Text(visibleGenres.joined(separator: "  ·  "))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.78))
+                    .lineLimit(2)
+            }
+
+            HStack(spacing: 16) {
+                if let communityRating = displayItem.communityRating ?? vm.item.communityRating {
+                    HStack(spacing: 7) {
+                        Image("JellyfinMark")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                        Text(communityRating.formatted(.number.precision(.fractionLength(1))))
+                    }
+                    .foregroundStyle(.white)
+                    .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
+                }
+                if let personalRating = vm.rating(of: displayItem) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "star.fill")
+                        Text(Int(personalRating.rounded()).formatted())
+                    }
+                    .foregroundStyle(.white)
+                    .accessibilityLabel("Meine Bewertung \(Int(personalRating.rounded())) von 10")
+                }
+            }
+            .font(.subheadline.weight(.semibold))
+            #endif
+
+            // Sodalite#146: series synopsis in the series state, the episode's own in episode state.
+            // The synopsis is visible immediately in the first detail panel.
             if !isPhonePortrait { heroSynopsis }
         }
         .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
@@ -959,6 +1011,31 @@ struct SeriesDetailView: View {
     /// the genres left the page (Sodalite#146 round 2): keeping them here would have been the one
     /// place they survived, on the state that has the least room for them. nil when there is no
     /// runtime, so the line collapses rather than drawing empty.
+    private func episodeHeading(vm: DetailViewModel) -> String {
+        let token = EpisodeMetadataFormatter.seasonEpisode(
+            season: displayItem.parentIndexNumber,
+            episode: displayItem.indexNumber
+        ).replacingOccurrences(of: ", ", with: " • ")
+        return [token, displayItem.name].filter { !$0.isEmpty }.joined(separator: " - ")
+    }
+
+    private func formattedDisplayDate() -> String? {
+        guard let rawDate = displayItem.premiereDate ?? viewModel?.item.premiereDate,
+              rawDate.count >= 10 else { return nil }
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = TimeZone(secondsFromGMT: 0)
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: String(rawDate.prefix(10))) else {
+            return String(rawDate.prefix(10))
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.timeZone = .current
+        formatter.dateFormat = "dd.MM.yyyy"
+        return formatter.string(from: date)
+    }
+
     private func episodeMetadataLine(vm: DetailViewModel) -> String? {
         guard let runtime = selectedEpisode?.runTimeTicks, runtime > 0 else { return nil }
         return runtime.ticksToDurationDisplay
@@ -968,13 +1045,93 @@ struct SeriesDetailView: View {
 
     /// Button row below the glass panel, outside it (Sodalite#15 round 6) so the plate stays a compact metadata card; each GlassActionButton carries its own material so the row needs no plate.
     private func actionButtonRow(vm: DetailViewModel) -> some View {
+        #if os(tvOS)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                InfuseDetailActionButton(
+                    title: isShowingEpisode
+                        ? ((selectedEpisode.map { vm.isPlayed($0) } == true) ? "Als ungesehen markieren" : "Als gesehen markieren")
+                        : (vm.isPlayed ? "Als ungesehen markieren" : "Als gesehen markieren"),
+                    symbol: "checkmark"
+                ) {
+                    if let episode = selectedEpisode {
+                        Task { await vm.setEpisodePlayed(episode, isPlayed: !vm.isPlayed(episode)) }
+                    } else {
+                        isConfirmingPlayedChange = true
+                    }
+                }
+                .focused($focusedAction, equals: .watched)
+
+                InfuseDetailActionButton(title: "Bewerten", symbol: "star") {
+                    let ratedItem = selectedEpisode ?? vm.item
+                    ratingPrompt = RatingPrompt(itemID: ratedItem.id)
+                }
+                .focused($focusedAction, equals: .rating)
+
+                InfuseDetailActionButton(
+                    title: isShowingEpisode
+                        ? ((selectedEpisode.map { vm.isFavorite($0) } == true) ? "Favorit entfernen" : "Favorit")
+                        : (vm.isFavorite ? "Favorit entfernen" : "Favorit"),
+                    symbol: "heart"
+                ) {
+                    if let episode = selectedEpisode {
+                        Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) }
+                    } else {
+                        Task { await vm.toggleFavorite() }
+                    }
+                }
+                .focused($focusedAction, equals: .favorite)
+
+                InfuseDetailActionButton(
+                    title: "Synchronisieren",
+                    symbol: "arrow.clockwise",
+                    isLoading: isRefreshingMetadata
+                ) {
+                    guard !isRefreshingMetadata else { return }
+                    isRefreshingMetadata = true
+                    Task {
+                        let selectedID = selectedEpisode?.id
+                        await vm.refreshMetadata()
+                        if let selectedID,
+                           let refreshed = vm.episodes.first(where: { $0.id == selectedID }) {
+                            selectedEpisode = refreshed
+                        }
+                        isRefreshingMetadata = false
+                    }
+                }
+                .focused($focusedAction, equals: .sync)
+            }
+
+            HStack(spacing: 12) {
+                InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
+                    if let target = playTarget(vm: vm) {
+                        requestPlay(target, fromBeginning: false, fromPlayButton: true)
+                    } else {
+                        pendingPlayRequest = true
+                    }
+                }
+                .focused($focusedAction, equals: .play)
+                .focused($playButtonFocused)
+
+                InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
+                    Task {
+                        if let trailer = await vm.loadTrailer() {
+                            playItem = trailer
+                            playFromBeginning = true
+                            playOriginatedFromPlayButton = false
+                            showPlayer = true
+                        }
+                    }
+                }
+                .focused($focusedAction, equals: .trailer)
+            }
+        }
+        #else
         Group {
             if isPhonePortrait {
                 VStack(spacing: 12) {
                     primaryActionButton(vm: vm)
                         .frame(maxWidth: .infinity)
-                    // Centered, and wrapping to a second line rather than scrolling: a button-heavy
-                    // series has more actions than one portrait line holds.
                     DetailActionRow(alignment: .center, balanced: true) {
                         secondaryActionButtons(vm: vm)
                     }
@@ -988,6 +1145,7 @@ struct SeriesDetailView: View {
                 }
             }
         }
+        #endif
     }
 
     private func primaryActionButton(vm: DetailViewModel) -> some View {
@@ -1587,6 +1745,7 @@ struct SeriesDetailView: View {
             isFocused: focusedEpisodeID == episode.id,
             isPlayed: vm.isPlayed(episode),
             isFavorite: vm.isFavorite(episode),
+            personalRating: vm.rating(of: episode),
             justMarkedPlayed: vm.wasMarkedPlayedInSession(episode)
         )
     }
@@ -1609,7 +1768,11 @@ struct SeriesDetailView: View {
 
     private func seasonSection(vm: DetailViewModel) -> some View {
         // .focusSection (at the bottom) keeps up/down inside the season+episode block, else a far-right episode's up-swipe bypasses the season bar and lands on the overview textbox; the onMoveCommand redirect then snaps to the selected tab.
+        #if os(tvOS)
+        VStack(alignment: .leading, spacing: 8) {
+        #else
         VStack(alignment: .leading, spacing: 20) {
+        #endif
             if usesSeasonMenu {
                 seasonMenu(vm: vm)
             } else {
@@ -1996,3 +2159,60 @@ struct SeriesDetailView: View {
         }
     }
 }
+
+#if os(tvOS)
+private struct InfuseDetailActionButtonStyle: ButtonStyle {
+    var isProminent: Bool
+    @Environment(\.isFocused) private var isFocused
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 13)
+                    .fill(
+                        isProminent
+                            ? (isFocused
+                                ? Color(red: 0.24, green: 0.58, blue: 1.0)
+                                : Color(red: 0.10, green: 0.38, blue: 0.78))
+                            : Color.white.opacity(isFocused ? 0.28 : 0.10)
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 13))
+            .animation(.easeOut(duration: 0.12), value: isFocused)
+            .animation(nil, value: configuration.isPressed)
+    }
+}
+
+private struct InfuseDetailActionButton: View {
+    let title: String
+    let symbol: String
+    var prominent = false
+    var isLoading = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                if isLoading {
+                    ProgressView().tint(.white)
+                } else {
+                    Image(systemName: symbol)
+                        .font(.system(size: prominent ? 23 : 25, weight: .semibold))
+                }
+                if prominent || title == "Trailer" {
+                    Text(title)
+                        .font(.system(size: 22, weight: .semibold))
+                        .lineLimit(1)
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 62)
+        }
+        .buttonStyle(InfuseDetailActionButtonStyle(isProminent: prominent))
+        .focusEffectDisabled(true)
+        .accessibilityLabel(Text(title))
+    }
+}
+#endif
+

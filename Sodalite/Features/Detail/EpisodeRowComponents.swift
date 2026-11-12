@@ -166,6 +166,9 @@ struct EpisodeLandscapeCard: View {
     /// Same reason as isPlayed; also the only feedback the context-menu favorite toggle has.
     var isFavorite: Bool = false
 
+    /// The viewer's personal rating, rendered at the artwork's top-left.
+    var personalRating: Double? = nil
+
     /// The viewer's own mark-watched from this session, which is a different fact from `isPlayed`
     /// and the only one that may hide the resume indicator (`DetailViewModel.wasMarkedPlayedInSession`).
     var justMarkedPlayed: Bool = false
@@ -232,6 +235,21 @@ struct EpisodeLandscapeCard: View {
                     posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+                if let personalRating {
+                    HStack(spacing: 5) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(Int(personalRating.rounded()).formatted())
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.72), in: Capsule())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(10)
+                }
             }
             .frame(width: artworkSize.width, height: artworkSize.height)
             // The ring's room, inside the card rather than outside it.

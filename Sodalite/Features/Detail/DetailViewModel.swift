@@ -368,6 +368,27 @@ final class DetailViewModel {
         startSeasonPrefetch()
     }
 
+    /// Refreshes the series metadata and its visible season/episode state in place.
+    /// Unlike loadFullDetail(), this does not toggle the page loading gate or rebuild the detail overlay.
+    func refreshMetadata() async {
+        let itemID = item.id
+        let detail = try? await itemService.getItemDetail(userID: userID, itemID: itemID)
+        if let detail {
+            await MainActor.run {
+                self.item = detail
+                self.isFavorite = detail.userData?.isFavorite ?? false
+                self.isPlayed = detail.userData?.played ?? false
+                if !self.isWritingRating {
+                    self.rating = detail.userData?.rating
+                }
+            }
+        }
+
+        guard item.type == .series else { return }
+        await refreshSeasons()
+        await refreshResumePosition()
+    }
+
     /// Re-fetch seasons after a deletion. Unlike loadSeasons(), skips next-up/initial-episode selection: keeps the surviving selected season (else first remaining). Drops the whole episode cache (deleted seasons leave stale entries).
     func refreshSeasons() async {
         guard item.type == .series else { return }
