@@ -148,8 +148,6 @@ struct HomeView: View {
                 .environment(\.serverSession, filter.serverID.map { dependencies.sessionRegistry.session(forServerID: $0) })
             }
         }
-    }
-
         )
     }
 
@@ -189,8 +187,6 @@ struct HomeView: View {
                 guard !covered else { return }
                 Task { await viewModel?.refreshIfStale(trigger: .coverDismissed) }
             }
-    }
-
         )
     }
 
@@ -220,8 +216,6 @@ struct HomeView: View {
                     }
                 }
             }
-    }
-
         )
     }
 
@@ -264,8 +258,6 @@ struct HomeView: View {
                     }
                 }
             }
-    }
-
         )
     }
 
@@ -295,8 +287,6 @@ struct HomeView: View {
                 guard vm.acceptsSources(sources) else { return }
                 Task { await vm.updateSources(sources) }
             }
-    }
-
         )
     }
 
@@ -318,8 +308,6 @@ struct HomeView: View {
             .onChange(of: viewModel?.rows.flatMap({ $0.items.map(\.id) })) { _, _ in
                 if let vm = viewModel { prefetchHomePosters(vm) }
             }
-    }
-
         )
     }
 
@@ -353,8 +341,6 @@ struct HomeView: View {
             } message: { message in
                 Text(message)
             }
-    }
-
         )
     }
 
