@@ -140,6 +140,11 @@ struct SeriesDetailView: View {
     /// movie page: the first entry lands on the first card, after that the row remembers.
     @FocusState private var focusedCastID: String?
     @State private var castEntryAimed = false
+    /// Focus is remembered per rail; the focus engine's nearest-neighbour choice must not
+    /// overwrite the last card the viewer used in another horizontal row.
+    @State private var lastFocusedSeasonID: String?
+    @State private var lastFocusedEpisodeID: String?
+    @State private var lastFocusedCastID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
@@ -701,10 +706,31 @@ struct SeriesDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
+                #if os(tvOS)
+                if vm.hasFullDetail && !vm.isLoadingSeasons {
+                    actionButtonRow(vm: vm)
+                } else {
+                    actionButtonSkeletonRow()
+                }
+                #else
                 actionButtonRow(vm: vm)
-                // Seasons and episodes are part of the same continuous backdrop scroll as the hero.
+                #endif
+                // Seasons and episodes are fetched in parallel, but on tvOS their real rows wait
+                // until the series detail and Next Up have settled. This prevents the lower rows
+                // appearing first and then being pushed down when the hero metadata arrives.
                 ScrollViewReader { outerProxy in
                     VStack(alignment: .leading, spacing: 8) {
+                        #if os(tvOS)
+                        if vm.hasFullDetail && !vm.isLoadingSeasons {
+                            if !vm.seasons.isEmpty {
+                                seasonSection(vm: vm)
+                                    .id("episodeRow")
+                            }
+                        } else {
+                            seasonSectionSkeleton(vm: vm)
+                                .id("episodeRow")
+                        }
+                        #else
                         if !vm.seasons.isEmpty {
                             seasonSection(vm: vm)
                                 .id("episodeRow")
@@ -712,6 +738,7 @@ struct SeriesDetailView: View {
                             seasonSectionSkeleton(vm: vm)
                                 .id("episodeRow")
                         }
+                        #endif
                     }
                     .onAppear { episodeRowScrollProxy = outerProxy }
                 }
@@ -761,7 +788,15 @@ struct SeriesDetailView: View {
                             onSelect: { handlePersonTap($0) }
                         )
                         .onFocusMoveUp(active: !seasonBlockIsFirst) { playButtonFocused = true }
-                        .onChange(of: focusedCastID) { _, newID in
+                        .onChange(of: focusedCastID) { oldID, newID in
+                            guard let newID else { return }
+                            if oldID == nil,
+                               let rememberedID = lastFocusedCastID,
+                               rememberedID != newID {
+                                DispatchQueue.main.async { focusedCastID = rememberedID }
+                                return
+                            }
+                            lastFocusedCastID = newID
                             aimFirstCastEntry(at: newID, in: cast)
                         }
                     }
@@ -1049,7 +1084,7 @@ struct SeriesDetailView: View {
     /// where that line is drawn, and through it whether the page is scrollable at all. The season
     /// block counts while it is still loading: its skeleton holds the same room the real one will.
     private func hasBelowFoldSections(vm: DetailViewModel) -> Bool {
-        !vm.seasons.isEmpty || vm.isLoadingSeasons
+        !vm.seasons.isEmpty || vm.isLoadingSeasons || !vm.hasFullDetail
             || !(vm.item.people?.isEmpty ?? true)
             || (!isShowingEpisode && vm.hasTrailersOrExtras)
             || !vm.similarItems.isEmpty
@@ -1095,6 +1130,35 @@ struct SeriesDetailView: View {
     }
 
     // MARK: - Action Buttons
+
+    #if os(tvOS)
+    /// Holds the two action rows' exact footprint until the detail and Next Up data are ready.
+    /// Non-focusable placeholders prevent the remote from landing on controls whose labels or
+    /// targets are still changing.
+    private func actionButtonSkeletonRow() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                ForEach(0..<4, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 13)
+                        .fill(Color.white.opacity(0.10))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 62)
+                }
+            }
+            HStack(spacing: 12) {
+                ForEach(0..<2, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 13)
+                        .fill(Color.white.opacity(0.10))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 62)
+                }
+            }
+        }
+        .frame(maxWidth: 880, alignment: .leading)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+    #endif
 
     /// Button row below the glass panel, outside it (Sodalite#15 round 6) so the plate stays a compact metadata card; each GlassActionButton carries its own material so the row needs no plate.
     private func actionButtonRow(vm: DetailViewModel) -> some View {
@@ -1812,13 +1876,19 @@ struct SeriesDetailView: View {
 
     /// Where a move down into the episode row lands. Every entry path (the focus bridge, the one-shot redirect below it, the return from the player) reads this one resolver so they cannot aim at different cards.
     private func episodeEntryTarget(vm: DetailViewModel) -> String? {
-        episodeAim.target(in: vm.episodes.map(\.id), currentEpisodeID: vm.currentEpisodeID)
+        if let lastFocusedEpisodeID,
+           vm.episodes.contains(where: { $0.id == lastFocusedEpisodeID }) {
+            return lastFocusedEpisodeID
+        }
+        return episodeAim.target(in: vm.episodes.map(\.id), currentEpisodeID: vm.currentEpisodeID)
     }
 
     /// Up out of the episode row. It used to go straight to the season bar, which skipped the season synopsis sitting between the two (reachable downwards, unreachable upwards). Now the synopsis takes the first stop when there is one, and its own up-move carries on to the season bar.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
         // The season synopsis panel is intentionally absent; move straight back to the selected season tab.
-        let target = vm.selectedSeasonID
+        let target = lastFocusedSeasonID.flatMap { remembered in
+            vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
+        } ?? vm.selectedSeasonID
         deferOnMain(by: 0.03) { focusedSeasonID = target }
     }
 
@@ -1869,24 +1939,23 @@ struct SeriesDetailView: View {
                         // Focus scale 1.05 needs vertical slack or the halo clips against the scroll-view edges.
                         .padding(.vertical, 12)
                     }
+                    .scrollClipDisabled()
                     .onChange(of: focusedSeasonID) { oldID, newID in
-                        // Force focus back to the current season on entry from above (oldID nil), return from the episode row (episodesHadFocus), or fall-through.
-                        let cameFromOutside = oldID == nil || episodesHadFocus
-                        if cameFromOutside, let newID, newID != vm.selectedSeasonID {
-                            let target = vm.selectedSeasonID
-                            // Defer one runloop tick: a synchronous @FocusState write inside its own onChange is dropped on tvOS; DispatchQueue.main is honored, Task/Task.sleep hops are swallowed.
-                            DispatchQueue.main.async {
-                                focusedSeasonID = target
+                        if let newID {
+                            if oldID == nil,
+                               let rememberedID = lastFocusedSeasonID,
+                               rememberedID != newID {
+                                // Restore this rail's previous focus instead of accepting the
+                                // focus engine's nearest card from whichever row we came from.
+                                DispatchQueue.main.async { focusedSeasonID = rememberedID }
+                            } else {
+                                lastFocusedSeasonID = newID
                             }
-                        }
-                        episodesHadFocus = false
-                        if newID != nil {
+                            episodesHadFocus = false
                             lastFocusedArea = .season
-                        }
-                        // Let tvOS preserve the season rail's own horizontal offset. Re-centering
-                        // on every focus transition caused unrelated rows to shift it.
-                        if newID != nil {
                             episodeRedirectDone = false
+                        } else if let oldID {
+                            lastFocusedSeasonID = oldID
                         }
                     }
                     .onChange(of: focusedEpisodeID) { oldEpisode, newEpisode in
@@ -1903,11 +1972,18 @@ struct SeriesDetailView: View {
                             }
                         }
 
-                        if newEpisode != nil {
+                        if let newEpisode {
+                            // A non-nil old value means horizontal movement inside this rail.
+                            // A nil old value is entry from another rail; keep the previous target.
+                            if oldEpisode != nil {
+                                lastFocusedEpisodeID = newEpisode
+                            }
                             episodesHadFocus = true
                             lastFocusedArea = .episode
                         } else if let oldEpisode {
+                            lastFocusedEpisodeID = oldEpisode
                             episodeAim.focusLeft(oldEpisode)
+                            episodeRedirectDone = false
                         }
                     }
                     .onChange(of: vm.selectedSeasonID) { _, newID in
@@ -1943,7 +2019,7 @@ struct SeriesDetailView: View {
                         }
                     case .none:
                         // First focus into this section (e.g. NavigationStack push): default to the selected season.
-                        let target = vm.selectedSeasonID
+                        let target = lastFocusedSeasonID ?? vm.selectedSeasonID
                         deferFocusWrite { focusedSeasonID = target }
                     }
                 }
@@ -1996,6 +2072,7 @@ struct SeriesDetailView: View {
                             .padding(.vertical, 32)
                         }
                         .scrollPosition($episodeRowPosition)
+                        .scrollClipDisabled()
                     .onChange(of: vm.selectedSeasonID) { _, _ in
                         // Back to the row's own start, NOT scrollTo(first, anchor: .leading): that parks the
                         // first card's leading edge on the viewport edge, which eats the row inset and leaves
@@ -2152,13 +2229,19 @@ struct SeriesDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(0..<6, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.Theme.surface)
-                            .frame(width: 128, height: 192)
+                        VStack(spacing: 5) {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.Theme.surface)
+                                .frame(width: 144, height: 216)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.white.opacity(0.12))
+                                .frame(width: 84, height: 10)
+                        }
                     }
                 }
                 .padding(.vertical, 12)
             }
+            .scrollClipDisabled()
 
             episodeSkeletonRow(vm: vm)
         }
@@ -2180,6 +2263,7 @@ struct SeriesDetailView: View {
                 }
                 .padding(.vertical, 32)
             }
+            .scrollClipDisabled()
         }
         .frame(height: 280)
         .allowsHitTesting(false)
