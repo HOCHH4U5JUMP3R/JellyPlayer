@@ -485,6 +485,9 @@ struct SeriesDetailView: View {
                     streamingQuality: { [dependencies] in dependencies.playbackPreferences.defaultStreamingQuality() }
                 )
                 viewModel?.trakt = dependencies.trakt
+                // Resolve the backdrop from the navigation snapshot immediately; do not wait for
+                // Next Up, season artwork, or the full-detail request to finish before painting it.
+                updateBackdropURL()
                 Task {
                     await viewModel?.loadFullDetail()
                     updateBackdropURL()
