@@ -16,8 +16,8 @@ struct SeasonTab: View {
     private var isFocused: Bool { focusedID.wrappedValue == id }
 
     var body: some View {
-        Button { action() } label: {
-            VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
+            Button { action() } label: {
                 ZStack(alignment: .topLeading) {
                     AsyncCachedImage(url: imageURL) { image in
                         image.resizable().aspectRatio(contentMode: .fill)
@@ -47,18 +47,19 @@ struct SeasonTab: View {
                         .padding(7)
                     }
                 }
-                Text(name)
-                    .font(.caption)
-                    .foregroundStyle(isSelected || isFocused ? .white : .secondary)
-                    .lineLimit(1)
-                    .frame(width: 128)
             }
-            .contentShape(Rectangle())
+            .buttonStyle(SeasonTabButtonStyle())
+            .focused(focusedID, equals: id)
+
+            Text(name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(width: 128, alignment: .leading)
         }
-        .buttonStyle(SeasonTabButtonStyle())
-        .focused(focusedID, equals: id)
     }
 }
+
 
 // MARK: - Button Styles
 

@@ -147,7 +147,9 @@ final class DetailViewModel {
 
     func loadFullDetail() async {
         // Episode deep-links arrive with the full episode in hand, enough to paint the first frame, so skip the loading gate and let seasons/cast/similar fade in (the episode path's "grey then everything at once" on slow CDNs). No next-up resolution runs here, so it's safe from the series-path repaint storm.
-        isLoading = (initialEpisode == nil)
+        // Series details can paint from the navigation snapshot while seasons/Next Up load progressively.
+        // Other item types retain the short snapshot gate used to avoid a field-fill repaint storm.
+        isLoading = (initialEpisode == nil && item.type != .series)
 
         let itemID = item.id
         let itemType = item.type

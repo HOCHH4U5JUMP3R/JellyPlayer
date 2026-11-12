@@ -62,6 +62,7 @@ extension Array where Element == CastMember {
 struct MediaCastRow: View {
     /// nil suppresses the built-in heading, for callers that draw their own section header.
     var title: LocalizedStringKey? = "detail.cast"
+    var titleFont: Font = .title3
     let members: [CastMember]
     /// Overrides the tier's row inset so the row can line up with a host screen that insets differently.
     var inset: CGFloat? = nil
@@ -79,7 +80,7 @@ struct MediaCastRow: View {
         VStack(alignment: .leading, spacing: 12) {
             if let title {
                 Text(title)
-                    .font(.title3)
+                    .font(titleFont)
                     .fontWeight(.semibold)
                     .padding(.horizontal, rowInset)
             }

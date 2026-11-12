@@ -92,6 +92,7 @@ struct SeriesDetailView: View {
     }
 
     private var metrics: LayoutMetrics { LayoutMetrics.current(hSizeClass) }
+    private var detailSectionTitleFont: Font { .system(size: 28, weight: .semibold, design: .rounded) }
     /// iPhone portrait: full-width primary action over a centered secondary row.
     private var isPhonePortrait: Bool {
         #if os(iOS)
@@ -484,6 +485,9 @@ struct SeriesDetailView: View {
                     streamingQuality: { [dependencies] in dependencies.playbackPreferences.defaultStreamingQuality() }
                 )
                 viewModel?.trakt = dependencies.trakt
+                // Resolve the backdrop from the navigation snapshot immediately; do not wait for
+                // Next Up, season artwork, or the full-detail request to finish before painting it.
+                updateBackdropURL()
                 Task {
                     await viewModel?.loadFullDetail()
                     updateBackdropURL()
@@ -527,6 +531,29 @@ struct SeriesDetailView: View {
                 }
                 // Settled either way (enrichedEpisode returns the input on failure): release the synopsis placeholder so it can't sit empty forever.
                 settledEpisodeDetailIDs.insert(episode.id)
+            }
+        }
+        .onChange(of: viewModel?.nextUpEpisode?.id) { _, newID in
+            guard initialEpisode == nil,
+                  selectedEpisode == nil,
+                  newID != nil,
+                  let episode = viewModel?.nextUpEpisode else { return }
+            episodeOrigin.openedFromSeries()
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedEpisode = episode
+            }
+        }
+        .onChange(of: viewModel?.isLoadingSeasons) { wasLoading, isLoading in
+            guard wasLoading == true,
+                  isLoading == false,
+                  initialEpisode == nil,
+                  selectedEpisode == nil,
+                  let vm = viewModel else { return }
+            let firstUnwatched = vm.episodes.first(where: { !vm.isPlayed($0) })
+            guard let episode = vm.nextUpEpisode ?? firstUnwatched ?? vm.episodes.first else { return }
+            episodeOrigin.openedFromSeries()
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedEpisode = episode
             }
         }
         .menuPresentation(isPresented: $isPresentingMoreDetails, panel: .plain) {
@@ -735,6 +762,7 @@ struct SeriesDetailView: View {
                             serverID: vm.item.serverID
                         )
                         MediaCastRow(
+                            titleFont: detailSectionTitleFont,
                             members: cast,
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
@@ -773,6 +801,7 @@ struct SeriesDetailView: View {
                     if !vm.similarItems.isEmpty {
                         HorizontalMediaRow(
                             title: "detail.similar",
+                            titleFont: detailSectionTitleFont,
                             items: vm.similarItems,
                             imageURLProvider: { vm.posterURL(for: $0) },
                             onItemSelected: { navigateToItem = $0 },
@@ -786,6 +815,7 @@ struct SeriesDetailView: View {
                     if !vm.catalogSimilar.isEmpty {
                         SeerrHorizontalMediaRow(
                             title: "search.section.catalog",
+                            titleFont: detailSectionTitleFont,
                             items: vm.catalogSimilar,
                             onItemSelected: { navigateToSeerrRequest = $0 }
                         )
@@ -811,13 +841,91 @@ struct SeriesDetailView: View {
     // MARK: - Glass Panel
 
     private func glassPanel(vm: DetailViewModel) -> some View {
-        // Centred on the upright iPhone, like the logo above it and the buttons below.
-        VStack(alignment: isPhonePortrait ? .center : .leading, spacing: 16) {
-            // Panel title is the episode name in episode mode; the series root has none (logo lives in the hero slot, see DetailContentOverlay).
+        VStack(alignment: isPhonePortrait ? .center : .leading, spacing: 10) {
+            #if os(tvOS)
+            if isShowingEpisode {
+                if let runtime = displayItem.runTimeTicks, runtime > 0 {
+                    let minutes = Int((Double(runtime) / 600_000_000).rounded())
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(minutes.formatted())
+                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                        Text("MIN.")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(1)
+                    }
+                    .foregroundStyle(.white.opacity(0.58))
+                    .padding(.bottom, 7)
+                }
+
+                if let date = formattedDisplayDate() {
+                    Text(date)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .padding(.bottom, 5)
+                }
+
+                HStack(spacing: 6) {
+                    if let officialRating = displayItem.officialRating ?? vm.item.officialRating {
+                        Text(officialRating)
+                            .metadataBox(compact: true)
+                    }
+                    let pills = formatBadgePills()
+                    if !pills.isEmpty {
+                        FormatBadgeRow(pills: pills, compact: true)
+                    }
+                }
+                .foregroundStyle(.white)
+
+                let episodeGenres = displayItem.genres ?? []
+                let visibleGenres = episodeGenres.isEmpty ? (vm.item.genres ?? []) : episodeGenres
+                if !visibleGenres.isEmpty {
+                    Text(visibleGenres.joined(separator: "  ·  "))
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .lineLimit(2)
+                }
+
+                HStack(spacing: 16) {
+                    if let communityRating = displayItem.communityRating ?? vm.item.communityRating {
+                        HStack(spacing: 7) {
+                            Image("JellyfinMark")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                            Text(communityRating.formatted(.number.precision(.fractionLength(1))))
+                        }
+                        .foregroundStyle(.white)
+                        .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
+                    }
+                    if let personalRating = vm.rating(of: displayItem) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "star.fill")
+                            Text(Int(personalRating.rounded()).formatted())
+                        }
+                        .foregroundStyle(.white)
+                        .accessibilityLabel("Meine Bewertung \(Int(personalRating.rounded())) von 10")
+                    }
+                }
+                .font(.subheadline.weight(.semibold))
+
+                heroSynopsis
+            } else {
+                DetailInfoRows(
+                    item: vm.item,
+                    hasFullDetail: vm.hasFullDetail
+                ) {
+                    ItemMetadataRow(
+                        item: vm.item,
+                        showRuntime: false,
+                        extras: seasonCount(vm: vm),
+                        externalRatings: vm.externalRatings,
+                        awaitingExternalRatings: vm.isAwaitingExternalRatings
+                    )
+                }
+            }
+            #else
             if isShowingEpisode {
                 Text(selectedEpisode.map { dependencies.spoilerPolicy(userID: appState.activeUser?.id).displayName(of: $0) } ?? "")
-                    // Smaller in the upright iPhone's narrow column, where the large title ran to two
-                    // lines and pushed Play off the first screen under the poster.
                     .font(isPhonePortrait ? .title3 : .largeTitle)
                     .fontWeight(isPhonePortrait ? .semibold : .bold)
                     .lineLimit(2)
@@ -825,19 +933,11 @@ struct SeriesDetailView: View {
                     .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
             }
 
-            // Metadata line with the series tagline set against it, in both modes so the episode
-            // panel matches the root; genres and studios moved into More Details (Sodalite#146
-            // round 2).
             DetailInfoRows(
                 item: vm.item,
                 hasFullDetail: vm.hasFullDetail
             ) {
                 if isShowingEpisode {
-                    // Single metadata line (runtime + series genres). S/E pair left the panel (Sodalite#15 round 6) since the play-button subtitle already carries it; keeps the episode panel at title + one line.
-                    // The format pills join that line where it has the width, so the episode panel
-                    // stays at title + one line. Portrait is the exception: the panel is one narrow
-                    // column there and the pills pushed it past the screen edge (Sodalite#145,
-                    // measured on the iPhone 2026-09-14).
                     if isPhonePortrait {
                         VStack(spacing: 8) {
                             episodeLine(vm: vm)
@@ -860,52 +960,13 @@ struct SeriesDetailView: View {
                 }
             }
 
-            #if os(tvOS)
-            let episodeGenres = displayItem.genres ?? []
-            let visibleGenres = episodeGenres.isEmpty ? (vm.item.genres ?? []) : episodeGenres
-            if let date = formattedDisplayDate() {
-                Text(date)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.82))
-            }
-            if !visibleGenres.isEmpty {
-                Text(visibleGenres.joined(separator: "  ·  "))
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.78))
-                    .lineLimit(2)
-            }
-
-            HStack(spacing: 16) {
-                if let communityRating = displayItem.communityRating ?? vm.item.communityRating {
-                    HStack(spacing: 7) {
-                        Image("JellyfinMark")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 20, height: 20)
-                        Text(communityRating.formatted(.number.precision(.fractionLength(1))))
-                    }
-                    .foregroundStyle(.white)
-                    .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
-                }
-                if let personalRating = vm.rating(of: displayItem) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "star.fill")
-                        Text(Int(personalRating.rounded()).formatted())
-                    }
-                    .foregroundStyle(.white)
-                    .accessibilityLabel("Meine Bewertung \(Int(personalRating.rounded())) von 10")
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            #endif
-
-            // Sodalite#146: series synopsis in the series state, the episode's own in episode state.
-            // The synopsis is visible immediately in the first detail panel.
             if !isPhonePortrait { heroSynopsis }
+            #endif
         }
-        .frame(maxWidth: isPhonePortrait ? .infinity : 680,
+        .frame(maxWidth: isPhonePortrait ? .infinity : 880,
                alignment: isPhonePortrait ? .center : .leading)
     }
+
 
     private var heroSynopsis: some View {
         DetailHeroSynopsis(
@@ -1120,7 +1181,7 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .trailer)
             }
         }
-        .frame(maxWidth: 680, alignment: .leading)
+        .frame(maxWidth: 880, alignment: .leading)
         #else
         Group {
             if isPhonePortrait {
@@ -1805,7 +1866,6 @@ struct SeriesDetailView: View {
                             }
                         }
                         // Focus scale 1.05 needs vertical slack or the halo clips against the scroll-view edges.
-                        .padding(.horizontal, metrics.rowInset)
                         .padding(.vertical, 12)
                     }
                     .onChange(of: focusedSeasonID) { oldID, newID in
@@ -1961,7 +2021,6 @@ struct SeriesDetailView: View {
                                 .id(episode.id)
                             }
                         }
-                        .padding(.horizontal, metrics.rowInset)
                         .padding(.vertical, 16)
                     }
                     .scrollPosition($episodeRowPosition)
@@ -2124,7 +2183,6 @@ struct SeriesDetailView: View {
                             .frame(width: 128, height: 192)
                     }
                 }
-                .padding(.horizontal, metrics.rowInset)
                 .padding(.vertical, 12)
             }
 

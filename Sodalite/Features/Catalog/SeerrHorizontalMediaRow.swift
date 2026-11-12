@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SeerrHorizontalMediaRow: View {
     let title: LocalizedStringKey
+    var titleFont: Font = .title3
     let items: [SeerrMedia]
     var isLoadingMore: Bool = false
     var onItemSelected: ((SeerrMedia) -> Void)?
@@ -18,7 +19,7 @@ struct SeerrHorizontalMediaRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.title3)
+                .font(titleFont)
                 .fontWeight(.semibold)
                 .padding(.leading, leadingInset)
                 .padding(.trailing, metrics.rowInset)
