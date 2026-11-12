@@ -9,7 +9,7 @@ options:
   groupSortPosition: top
   # Writes LastUpgradeCheck, so Xcode stops offering its "recommended settings" upgrade, which
   # would only edit the generated project.
-  xcodeVersion: "27.0"
+  xcodeVersion: "26.0" # JellyPlayer development environment: Xcode 26.0.1
 settings:
   base:
     MARKETING_VERSION: "1.1.0"
