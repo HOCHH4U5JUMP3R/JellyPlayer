@@ -842,17 +842,17 @@ struct SeriesDetailView: View {
                         let minutes = Int((Double(runtime) / 600_000_000).rounded())
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
                             Text(minutes.formatted())
-                                 .font(.system(size: 24, weight: .semibold, design: .rounded))
+                                .font(.system(size: 22, weight: .semibold, design: .rounded))
                             Text("MIN.")
-                                .font(.system(size: 12, weight: .semibold))
-                                .tracking(1)
+                                .font(.system(size: 22, weight: .semibold, design: .rounded))
                         }
                         .foregroundStyle(.white.opacity(0.58))
+                        .padding(.trailing, 12)
                     }
                     if let date = formattedDisplayDate() {
                         Text(date)
-                            .font(.system(size: 24, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.92))
+                            .font(.system(size: 22, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.58))
                     }
                     if let officialRating = displayItem.officialRating ?? vm.item.officialRating {
                         Text(officialRating)
@@ -861,7 +861,7 @@ struct SeriesDetailView: View {
                     }
                     let pills = formatBadgePills()
                     if !pills.isEmpty {
-                        FormatBadgeRow(pills: pills, prominent: true)
+                        FormatBadgeRow(pills: pills, compact: true)
                     }
                 }
                 .foregroundStyle(.white)
@@ -1883,9 +1883,8 @@ struct SeriesDetailView: View {
                         if newID != nil {
                             lastFocusedArea = .season
                         }
-                        if let focusedID = focusedSeasonID {
-                            withAnimation { proxy.scrollTo(focusedID, anchor: .center) }
-                        }
+                        // Let tvOS preserve the season rail's own horizontal offset. Re-centering
+                        // on every focus transition caused unrelated rows to shift it.
                         if newID != nil {
                             episodeRedirectDone = false
                         }
@@ -2051,9 +2050,9 @@ struct SeriesDetailView: View {
                         guard let target, vm.episodes.contains(where: { $0.id == target }) else { return }
                         episodeProxy.scrollTo(target, anchor: .center)
                     }
-                    .onAppear {
-                        scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
-                    }
+                    // Keep the horizontal scroll position owned by episodeRowPosition.
+                    // Re-centering on every appearance caused the row to jump when returning
+                    // from Cast / Similar / Catalog.
                     }
                     .frame(height: 280)
                 }
