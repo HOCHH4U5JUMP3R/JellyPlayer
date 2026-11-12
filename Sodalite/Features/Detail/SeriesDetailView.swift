@@ -680,6 +680,19 @@ struct SeriesDetailView: View {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
                 actionButtonRow(vm: vm)
+                // Seasons and episodes are part of the same continuous backdrop scroll as the hero.
+                ScrollViewReader { outerProxy in
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !vm.seasons.isEmpty {
+                            seasonSection(vm: vm)
+                                .id("episodeRow")
+                        } else if vm.isLoadingSeasons {
+                            seasonSectionSkeleton(vm: vm)
+                                .id("episodeRow")
+                        }
+                    }
+                    .onAppear { episodeRowScrollProxy = outerProxy }
+                }
                 if isPhonePortrait { heroSynopsis }
                 // See MovieDetailView: with this line below the fold the page measures ~30 pt of
                 // content down there, the trailing chrome adds 200, and tvOS scrolls 116 pt to park
@@ -696,23 +709,13 @@ struct SeriesDetailView: View {
             .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
-            ScrollViewReader { outerProxy in
-                VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
                     // No synopsis block here any more (Sodalite#146). Three lines of it sit in the
                     // first viewport and the whole of it is behind More Details, so a third copy
                     // under the fold was the page saying the same thing twice with a focus stop
                     // between. The season bar is the first stop now, and the up-move out of it is
                     // handled the way #53 measured: the secondaries leave the focus engine while
                     // focus is not in the action row.
-                    if !vm.seasons.isEmpty {
-                        seasonSection(vm: vm)
-                            .id("episodeRow")
-                    } else if vm.isLoadingSeasons {
-                        // getSeasons in flight: skeleton tabs + episode row so it isn't a blank gap on a slow CDN. Swapped for the real section once seasons arrive.
-                        seasonSectionSkeleton(vm: vm)
-                            .id("episodeRow")
-                    }
-
                     // Cast above Related (Sodalite#47): with the season/episode block over
                     // it, the cast row already sits far down the page for viewers who only
                     // want the people.
@@ -798,10 +801,6 @@ struct SeriesDetailView: View {
                             .animation(.easeInOut(duration: 0.3), value: selectedEpisode?.id)
                     }
                 }
-                .onAppear {
-                    episodeRowScrollProxy = outerProxy
-                }
-            }
         }
         .modifier(PageScrollProxyCapture(proxy: $pageScrollProxy))
         .transition(.opacity)
@@ -1785,6 +1784,8 @@ struct SeriesDetailView: View {
                                 SeasonTab(
                                     id: season.id,
                                     name: season.name,
+                                    imageURL: vm.posterURL(for: season),
+                                    personalRating: vm.seasonRating(for: season),
                                     isSelected: vm.selectedSeasonID == season.id,
                                     focusedID: $focusedSeasonID,
                                     action: {
@@ -2100,9 +2101,8 @@ struct SeriesDetailView: View {
     @ViewBuilder
     /// Whole-section placeholder while getSeasons is in flight: skeleton season tabs above the episode skeleton row. Mirrors seasonSection's ScrollView/spacing/padding so the swap doesn't shift layout.
     private func seasonSectionSkeleton(vm: DetailViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Same horizontal ScrollView as the real season bar, and not just for the swap: six
-            // fixed 110pt tabs measure 742pt with the insets, so a bare HStack reports that width
+        VStack(alignment: .leading, spacing: 8) {
+            // Same horizontal poster rail as the real season row; keep its footprint stable while loading.
             // to the page even when the viewport proposes 402. The content column then takes 742,
             // and every sibling (glass panel, action row, hero logo) is drawn at that width and
             // clipped on both edges until the seasons land, roughly a second later. The action row
@@ -2112,7 +2112,7 @@ struct SeriesDetailView: View {
                     ForEach(0..<6, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.Theme.surface)
-                            .frame(width: 110, height: 52)
+                            .frame(width: 128, height: 192)
                     }
                 }
                 .padding(.horizontal, metrics.rowInset)
