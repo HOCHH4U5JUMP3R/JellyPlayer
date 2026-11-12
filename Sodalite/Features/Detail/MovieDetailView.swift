@@ -570,7 +570,6 @@ struct MovieDetailView: View {
                            spoilerItem: vm.item, onTap: { openMoreDetails(vm: vm) },
                            expandsInPlace: isPhonePortrait)
     }
-    }
 
     /// Sodalite#145. Reads the version the page is showing, the same source id the tech strip below
     /// uses, so the pills cannot describe a copy the viewer did not pick.
