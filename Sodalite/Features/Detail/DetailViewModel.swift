@@ -157,7 +157,16 @@ final class DetailViewModel {
         // Avoid `async let`: @MainActor service calls crossing back into this non-isolated @Observable crash the task-local allocator with swift_task_dealloc_specific SIGABRT "freed pointer was not the last allocation". Task{}.value keeps each call on its own allocator while staying parallel.
         let detailTask = Task { try? await itemService.getItemDetail(userID: userID, itemID: itemID) }
 
-        // Series content depends only on the item ID (already in hand), so run it parallel with the detail fetch and the play button's "Fortsetzen + S1E5 · 12:34" subtitle arrives with the rest of the panel.
+        // Mark the series rail as loading BEFORE scheduling its task. The view uses this
+        // synchronously-set flag to keep the skeleton visible until the detail + Next Up stage is
+        // ready, avoiding a one-frame flash of partially loaded rows if the detail request wins
+        // the task scheduling race.
+        if itemType == .series {
+            isLoadingSeasons = true
+        }
+
+        // Series content still loads in parallel with the detail fetch; the tvOS view stages its
+        // presentation so the hero information is ready before the action and media rows appear.
         let seriesContentTask: Task<Void, Never>? = (itemType == .series) ? Task {
             await loadSeasons()
         } : nil
