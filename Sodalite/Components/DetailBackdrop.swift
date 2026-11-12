@@ -98,6 +98,8 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     /// upright iPhone. Only for items with a real upright poster to fall back on (films, series,
     /// collections); an episode still or a home video's thumb is wide.
     var portraitHero: Bool = false
+    /// Series pages place the title near the top edge so the episode rail can use the lower half.
+    var heroAtTop: Bool = false
     @ViewBuilder let hero: () -> Hero
     @ViewBuilder let primary: () -> Primary
     @ViewBuilder let content: () -> Content
@@ -209,6 +211,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
         heroPosterURL: URL? = nil,
         heroTallImageURL: URL? = nil,
         portraitHero: Bool = false,
+        heroAtTop: Bool = false,
         @ViewBuilder hero: @escaping () -> Hero = { EmptyView() },
         @ViewBuilder primary: @escaping () -> Primary,
         @ViewBuilder content: @escaping () -> Content
@@ -217,6 +220,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
         self.heroPosterURL = heroPosterURL
         self.heroTallImageURL = heroTallImageURL
         self.portraitHero = portraitHero
+        self.heroAtTop = heroAtTop
         self.hero = hero
         self.primary = primary
         self.content = content
@@ -241,7 +245,9 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                 } else {
                     // First page one viewport tall, hero + primary bottom-aligned; the Spacer hands leftover space to the backdrop so the button row ends flush with the fold.
                     VStack(alignment: .leading, spacing: 0) {
-                        Spacer(minLength: 0)
+                        if !heroAtTop {
+                            Spacer(minLength: 0)
+                        }
                         gradientWithHero
                         VStack(alignment: .leading, spacing: 0) {
                             primary()
@@ -760,13 +766,14 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(height: 200)
-        .overlay(alignment: .bottomLeading) {
+        .frame(height: heroAtTop ? 140 : 200)
+        .overlay(alignment: heroAtTop ? .topLeading : .bottomLeading) {
             hero()
                 .padding(.horizontal, metrics.rowInset)
                 .padding(.leading, safeLeading)
                 .padding(.trailing, safeTrailing)
-                .padding(.bottom, 8)
+                .padding(.top, heroAtTop ? 42 : 0)
+                .padding(.bottom, heroAtTop ? 0 : 8)
         }
     }
 }
@@ -859,6 +866,7 @@ extension DetailContentOverlay where Primary == EmptyView {
             heroPosterURL: heroPosterURL,
             heroTallImageURL: heroTallImageURL,
             portraitHero: portraitHero,
+            heroAtTop: heroAtTop,
             hero: hero,
             primary: { EmptyView() },
             content: content
