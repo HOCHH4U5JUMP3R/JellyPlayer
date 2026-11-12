@@ -89,22 +89,32 @@ struct MediaCastRow: View {
             // its bounds. A 276pt tvOS card overshoots 6.9pt per side at 1.05, so the tier's row
             // padding has to carry it; the flat 12pt here cut the ring off the top of the enlarged
             // portrait (Sodalite#55 device round).
-            RowScrollView(leading: rowInset, trailing: rowInset,
-                          vertical: metrics.rowVerticalPadding) {
-                // Top-aligned: a two-line role (or a member with no role at all) makes cards
-                // differ in height, and centering would push their portraits out of line.
-                LazyHStack(alignment: .top, spacing: metrics.itemSpacing) {
-                    ForEach(members.mergingDuplicatePeople()) { member in
-                        bindingFocus(
-                            MediaCastCard(
-                                member: member,
-                                portrait: metrics.castPortrait,
-                                labelWidth: metrics.castLabelWidth,
-                                onSelect: onSelect.map { cb in { cb(member) } }
-                            ),
-                            to: member.id
-                        )
+            ScrollViewReader { proxy in
+                RowScrollView(leading: rowInset, trailing: rowInset,
+                              vertical: metrics.rowVerticalPadding) {
+                    // Top-aligned: a two-line role (or a member with no role at all) makes cards
+                    // differ in height, and centering would push their portraits out of line.
+                    LazyHStack(alignment: .top, spacing: metrics.itemSpacing) {
+                        ForEach(members.mergingDuplicatePeople()) { member in
+                            bindingFocus(
+                                MediaCastCard(
+                                    member: member,
+                                    portrait: metrics.castPortrait,
+                                    labelWidth: metrics.castLabelWidth,
+                                    onSelect: onSelect.map { cb in { cb(member) } }
+                                ),
+                                to: member.id
+                            )
+                            .id(member.id)
+                        }
                     }
+                }
+                .onChange(of: focusedID?.wrappedValue) { _, target in
+                    guard let target else { return }
+                    // A remembered cast member may be outside the visible part of this lazy row.
+                    // Materialize it before the host restores focus, instead of silently landing
+                    // on the first visible card again.
+                    proxy.scrollTo(target, anchor: .center)
                 }
             }
             .focusSectionCompat()
