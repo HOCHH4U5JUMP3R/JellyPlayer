@@ -81,6 +81,7 @@ struct MediaCastRow: View {
             if let title {
                 Text(title)
                     .font(titleFont)
+                    .fontWeight(.semibold)
                     .padding(.horizontal, rowInset)
             }
 
