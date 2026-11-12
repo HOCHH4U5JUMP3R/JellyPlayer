@@ -92,7 +92,7 @@ struct SeriesDetailView: View {
     }
 
     private var metrics: LayoutMetrics { LayoutMetrics.current(hSizeClass) }
-    private var detailSectionTitleFont: Font { .system(size: 28, weight: .semibold, design: .rounded) }
+    private var detailSectionTitleFont: Font { .system(size: 52, weight: .bold, design: .rounded) }
     /// iPhone portrait: full-width primary action over a centered secondary row.
     private var isPhonePortrait: Bool {
         #if os(iOS)
@@ -844,29 +844,26 @@ struct SeriesDetailView: View {
         VStack(alignment: isPhonePortrait ? .center : .leading, spacing: 10) {
             #if os(tvOS)
             if isShowingEpisode {
-                if let runtime = displayItem.runTimeTicks, runtime > 0 {
-                    let minutes = Int((Double(runtime) / 600_000_000).rounded())
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(minutes.formatted())
-                            .font(.system(size: 18, weight: .medium, design: .rounded))
-                        Text("MIN.")
-                            .font(.system(size: 11, weight: .semibold))
-                            .tracking(1)
+                HStack(alignment: .center, spacing: 9) {
+                    if let runtime = displayItem.runTimeTicks, runtime > 0 {
+                        let minutes = Int((Double(runtime) / 600_000_000).rounded())
+                        HStack(alignment: .firstTextBaseline, spacing: 5) {
+                            Text(minutes.formatted())
+                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                            Text("MIN.")
+                                .font(.system(size: 10, weight: .semibold))
+                                .tracking(1)
+                        }
+                        .foregroundStyle(.white.opacity(0.58))
                     }
-                    .foregroundStyle(.white.opacity(0.58))
-                    .padding(.bottom, 7)
-                }
-
-                if let date = formattedDisplayDate() {
-                    Text(date)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.78))
-                        .padding(.bottom, 5)
-                }
-
-                HStack(spacing: 6) {
+                    if let date = formattedDisplayDate() {
+                        Text(date)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.78))
+                    }
                     if let officialRating = displayItem.officialRating ?? vm.item.officialRating {
                         Text(officialRating)
+                            .font(.system(size: 11, weight: .medium))
                             .metadataBox(compact: true)
                     }
                     let pills = formatBadgePills()
@@ -875,6 +872,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
 
                 let episodeGenres = displayItem.genres ?? []
                 let visibleGenres = episodeGenres.isEmpty ? (vm.item.genres ?? []) : episodeGenres
@@ -891,7 +889,7 @@ struct SeriesDetailView: View {
                             Image("JellyfinMark")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 20, height: 20)
+                                .frame(width: 18, height: 18)
                             Text(communityRating.formatted(.number.precision(.fractionLength(1))))
                         }
                         .foregroundStyle(.white)
@@ -900,6 +898,7 @@ struct SeriesDetailView: View {
                     if let personalRating = vm.rating(of: displayItem) {
                         HStack(spacing: 6) {
                             Image(systemName: "star.fill")
+                                .font(.system(size: 16, weight: .semibold))
                             Text(Int(personalRating.rounded()).formatted())
                         }
                         .foregroundStyle(.white)
@@ -910,18 +909,8 @@ struct SeriesDetailView: View {
 
                 heroSynopsis
             } else {
-                DetailInfoRows(
-                    item: vm.item,
-                    hasFullDetail: vm.hasFullDetail
-                ) {
-                    ItemMetadataRow(
-                        item: vm.item,
-                        showRuntime: false,
-                        extras: seasonCount(vm: vm),
-                        externalRatings: vm.externalRatings,
-                        awaitingExternalRatings: vm.isAwaitingExternalRatings
-                    )
-                }
+                // The series overview is deliberately not repeated below the season rail.
+                EmptyView()
             }
             #else
             if isShowingEpisode {
@@ -1107,7 +1096,7 @@ struct SeriesDetailView: View {
                     title: isShowingEpisode
                         ? ((selectedEpisode.map { vm.isPlayed($0) } == true) ? "Als ungesehen markieren" : "Als gesehen markieren")
                         : (vm.isPlayed ? "Als ungesehen markieren" : "Als gesehen markieren"),
-                    symbol: "checkmark"
+                    symbol: (isShowingEpisode ? (selectedEpisode.map { vm.isPlayed($0) } ?? false) : vm.isPlayed) ? "checkmark" : "eye"
                 ) {
                     if let episode = selectedEpisode {
                         Task { await vm.setEpisodePlayed(episode, isPlayed: !vm.isPlayed(episode)) }
@@ -1117,7 +1106,10 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .watched)
 
-                InfuseDetailActionButton(title: "Bewerten", symbol: "star") {
+                InfuseDetailActionButton(
+                    title: "Bewerten",
+                    symbol: vm.rating(of: selectedEpisode ?? vm.item) == nil ? "star" : "star.fill"
+                ) {
                     let ratedItem = selectedEpisode ?? vm.item
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
@@ -1127,7 +1119,9 @@ struct SeriesDetailView: View {
                     title: isShowingEpisode
                         ? ((selectedEpisode.map { vm.isFavorite($0) } == true) ? "Favorit entfernen" : "Favorit")
                         : (vm.isFavorite ? "Favorit entfernen" : "Favorit"),
-                    symbol: "heart"
+                    symbol: (isShowingEpisode
+                        ? (selectedEpisode.map { vm.isFavorite($0) } ?? false)
+                        : vm.isFavorite) ? "heart.fill" : "heart"
                 ) {
                     if let episode = selectedEpisode {
                         Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) }
@@ -2012,11 +2006,6 @@ struct SeriesDetailView: View {
                                     // lives inside them (see EpisodeCardStroke.ringMargin).
                                     .contextMenu { episodeContextMenu(episode, vm: vm) }
 
-                                    // Per-card synopsis box; reserves a fixed three-line height even when empty so every column stays the same height.
-                                    EpisodeSynopsisBox(
-                                        episode: episode,
-                                        text: episode.overview?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                                    )
                                 }
                                 .id(episode.id)
                             }
