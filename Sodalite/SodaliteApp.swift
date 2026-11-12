@@ -91,12 +91,13 @@ struct SodaliteApp: App {
 
         // Cloud sync: attach after the container is fully built, then register
         // for the silent CloudKit pushes that drive near-real-time propagation.
-        dependencies.attachCloudSync()
+        // JellyPlayer: cloud sync stays disabled as in the existing app.
+        // dependencies.attachCloudSync()
         Task { @MainActor in
             #if canImport(UIKit)
-            UIApplication.shared.registerForRemoteNotifications()
+            // UIApplication.shared.registerForRemoteNotifications()
             #elseif canImport(AppKit)
-            NSApplication.shared.registerForRemoteNotifications()
+            // NSApplication.shared.registerForRemoteNotifications()
             #endif
         }
 
