@@ -2045,7 +2045,7 @@ struct SeriesDetailView: View {
                         scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
                     }
                     }
-                    .frame(height: 180)
+                    .frame(height: 220)
                 }
             }
         }
@@ -2172,7 +2172,7 @@ struct SeriesDetailView: View {
                 .padding(.vertical, 32)
             }
         }
-        .frame(height: 180)
+        .frame(height: 220)
         .allowsHitTesting(false)
     }
 
