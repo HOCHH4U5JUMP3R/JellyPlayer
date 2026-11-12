@@ -31,8 +31,8 @@ struct SeasonTab: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay {
                         RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(isFocused ? Color.accentColor : (isSelected ? Color.Theme.panelEdge : Color.clear),
-                                          lineWidth: isFocused ? FocusStroke.width : 1)
+                            .strokeBorder((isFocused || isSelected) ? Color.accentColor : Color.clear,
+                                          lineWidth: (isFocused || isSelected) ? FocusStroke.width : 0)
                     }
 
                     if isPlayed {
