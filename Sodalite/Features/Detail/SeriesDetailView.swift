@@ -675,8 +675,9 @@ struct SeriesDetailView: View {
                 }
             }
         }, primary: {
-            // Glass panel + action buttons as the bottom-aligned first-page block (Sodalite#15 round 6), kept one unit so the id-rebuild and episode crossfade cover both.
-            VStack(alignment: .leading, spacing: 24) {
+            // Compact left-aligned information and controls over the backdrop, matching the supplied Infuse reference.
+            // Keep the episode rail full-width; only the metadata and action controls use the narrower left column.
+            VStack(alignment: .leading, spacing: 12) {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
                 actionButtonRow(vm: vm)
@@ -901,15 +902,8 @@ struct SeriesDetailView: View {
             // The synopsis is visible immediately in the first detail panel.
             if !isPhonePortrait { heroSynopsis }
         }
-        .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
-        // The movie page's numbers: no panel on the upright iPhone (Blexbi), 30 everywhere else.
-        .padding(isPhonePortrait ? 0 : 30)
-        .background {
-            if !isPhonePortrait {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-            }
-        }
+        .frame(maxWidth: isPhonePortrait ? .infinity : 680,
+               alignment: isPhonePortrait ? .center : .leading)
     }
 
     private var heroSynopsis: some View {
@@ -1125,6 +1119,7 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .trailer)
             }
         }
+        .frame(maxWidth: 680, alignment: .leading)
         #else
         Group {
             if isPhonePortrait {
