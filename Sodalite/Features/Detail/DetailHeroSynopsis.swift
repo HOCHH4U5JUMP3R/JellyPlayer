@@ -78,6 +78,7 @@ struct DetailHeroSynopsis: View {
             // A focusable text surface, not a Button: tvOS applies button hover/focus
             // treatment even with .plain in some focus transitions.
             .focusable()
+            .focusEffectDisabled(true)
             .onTapGesture { onTap?() }
             .onMoveCommand { direction in
                 if direction == .down { onMoveDown?() }
