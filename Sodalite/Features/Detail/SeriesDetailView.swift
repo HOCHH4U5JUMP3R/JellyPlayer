@@ -690,6 +690,9 @@ struct SeriesDetailView: View {
                         .foregroundStyle(.white.opacity(0.96))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
+                } else if vm.isLoadingSeasons || !vm.hasFullDetail {
+                    // Keep the episode-heading slot from the first paint; Next Up fills it in place.
+                    Color.clear.frame(height: 36)
                 }
             }
         }, primary: {
