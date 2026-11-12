@@ -23,7 +23,10 @@ struct DetailHeroSynopsis: View {
     /// What a tap on the teaser does on touch: the page's More Details action, so the truncated
     /// text is not a dead end. tvOS leaves the panel outside the focus engine and ignores it.
     var onTap: (() -> Void)?
-    /// Explicit tvOS destination when moving down from the synopsis.
+    /// Shared page focus state: the synopsis has its own identity, so moving down can
+    /// assign the exact destination without letting tvOS choose a geometric neighbour.
+    var focusedAction: FocusState<DetailAction?>.Binding? = nil
+    /// Explicit fallback for callers that do not share the page's action focus state.
     var onMoveDown: (() -> Void)?
     /// The upright iPhone's placement under the action row (Blexbi): the page scrolls freely there,
     /// so a tap opens the whole text in place instead of leaving for More Details. The reserved
@@ -35,6 +38,7 @@ struct DetailHeroSynopsis: View {
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.dependencies) private var dependencies
     @Environment(\.appState) private var appState
+    @Environment(\.isFocused) private var isFocused
 
     /// Two lines in a short viewport (iPhone landscape), where the first page is not viewport-locked
     /// and every added line pushes the action row further past the fold, and in the upright
@@ -74,14 +78,25 @@ struct DetailHeroSynopsis: View {
         synopsisText
             .padding(.horizontal, 5)
             .padding(.vertical, 3)
-            .contentShape(Rectangle())
-            // A focusable text surface, not a Button: tvOS applies button hover/focus
-            // treatment even with .plain in some focus transitions.
+            .contentShape(RoundedRectangle(cornerRadius: 13))
+            // Match the secondary action buttons' quiet focus fill without turning the
+            // synopsis into a Button (which reintroduced the bright system hover plate).
+            .background {
+                RoundedRectangle(cornerRadius: 13)
+                    .fill(Color.white.opacity(isFocused ? 0.28 : 0.10))
+                    .animation(.easeOut(duration: 0.12), value: isFocused)
+            }
             .focusable()
             .focusEffectDisabled(true)
+            .focused(focusedAction ?? .init(get: { nil }, set: { _ in }), equals: .synopsis)
             .onTapGesture { onTap?() }
             .onMoveCommand { direction in
-                if direction == .down { onMoveDown?() }
+                guard direction == .down else { return }
+                if let focusedAction {
+                    focusedAction.wrappedValue = .watched
+                } else {
+                    onMoveDown?()
+                }
             }
         #else
         synopsisText
