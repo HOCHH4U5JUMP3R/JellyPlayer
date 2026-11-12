@@ -4,6 +4,7 @@ struct HorizontalMediaRow: View {
     let title: LocalizedStringKey
     /// Rendered verbatim instead of `title` for per-library rows whose heading is a runtime string, not a localization key.
     var verbatimTitle: String? = nil
+    var titleFont: Font = .title3
     let items: [JellyfinItem]
     let imageURLProvider: (JellyfinItem) -> URL?
     /// Per-item fallback image tried when the primary fails (e.g. series Thumb to backdrop/still).
@@ -40,8 +41,7 @@ struct HorizontalMediaRow: View {
                     Text(title)
                 }
             }
-            .font(.title3)
-            .fontWeight(.semibold)
+            .font(titleFont)
             .padding(.leading, leadingInset)
             .padding(.trailing, rowInset)
 
