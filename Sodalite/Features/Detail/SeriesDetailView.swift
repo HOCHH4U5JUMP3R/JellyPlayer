@@ -257,19 +257,9 @@ struct SeriesDetailView: View {
             }
         }
         .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
-        // Menu returns to the series state rather than dismissing the page (Sodalite#146). The page
-        // swaps its header for an episode rather than pushing a screen, so tvOS had nothing to pop
-        // and Menu went straight past it to the detail cover: opening an episode cost the whole show
-        // page to get back out of.
-        //
-        // Only when a series state is actually BEHIND this one. An episode opened from Continue
-        // Watching arrives with the page already in the episode state, and intercepting there put a
-        // series page the viewer never asked for between them and Home, which is one press more than
-        // before (Vincent, device, 2026-09-14).
-        //
-        // Via the nil-passing helper, because an empty closure would swallow the press that has to
-        // reach the cover or the navigation stack behind it (Sodalite#140).
-        .onExitCommandIfEnabled(isShowingEpisode && episodeOrigin.hasSeriesStateBehind, perform: closeEpisodeState)
+        // Back/Menu always leaves the detail page. The in-page "Show Series" action remains the
+        // explicit way to switch from an episode panel back to the series overview; intercepting
+        // Menu here inserted an unwanted intermediate page and required two presses to leave.
         // iPhone portrait respects the safe area so detail content is not clipped under the status
         // bar; the backdrop keeps its own .ignoresSafeArea() to stay full-bleed. tvOS/iPad full-bleed.
         .ignoresSafeArea(when: !isPhonePortrait)
@@ -960,7 +950,10 @@ struct SeriesDetailView: View {
     private var heroSynopsis: some View {
         DetailHeroSynopsis(
             text: displayOverview,
-            isPending: overviewMayStillLand,
+            // Keep the same three-line synopsis footprint throughout episode changes, including
+            // episodes that ultimately have no overview. This prevents the hero and action row
+            // from jumping while Jellyfin enrichment settles.
+            isPending: overviewMayStillLand || isShowingEpisode,
             spoilerItem: displayItem,
             onTap: openMoreDetails,
             expandsInPlace: isPhonePortrait
@@ -1978,7 +1971,9 @@ struct SeriesDetailView: View {
                                 .id(episode.id)
                             }
                         }
-                        .padding(.vertical, 16)
+                        // Reserve room for the tvOS focus lift so the top edge and focus ring stay
+                        // inside the horizontal ScrollView's clipping bounds.
+                        .padding(.vertical, 32)
                     }
                     .scrollPosition($episodeRowPosition)
                     .onChange(of: vm.selectedSeasonID) { _, _ in
