@@ -866,7 +866,6 @@ extension DetailContentOverlay where Primary == EmptyView {
             heroPosterURL: heroPosterURL,
             heroTallImageURL: heroTallImageURL,
             portraitHero: portraitHero,
-            heroAtTop: heroAtTop,
             hero: hero,
             primary: { EmptyView() },
             content: content
