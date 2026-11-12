@@ -544,6 +544,20 @@ struct UserItemData: Codable, Sendable, Equatable {
             rating: rating
         )
     }
+
+    /// Copy with the personal rating replaced; nil explicitly clears it.
+    func with(rating newRating: Double?) -> UserItemData {
+        UserItemData(
+            playbackPositionTicks: playbackPositionTicks,
+            playCount: playCount,
+            isFavorite: isFavorite,
+            played: played,
+            unplayedItemCount: unplayedItemCount,
+            playedPercentage: playedPercentage,
+            lastPlayedDate: lastPlayedDate,
+            rating: newRating
+        )
+    }
 }
 
 struct MediaStream: Codable, Sendable, Equatable, Identifiable {
