@@ -333,15 +333,15 @@ struct SeriesDetailView: View {
                     Task { await vm.setRating(value) }
                 } else if let episode = ratedEpisode(for: prompt, vm: vm) {
                     Task {
-                    await vm.setEpisodeRating(episode, rating: value)
-                    if let userID = appState.activeUser?.id {
-                        await dependencies.posterBadgeStore.refreshSeriesRating(
-                            userID: userID,
-                            seriesID: vm.item.id,
-                            serverID: vm.item.serverID
-                        )
+                        await vm.setEpisodeRating(episode, rating: value)
+                        if let userID = appState.activeUser?.id {
+                            await dependencies.posterBadgeStore.refreshSeriesRating(
+                                userID: userID,
+                                seriesID: vm.item.id,
+                                serverID: vm.item.serverID
+                            )
+                        }
                     }
-                }
                 }
             }
         }

@@ -23,7 +23,7 @@ struct FormatBadgeRow: View {
         HStack(spacing: 6) {
             ForEach(pills, id: \.self) { pill in
                 Text(pill)
-.font(font)
+                    .font(font)
                     .padding(.horizontal, horizontalPadding)
                     .padding(.vertical, verticalPadding)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary.opacity(0.5), lineWidth: 1))
