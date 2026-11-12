@@ -658,6 +658,7 @@ struct SeriesDetailView: View {
             heroPosterURL: vm.seriesHeroPosterURL(for: vm.item, episode: initialEpisode),
             heroTallImageURL: tallBackdropURL,
             portraitHero: true,
+            heroAtTop: true,
             hero: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(vm.item.name)
@@ -1829,6 +1830,19 @@ struct SeriesDetailView: View {
                         }
                     }
                     .onChange(of: focusedEpisodeID) { oldEpisode, newEpisode in
+                        if let newEpisode,
+                           let episode = vm.episodes.first(where: { $0.id == newEpisode }),
+                           selectedEpisode?.id != newEpisode {
+                            // Infuse-style preview: the focused card is the page's active episode.
+                            // No Select/menu action is needed; all hero metadata reads displayItem.
+                            if selectedEpisode == nil {
+                                episodeOrigin.openedFromSeries()
+                            }
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedEpisode = episode
+                            }
+                        }
+
                         if newEpisode != nil {
                             episodesHadFocus = true
                             lastFocusedArea = .episode
