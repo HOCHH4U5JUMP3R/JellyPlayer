@@ -965,7 +965,6 @@ struct SeriesDetailView: View {
     }
 
 
-
     private var heroSynopsis: some View {
         DetailHeroSynopsis(
             text: displayOverview,
