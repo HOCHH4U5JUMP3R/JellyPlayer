@@ -487,24 +487,20 @@ struct MovieDetailView: View {
     // MARK: - Glass Panel
 
     private func glassPanel(vm: DetailViewModel) -> some View {
-        // Centred on the upright iPhone, like the logo above it and the buttons below.
-        VStack(alignment: isPhonePortrait ? .center : .leading, spacing: 16) {
-            // Title/logo lives in the hero slot (see DetailContentOverlay); panel opens into the metadata row.
+        VStack(alignment: isPhonePortrait ? .center : .leading, spacing: 14) {
+            // The title/logo belongs to the artwork hero; an episode opened on its own also keeps
+            // its parent series visible as a quiet eyebrow.
             if vm.item.type == .episode, let series = vm.item.seriesName {
                 Text(episodeSubtitle(vm: vm, seriesName: series))
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.78))
+                    .lineLimit(1)
             }
 
-            // Metadata line with the tagline set against it; genres and studios moved into More
-            // Details (Sodalite#146 round 2).
             DetailInfoRows(
                 item: vm.item,
                 hasFullDetail: vm.hasFullDetail
             ) {
-                // Portrait puts the pills on a line of their own: the panel is one narrow column
-                // there, and four of them on the metadata line pushed it past the screen edge and
-                // dragged the studios line out with it (measured on the iPhone, 2026-09-14).
                 if isPhonePortrait {
                     VStack(spacing: 8) {
                         ItemMetadataRow(item: vm.item, externalRatings: vm.externalRatings, awaitingExternalRatings: vm.isAwaitingExternalRatings)
@@ -535,31 +531,45 @@ struct MovieDetailView: View {
                 }
             }
 
-            // Sodalite#146: the plot belongs in the viewport the viewer actually meets. The box
-            // below the fold keeps the full text; this is the teaser that decides whether they
-            // scroll to it. The upright iPhone has it under the buttons instead.
+            if let genres = vm.item.genres, !genres.isEmpty {
+                Text(genres.joined(separator: "  ·  "))
+                    .font(.subheadline).foregroundStyle(.white.opacity(0.78)).lineLimit(2)
+            }
+            HStack(spacing: 10) {
+                if let communityRating = vm.item.communityRating {
+                    Label(String(format: "%.1f", communityRating), systemImage: "star.fill")
+                        .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+                if let personalRating = vm.userRating {
+                    Label("Meine Bewertung  ·  \(Int(personalRating.rounded()))/10", systemImage: "star.fill")
+                        .foregroundStyle(.yellow).padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                } else {
+                    Label("Noch nicht bewertet", systemImage: "star")
+                        .foregroundStyle(.white.opacity(0.82)).padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+            }
+            .font(.subheadline).accessibilityElement(children: .combine)
             if !isPhonePortrait { heroSynopsis(vm: vm) }
         }
         .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
-        // The upright iPhone draws no panel (Blexbi): its column sits on the page's own ground
-        // under the poster, not over the backdrop, so the glass only boxed the text in.
-        .padding(isPhonePortrait ? 0 : 30)
+        .padding(.vertical, isPhonePortrait ? 0 : 12)
         .background {
             if !isPhonePortrait {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
+                LinearGradient(colors: [.black.opacity(0.58), .black.opacity(0.30), .clear],
+                               startPoint: .leading, endPoint: .trailing)
+                    .padding(.horizontal, -metrics.rowInset).padding(.vertical, -12)
             }
         }
     }
 
     private func heroSynopsis(vm: DetailViewModel) -> some View {
-        DetailHeroSynopsis(
-            text: vm.item.overview,
-            isPending: !vm.hasFullDetail,
-            spoilerItem: vm.item,
-            onTap: { openMoreDetails(vm: vm) },
-            expandsInPlace: isPhonePortrait
-        )
+        DetailHeroSynopsis(text: vm.item.overview, isPending: !vm.hasFullDetail,
+                           spoilerItem: vm.item, onTap: { openMoreDetails(vm: vm) },
+                           expandsInPlace: isPhonePortrait)
+    }
     }
 
     /// Sodalite#145. Reads the version the page is showing, the same source id the tech strip below
@@ -665,20 +675,47 @@ struct MovieDetailView: View {
                 VStack(spacing: 12) {
                     primaryActionButton(vm: vm)
                         .frame(maxWidth: .infinity)
-                    // Centered, and wrapping to a second line rather than scrolling.
                     DetailActionRow(alignment: .center, balanced: true) {
                         secondaryActionButtons(vm: vm)
                     }
                     .frame(maxWidth: .infinity)
                 }
             } else {
-                DetailActionRow {
-                    primaryActionButton(vm: vm)
-                    secondaryActionButtons(vm: vm)
-                        .focusSuppressed(focusedAction == nil)
+                VStack(alignment: .leading, spacing: 16) {
+                    // Compact, icon-first utility actions sit above the two main playback choices.
+                    DetailActionRow {
+                        secondaryActionButtons(vm: vm)
+                    }
+                    .collapsesActionButtonLabel()
+
+                    HStack(spacing: 14) {
+                        primaryActionButton(vm: vm)
+                        if vm.hasTrailer {
+                            trailerActionButton(vm: vm)
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private func trailerActionButton(vm: DetailViewModel) -> some View {
+        GlassActionButton(
+            title: "detail.trailer",
+            systemImage: "play.rectangle",
+            action: {
+                #if !os(tvOS)
+                if let remote = vm.remoteTrailer { youTubeTrailer = remote; return }
+                #endif
+                Task {
+                    if let trailer = await vm.loadTrailer() {
+                        extraItem = trailer
+                        showExtra = true
+                    }
+                }
+            }
+        )
+        .focused($focusedAction, equals: .trailer)
     }
 
     private func primaryActionButton(vm: DetailViewModel) -> some View {
@@ -741,27 +778,12 @@ struct MovieDetailView: View {
                 .focused($focusedAction, equals: .replay)
             }
 
-            if vm.hasTrailer {
-                GlassActionButton(
-                    title: "detail.trailer",
-                    systemImage: "play.rectangle",
-                    action: {
-                        #if !os(tvOS)
-                        if let remote = vm.remoteTrailer {
-                            youTubeTrailer = remote
-                            return
-                        }
-                        #endif
-                        Task {
-                            if let trailer = await vm.loadTrailer() {
-                                extraItem = trailer
-                                showExtra = true
-                            }
-                        }
-                    }
-                )
-                .focused($focusedAction, equals: .trailer)
-            }
+            GlassActionButton(
+                title: "Bewerten",
+                systemImage: "star",
+                action: { ratingPrompt = RatingPrompt(itemID: vm.item.id, title: vm.item.name) }
+            )
+            .focused($focusedAction, equals: .rating)
 
             if vm.item.type != .episode {
                 GlassActionButton(
@@ -912,5 +934,65 @@ struct MovieDetailView: View {
             member: member,
             sourceTMDBID: viewModel?.item.tmdbID ?? item.tmdbID
         )
+    }
+}
+
+
+/// tvOS-friendly personal rating picker. Selection previews while moving focus;
+/// the server is only changed after the explicit Save action.
+private struct PersonalRatingPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var selection: Int
+    let onSave: (Double?) async -> Void
+
+    init(initialRating: Double?, onSave: @escaping (Double?) async -> Void) {
+        _selection = State(initialValue: initialRating.map { min(10, max(1, Int($0.rounded()))) } ?? 0)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        VStack(spacing: 28) {
+            Text("Deine Bewertung")
+                .font(.title2.weight(.semibold))
+            HStack(spacing: 8) {
+                ForEach(1...10, id: \.self) { value in
+                    Button {
+                        selection = value
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: selection > 0 && value <= selection ? "star.fill" : "star")
+                                .font(.title2)
+                            Text("\(value)")
+                                .font(.caption)
+                        }
+                        .frame(minWidth: 48, minHeight: 72)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(value <= selection ? .yellow : .secondary)
+                }
+            }
+            Text(selection == 0 ? "Bitte 1 bis 10 Sterne auswählen" : "\(selection) von 10")
+                .font(.headline)
+            HStack(spacing: 20) {
+                Button("Abbrechen") { dismiss() }
+                Button("Bewertung entfernen", role: .destructive) {
+                    Task {
+                        await onSave(nil)
+                        dismiss()
+                    }
+                }
+                Button("Speichern") {
+                    Task {
+                        await onSave(Double(selection))
+                        dismiss()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selection == 0)
+            }
+        }
+        .padding(40)
+        .frame(minWidth: 760, minHeight: 300)
     }
 }
