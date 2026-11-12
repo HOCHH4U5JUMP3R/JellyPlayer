@@ -66,7 +66,7 @@ final class HomeViewModel {
     var onUnauthorized: ((String) -> Void)?
     /// Seerr's next announced episode for a TMDB id, nil without a Seerr session. The Upcoming row's
     /// fallback for shows the library lists nothing ahead for (Sodalite#198).
-    var nextAiringLookup: (@Sendable (Int) async throws -> SeerrEpisode?)?
+    @ObservationIgnored var nextAiringLookup: (@Sendable (Int) async throws -> SeerrEpisode?)?
     /// Answers from `nextAiringLookup`, so a refetch of Home does not ask Seerr about every show again.
     var nextAiringCache: [Int: HomeUpcoming.CachedAiring] = [:]
     /// The home feed's cache slot: the profile's own with one source, a combined one otherwise.

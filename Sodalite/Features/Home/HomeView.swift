@@ -78,6 +78,12 @@ struct HomeView: View {
     }
 
     var body: some View {
+        homeWithAlerts
+    }
+
+    /// The navigation shell and its content are kept separate from the lifecycle observers below.
+    /// This keeps SwiftUI's type checker from having to infer the entire Home screen as one expression.
+    private var homeRoot: some View {
         ThemeNavigationStack {
             Group {
                 if let vm = viewModel {
@@ -141,9 +147,120 @@ struct HomeView: View {
                 .environment(\.serverSession, filter.serverID.map { dependencies.sessionRegistry.session(forServerID: $0) })
             }
         }
-        .onAppear {
-            guard let userID = appState.activeUser?.id else { return }
-            if viewModel == nil {
+    }
+
+    /// Appearance and foreground/cover refreshes.
+    private var homeLifecycleObservers: some View {
+        homeRoot
+            .onAppear {
+                guard let userID = appState.activeUser?.id else { return }
+                if viewModel == nil {
+                    viewModel = HomeViewModel(
+                        libraryService: dependencies.jellyfinLibraryService,
+                        imageService: dependencies.jellyfinImageService,
+                        discoverService: dependencies.seerrDiscoverService,
+                        userID: userID,
+                        serverID: appState.activeServer?.id ?? userID,
+                        sources: dependencies.homeSources(activeUserID: userID)
+                    )
+                    attachCallbacks(to: viewModel)
+                    Task { await viewModel?.loadContent() }
+                } else {
+                    // Pick up new server-side content on the way back to the tab; the view model owns
+                    // the age that is worth a refetch, because the foreground observer below asks it
+                    // the same question.
+                    Task { await viewModel?.refreshIfStale(trigger: .tab) }
+                }
+            }
+            // A background round trip fires scenePhase transitions without another onAppear.
+            // Do not refresh while a detail page or player covers Home; the cover observer below
+            // picks it up when Home becomes the visible screen again.
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await viewModel?.refreshIfStale(trigger: .foreground, covered: isCovered) }
+            }
+            .task(id: traktRowsTrigger) { await refreshTraktRows(traktRowsTrigger) }
+            .onChange(of: isCovered) { _, covered in
+                guard !covered else { return }
+                Task { await viewModel?.refreshIfStale(trigger: .coverDismissed) }
+            }
+    }
+
+    /// Notifications that change the shape or contents of the Home feed.
+    private var homeContentNotifications: some View {
+        homeLifecycleObservers
+            .onReceive(NotificationCenter.default.publisher(for: .homeConfigDidChange)) { _ in
+                viewModel?.reloadConfig()
+                viewModel?.scheduleConfigReload()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .homeFavoritesDidChange)) { _ in
+                Task { @MainActor in
+                    if isCovered {
+                        viewModel?.markDirty()
+                    } else {
+                        await viewModel?.loadContent()
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .homePlayedDidChange)) { _ in
+                Task { @MainActor in
+                    if isCovered {
+                        viewModel?.markDirty()
+                    } else {
+                        await viewModel?.loadContent()
+                    }
+                }
+            }
+    }
+
+    /// Playback progress is patched immediately, then the feed is refreshed when Home is visible.
+    private var homePlaybackNotifications: some View {
+        homeContentNotifications
+            .onReceive(NotificationCenter.default.publisher(for: .playbackProgressDidChange)) { note in
+                let itemID = note.userInfo?[PlaybackProgressKey.itemID] as? String
+                let ticks = note.userInfo?[PlaybackProgressKey.positionTicks] as? Int64
+                let seriesID = note.userInfo?[PlaybackProgressKey.seriesID] as? String
+                let serverID = note.userInfo?[PlaybackProgressKey.serverID] as? String
+                Task { @MainActor in
+                    if let seriesID, let vm = viewModel {
+                        DroppedSeriesStore.restore("\(serverID ?? vm.serverID)|\(seriesID)", scope: vm.homeScope)
+                    }
+                    if let itemID, let ticks {
+                        viewModel?.applyPlaybackPosition(itemID: itemID, ticks: ticks)
+                    }
+                    if isCovered {
+                        viewModel?.markDirty()
+                        return
+                    }
+                    await viewModel?.loadContent()
+                    if let itemID, let ticks {
+                        viewModel?.applyPlaybackPosition(itemID: itemID, ticks: ticks)
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .libraryItemDidReplace)) { _ in
+                // Continue Watching may hold the id the library just replaced.
+                Task { await viewModel?.loadContent() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .homeItemDidDelete)) { _ in
+                Task { @MainActor in
+                    if isCovered {
+                        viewModel?.markDirty()
+                    } else {
+                        await viewModel?.loadContent()
+                    }
+                }
+            }
+    }
+
+    /// Profile and combined-server changes rebuild or update the current feed.
+    private var homeSessionObservers: some View {
+        homePlaybackNotifications
+            .onChange(of: appState.activeUser?.id) { _, newValue in
+                guard let userID = newValue else {
+                    viewModel = nil
+                    return
+                }
                 viewModel = HomeViewModel(
                     libraryService: dependencies.jellyfinLibraryService,
                     imageService: dependencies.jellyfinImageService,
@@ -154,180 +271,63 @@ struct HomeView: View {
                 )
                 attachCallbacks(to: viewModel)
                 Task { await viewModel?.loadContent() }
-            } else {
-                // Pick up new server-side content on the way back to the tab; the view model owns
-                // the age that is worth a refetch, because the foreground observer below asks it
-                // the same question.
-                Task { await viewModel?.refreshIfStale(trigger: .tab) }
             }
-        }
-        // The app coming back to the foreground, which is the return `onAppear` does not cover: a
-        // background round trip fires scenePhase transitions and nothing else (measured on tvOS
-        // 26.5 and iOS 26.5). Without this, an Apple TV that slept with Sodalite open showed the
-        // shelf from before it slept until the app was force quit (Sodalite#117).
-        //
-        // Not while something is presented over Home. The screen the user is actually on owns the
-        // moment, and a fan-out landing on the shared request limiter next to a player that is
-        // rebuilding its pipeline is the class of burst that starves a stream (Sodalite#12). The
-        // observer below picks it up when the cover goes.
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await viewModel?.refreshIfStale(trigger: .foreground, covered: isCovered) }
-        }
-        .task(id: traktRowsTrigger) { await refreshTraktRows(traktRowsTrigger) }
-        // Home becoming the screen again. A cover dismiss fires no `onAppear` either (measured,
-        // iOS 26.5), so this is the other half of the same gate: what the user changed behind the
-        // cover already arrives by notification, what passed in the meantime does not.
-        .onChange(of: isCovered) { _, covered in
-            guard !covered else { return }
-            Task { await viewModel?.refreshIfStale(trigger: .coverDismissed) }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .homeConfigDidChange)) { _ in
-            viewModel?.reloadConfig()
-            viewModel?.scheduleConfigReload()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .homeFavoritesDidChange)) { _ in
-            // While something covers Home (detail/player), mark it stale instead of reloading now:
-            // a fan-out landing on the shared limiter next to a player rebuilding its pipeline is the
-            // class of burst that starves a stream (Sodalite#12, Audit 2026-09-25 BROWSE-1). The
-            // `isCovered` observer above does the one reload once Home is the screen again.
-            Task { @MainActor in
-                if isCovered {
-                    viewModel?.markDirty()
-                } else {
-                    await viewModel?.loadContent()
-                }
+            .onChange(of: dependencies.sessionRegistry.participantsRevision) { _, _ in
+                guard let userID = appState.activeUser?.id, let vm = viewModel else { return }
+                let sources = dependencies.homeSources(activeUserID: userID)
+                guard vm.acceptsSources(sources) else { return }
+                Task { await vm.updateSources(sources) }
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .homePlayedDidChange)) { _ in
-            Task { @MainActor in
-                if isCovered {
-                    viewModel?.markDirty()
-                } else {
-                    await viewModel?.loadContent()
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .playbackProgressDidChange)) { note in
-            // Patch the tile progress in place from the payload (race-free). While covered, that
-            // patch is all this gets: the reload for structural changes (reorder, finished
-            // drop-out) waits for the cover to actually go, instead of running once per auto-advance
-            // right next to the player opening the next stream (Sodalite#12, Audit 2026-09-25
-            // BROWSE-1). Not covered, reload now and re-apply so a stale cached re-fetch can't
-            // regress the bar (issue #24).
-            let itemID = note.userInfo?[PlaybackProgressKey.itemID] as? String
-            let ticks = note.userInfo?[PlaybackProgressKey.positionTicks] as? Int64
-            let seriesID = note.userInfo?[PlaybackProgressKey.seriesID] as? String
-            let serverID = note.userInfo?[PlaybackProgressKey.serverID] as? String
-            Task { @MainActor in
-                // Watching a dropped show again is the way back for it.
-                if let seriesID, let vm = viewModel {
-                    DroppedSeriesStore.restore("\(serverID ?? vm.serverID)|\(seriesID)", scope: vm.homeScope)
-                }
-                if let itemID, let ticks {
-                    viewModel?.applyPlaybackPosition(itemID: itemID, ticks: ticks)
-                }
-                if isCovered {
-                    viewModel?.markDirty()
-                    return
+    }
+
+    /// External reload signals and poster prefetching are deliberately their own modifier layer.
+    private var homeRefreshObservers: some View {
+        homeSessionObservers
+            .task(id: appState.requestContentReload) {
+                let signal = appState.requestContentReload
+                guard signal > 0, signal != lastHandledContentReload else { return }
+                lastHandledContentReload = signal
+                defer {
+                    if Task.isCancelled, lastHandledContentReload == signal {
+                        lastHandledContentReload = 0
+                    }
                 }
                 await viewModel?.loadContent()
-                if let itemID, let ticks {
-                    viewModel?.applyPlaybackPosition(itemID: itemID, ticks: ticks)
-                }
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .libraryItemDidReplace)) { _ in
-            // Continue Watching is holding the id the library just replaced; reload so the row points at
-            // the new item instead of failing playback on the corpse.
-            Task { await viewModel?.loadContent() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .homeItemDidDelete)) { _ in
-            // Reload so the deleted item drops out immediately instead of lingering until the next stale refresh.
-            Task { @MainActor in
-                if isCovered {
-                    viewModel?.markDirty()
-                } else {
-                    await viewModel?.loadContent()
-                }
+            .onChange(of: viewModel?.rows.flatMap({ $0.items.map(\.id) })) { _, _ in
+                if let vm = viewModel { prefetchHomePosters(vm) }
             }
-        }
-        .onChange(of: appState.activeUser?.id) { _, newValue in
-            // Profile switch: tear down the old VM so .onAppear rebuilds it with the new userID (else it keeps loading the previous profile's permissions/watch state).
-            guard let userID = newValue else {
-                viewModel = nil
-                return
+    }
+
+    /// Presentation modifiers stay outside the feed/lifecycle expression to keep type checking bounded.
+    private var homeWithAlerts: some View {
+        homeRefreshObservers
+            .addExternalAddressSheet(isPresented: $showAddURLSheet)
+            .alert(
+                "home.removeShowHistory.confirm.title",
+                isPresented: Binding(
+                    get: { historyRemovalItem != nil },
+                    set: { if !$0 { historyRemovalItem = nil } }
+                ),
+                presenting: historyRemovalItem
+            ) { item in
+                Button("home.removeShowHistory.confirm.action", role: .destructive) { removeSeriesHistory(of: item) }
+                Button("common.cancel", role: .cancel) {}
+            } message: { item in
+                Text("home.removeShowHistory.confirm.message \(item.seriesName ?? item.name)")
             }
-            viewModel = HomeViewModel(
-                libraryService: dependencies.jellyfinLibraryService,
-                imageService: dependencies.jellyfinImageService,
-                discoverService: dependencies.seerrDiscoverService,
-                userID: userID,
-                serverID: appState.activeServer?.id ?? userID,
-                sources: dependencies.homeSources(activeUserID: userID)
-            )
-            attachCallbacks(to: viewModel)
-            Task { await viewModel?.loadContent() }
-        }
-        // The participating servers changed (Combine servers switched, a server added or muted):
-        // repaint from that set's cached feed, then fetch (Sodalite#85).
-        .onChange(of: dependencies.sessionRegistry.participantsRevision) { _, _ in
-            guard let userID = appState.activeUser?.id, let vm = viewModel else { return }
-            let sources = dependencies.homeSources(activeUserID: userID)
-            guard vm.acceptsSources(sources) else { return }
-            Task { await vm.updateSources(sources) }
-        }
-        // No serverDidSwitch handler here: TabRootView is `.id(appState.activeServer?.id)`, so a
-        // switch tears this whole view down and `.onAppear` above builds a fresh view model on the
-        // destination identity, hydrated from its own cached feed (Audit 2026-09-25 BROWSE-3). A
-        // handler here duplicated that first load and, on iOS where Settings stays a sheet over a
-        // live Home, could fire against the outgoing view model before AppRouter's probe repointed
-        // `activeServer`.
-        // A cause outside Home has made its last failure obsolete (the Local Network permission came
-        // back, Sodalite#92). Home is still showing the error it hit while that was off, and only a
-        // reload can retire it.
-        .task(id: appState.requestContentReload) {
-            let signal = appState.requestContentReload
-            guard signal > 0, signal != lastHandledContentReload else { return }
-            lastHandledContentReload = signal
-            defer {
-                if Task.isCancelled, lastHandledContentReload == signal {
-                    lastHandledContentReload = 0
-                }
+            .alert(
+                "home.removeShowHistory.failed.title",
+                isPresented: Binding(
+                    get: { historyRemovalError != nil },
+                    set: { if !$0 { historyRemovalError = nil } }
+                ),
+                presenting: historyRemovalError
+            ) { _ in
+                Button("common.ok", role: .cancel) {}
+            } message: { message in
+                Text(message)
             }
-            await viewModel?.loadContent()
-        }
-        // Pre-warm row artwork as rows land so first focus doesn't pay round-trip + decode. Keyed on the cross-row item-id set so it re-fires whenever row membership changes.
-        .onChange(of: viewModel?.rows.flatMap({ $0.items.map(\.id) })) { _, _ in
-            if let vm = viewModel { prefetchHomePosters(vm) }
-        }
-        // The fix for an off-network server, offered where the failure is (Sodalite#122).
-        .addExternalAddressSheet(isPresented: $showAddURLSheet)
-        .alert(
-            "home.removeShowHistory.confirm.title",
-            isPresented: Binding(
-                get: { historyRemovalItem != nil },
-                set: { if !$0 { historyRemovalItem = nil } }
-            ),
-            presenting: historyRemovalItem
-        ) { item in
-            Button("home.removeShowHistory.confirm.action", role: .destructive) { removeSeriesHistory(of: item) }
-            Button("common.cancel", role: .cancel) {}
-        } message: { item in
-            Text("home.removeShowHistory.confirm.message \(item.seriesName ?? item.name)")
-        }
-        .alert(
-            "home.removeShowHistory.failed.title",
-            isPresented: Binding(
-                get: { historyRemovalError != nil },
-                set: { if !$0 { historyRemovalError = nil } }
-            ),
-            presenting: historyRemovalError
-        ) { _ in
-            Button("common.ok", role: .cancel) {}
-        } message: { message in
-            Text(message)
-        }
     }
 
     /// Unplayed on the series is the server's own cascade: every episode loses its played mark,

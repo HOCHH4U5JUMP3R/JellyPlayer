@@ -4,12 +4,15 @@ import AetherEngine
 @MainActor
 final class MultiviewEnginePool {
     let primary: AetherEngine
-    private let make: () throws -> AetherEngine
+    private let make: @MainActor () throws -> AetherEngine
     private var secondaries: [Int: AetherEngine] = [:]
 
-    init(primary: AetherEngine, make: @escaping () throws -> AetherEngine = { try AetherEngine() }) {
+    init(
+        primary: AetherEngine,
+        make: (@MainActor () throws -> AetherEngine)? = nil
+    ) {
         self.primary = primary
-        self.make = make
+        self.make = make ?? { try AetherEngine() }
     }
 
     func slot(of engine: AetherEngine) -> Int? {
