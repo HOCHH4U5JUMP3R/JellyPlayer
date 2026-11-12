@@ -22,6 +22,7 @@ private struct PosterBadgeEnrichment: ViewModifier {
             .task(id: EnrichmentKey(itemIDs: items.map(\.id),
                                     enabled: dependencies.appearancePreferences.showPosterBadges)) {
                 guard let userID = appState.activeUser?.id else { return }
+                await dependencies.posterBadgeStore.enrichSeriesRatings(userID: userID, items: items)
                 await dependencies.posterBadgeStore.enrich(userID: userID, items)
             }
     }
