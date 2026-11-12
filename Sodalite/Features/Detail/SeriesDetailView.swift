@@ -332,7 +332,16 @@ struct SeriesDetailView: View {
                 if prompt.itemID == vm.item.id {
                     Task { await vm.setRating(value) }
                 } else if let episode = ratedEpisode(for: prompt, vm: vm) {
-                    Task { await vm.setEpisodeRating(episode, rating: value) }
+                    Task {
+                    await vm.setEpisodeRating(episode, rating: value)
+                    if let userID = appState.activeUser?.id {
+                        await dependencies.posterBadgeStore.refreshSeriesRating(
+                            userID: userID,
+                            seriesID: vm.item.id,
+                            serverID: vm.item.serverID
+                        )
+                    }
+                }
                 }
             }
         }
@@ -1503,12 +1512,6 @@ struct SeriesDetailView: View {
                 })
                 .focused($focusedAction, equals: .trailer)
             }
-            let ratedItem = selectedEpisode ?? vm.item
-            GlassActionButton(title: "Bewerten", systemImage: "star", action: {
-                ratingPrompt = RatingPrompt(itemID: ratedItem.id, title: ratedItem.name)
-            })
-            .focused($focusedAction, equals: .rating)
-
             if !isShowingEpisode {
                 GlassActionButton(focusLiftEnabled: false,
                     title: vm.isFavorite ? "detail.unfavorite" : "detail.favorite",

@@ -777,15 +777,7 @@ struct MovieDetailView: View {
                 )
                 .focused($focusedAction, equals: .replay)
             }
-
-            GlassActionButton(
-                title: "Bewerten",
-                systemImage: "star",
-                action: { ratingPrompt = RatingPrompt(itemID: vm.item.id, title: vm.item.name) }
-            )
-            .focused($focusedAction, equals: .rating)
-
-            if vm.item.type != .episode {
+if vm.item.type != .episode {
                 GlassActionButton(
                     title: vm.isFavorite ? "detail.unfavorite" : "detail.favorite",
                     systemImage: vm.isFavorite ? "heart.fill" : "heart",
