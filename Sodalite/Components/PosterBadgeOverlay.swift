@@ -1,5 +1,24 @@
 import SwiftUI
 
+/// Shared personal-rating mark for poster and season artwork.
+struct PersonalRatingMark: View {
+    let rating: Int
+    let fontSize: CGFloat
+    let accessibilityLabel: String
+    var inset: CGFloat = 0
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "star.fill")
+            Text("\(rating)")
+        }
+        .font(.system(size: fontSize, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(inset)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
 /// The pills in a card's top-left corner (Sodalite#79).
 ///
 /// A leaf on purpose: it, not `MediaCard`, reads the badge store, so a batch of enrichment landing
@@ -14,9 +33,27 @@ struct PosterBadgeOverlay: View {
     var body: some View {
         let appearance = dependencies.appearancePreferences
         let pills = appearance.showPosterBadges ? dependencies.posterBadgeStore.badges(for: item).pills : []
-        let rating = appearance.showPosterRating ? item.userData?.rating : nil
-        if !pills.isEmpty || rating != nil {
-            PosterBadgePills(pills: pills, fontSize: fontSize, rating: rating)
+        let personalRating: Int? = {
+            guard appearance.showPosterRating else { return nil }
+            if item.type == .series {
+                return item.userData?.rating.map { Int($0.rounded()) }
+                    ?? dependencies.posterBadgeStore.personalSeriesRating(for: item)
+            }
+            return item.userData?.rating.map { Int($0.rounded()) }
+        }()
+        if !pills.isEmpty || personalRating != nil {
+            VStack(alignment: .leading, spacing: 4) {
+                if !pills.isEmpty {
+                    PosterBadgePills(pills: pills, fontSize: fontSize)
+                }
+                if let personalRating {
+                    PersonalRatingMark(
+                        rating: personalRating,
+                        fontSize: fontSize * (0.13 / 0.06) * 0.90,
+                        accessibilityLabel: "Meine Bewertung \(personalRating) von 10"
+                    )
+                }
+            }
         }
     }
 }
