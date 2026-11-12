@@ -23,14 +23,14 @@ struct DetailHeroSynopsis: View {
     /// What a tap on the teaser does on touch: the page's More Details action, so the truncated
     /// text is not a dead end. tvOS leaves the panel outside the focus engine and ignores it.
     var onTap: (() -> Void)?
+    /// Explicit tvOS destination when moving down from the synopsis.
+    var onMoveDown: (() -> Void)?
     /// The upright iPhone's placement under the action row (Blexbi): the page scrolls freely there,
     /// so a tap opens the whole text in place instead of leaving for More Details. The reserved
     /// lines still hold while it is closed, which is what keeps the buttons above it still.
     var expandsInPlace = false
 
     @State private var isExpanded = false
-    @FocusState private var isFocused: Bool
-
     @Environment(\.verticalSizeClass) private var vSizeClass
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.dependencies) private var dependencies
@@ -75,17 +75,15 @@ struct DetailHeroSynopsis: View {
             synopsisText
                 .padding(.horizontal, 5)
                 .padding(.vertical, 3)
-                .background {
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(Color.white.opacity(isFocused ? 0.09 : 0))
-                }
                 .contentShape(Rectangle())
         }
             .buttonStyle(.plain)
             .tint(.white)
             .foregroundStyle(.white.opacity(0.68))
-            .focusEffectDisabled()
-            .focused($isFocused)
+            .focusEffectDisabled(true)
+            .onMoveCommand { direction in
+                if direction == .down { onMoveDown?() }
+            }
         #else
         synopsisText
             .contentShape(Rectangle())
