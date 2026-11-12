@@ -114,8 +114,8 @@ struct ItemMetadataRow: View {
 extension View {
     /// The bordered look of a metadata segment (age rating, format pill). The edge is drawn in the
     /// text's own style, so box and label stay one colour wherever the row puts them (Sodalite#171).
-    func metadataBox(compact: Bool = false) -> some View {
-        font(compact ? .system(size: 11, weight: .medium) : .caption)
+    func metadataBox(compact: Bool = false, prominent: Bool = false) -> some View {
+        font(compact ? .system(size: 11, weight: .medium) : (prominent ? .system(size: 20, weight: .medium) : .caption))
             .padding(.horizontal, compact ? 6 : 8)
             .padding(.vertical, compact ? 2 : 3)
             .overlay(
