@@ -1908,7 +1908,6 @@ struct SeriesDetailView: View {
                 }
             }
 
-remove season synopsis
             // Full-width invisible focus bridge between the season bar and episode row: an up-swipe from a far-right episode lands here before tvOS's picker continues up into the overview/tech-info cards, then redirects by which row the user came from on the next cycle.
             // Height 24pt: tvOS's geographic picker weights frame size on proximity ties and skips sub-10pt focusables near larger ones (1pt missed often, 8pt flaky on fast season-tab→down). 24pt is reliable.
             // tvOS only: touch has no focus picker to redirect, so on iOS the bridge is 24pt of dead
