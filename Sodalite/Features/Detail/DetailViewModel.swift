@@ -6,6 +6,7 @@ final class DetailViewModel {
     var item: JellyfinItem
     var isFavorite: Bool
     var isPlayed: Bool
+    var userRating: Double? { rating }
     /// The viewer's own 0 to 10 rating of the top-level item, nil when unrated.
     var rating: Double?
     /// A rating write is in flight, so a detail refetch landing meanwhile must not put the old value back.
@@ -76,6 +77,19 @@ final class DetailViewModel {
         selectedSeasonID.flatMap { id in seasons.first(where: { $0.id == id }) }
     }
 
+    /// Scrob's season score is the average of the personally rated episodes in that season,
+    /// rounded to a whole star on Jellyfin's 1–10 scale. Jellyfin does not expose a season
+    /// UserData.Rating, so this must be derived from the episode UserData values.
+    func personalSeasonRating(for season: JellyfinItem) -> Int? {
+        let seasonEpisodes = episodesCache[season.id]
+            ?? (selectedSeasonID == season.id ? episodes : [])
+        let ratings = seasonEpisodes.compactMap { rating(of: $0) }
+            .filter { $0.isFinite && (1...10).contains($0) }
+        guard !ratings.isEmpty else { return nil }
+        let average = ratings.reduce(0, +) / Double(ratings.count)
+        return Int(average.rounded())
+    }
+
     private let itemService: JellyfinItemServiceProtocol
     private let libraryService: JellyfinLibraryServiceProtocol?
     private let playbackService: JellyfinPlaybackServiceProtocol?
@@ -143,6 +157,18 @@ final class DetailViewModel {
         if let loaded = localTrailers.first { return loaded }
         let trailers = try? await itemService.getLocalTrailers(userID: userID, itemID: item.id)
         return trailers?.first
+    }
+
+    func refreshMetadata() async {
+        if let detail = try? await itemService.getItemDetail(userID: userID, itemID: item.id) {
+            await MainActor.run {
+                item = detail
+                isFavorite = detail.userData?.isFavorite ?? false
+                isPlayed = detail.userData?.played ?? false
+                hasFullDetail = true
+            }
+        }
+        await refreshSeasons()
     }
 
     func loadFullDetail() async {
@@ -637,6 +663,11 @@ final class DetailViewModel {
         }
     }
 
+    /// Compatibility for JellyPlayer's existing detail UI; the 1.1 rating path also syncs Trakt.
+    func setUserRating(_ rating: Double?) async {
+        await setRating(rating)
+    }
+
     func toggleFavorite() async {
         let oldValue = isFavorite
         isFavorite.toggle()
@@ -658,6 +689,15 @@ final class DetailViewModel {
         defer { isWritingRating = false }
         do {
             try await itemService.setRating(userID: userID, itemID: item.id, rating: newValue)
+            if let userData = item.userData {
+                item.userData = userData.with(rating: newValue)
+            } else {
+                item.userData = UserItemData(
+                    playbackPositionTicks: nil, playCount: nil, isFavorite: nil,
+                    played: nil, unplayedItemCount: nil, playedPercentage: nil,
+                    lastPlayedDate: nil, rating: newValue
+                )
+            }
             trakt?.ratingChanged(for: item, rating: newValue)
         } catch {
             rating = oldValue

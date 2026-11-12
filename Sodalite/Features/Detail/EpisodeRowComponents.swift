@@ -8,44 +8,72 @@ struct SeasonTab: View {
     let id: String
     let name: String
     let isSelected: Bool
+    /// Scrob's rounded personal season rating, delivered as Jellyfin UserData.Rating.
+    var personalRating: Int? = nil
+    var imageURL: URL? = nil
     var focusedID: FocusState<String?>.Binding
     let action: () -> Void
 
     private var isFocused: Bool { focusedID.wrappedValue == id }
 
+    @Environment(\.appearanceTheme) private var appearanceTheme
+
     var body: some View {
         Button { action() } label: {
-            Text(name)
-                .font(.subheadline)
-                .fontWeight(isSelected ? .bold : .regular)
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(tabBackground)
-                )
-                // A resting edge on the selected tab, so the bar says which season is showing even
-                // where its fill is too quiet to draw its own shape (Sodalite#146 round 4). The
-                // QUIET edge, not the pills' `hairline`: those float over whatever the scraper
-                // found, this sits below the fold on a ground the app draws itself. The fill stays
-                // `restFill` for the same reason it always was, the focus lift here goes to white
-                // rather than to the tint.
-                .overlay {
-                    if isSelected {
+            VStack(alignment: .leading, spacing: 4) {
+                ZStack(alignment: .bottomLeading) {
+                    AsyncCachedImage(url: imageURL) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.Theme.surface)
+                            .overlay {
+                                Image(systemName: "tv")
+                                    .font(.system(size: 30, weight: .medium))
+                                    .foregroundStyle(.tertiary)
+                            }
+                    }
+                    .frame(width: 150, height: 225)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.82)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay {
                         RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.Theme.panelEdge, lineWidth: 1)
+                            .strokeBorder(
+                                isFocused ? appearanceTheme.palette.focus.color : (isSelected ? Color.Theme.panelEdge : .clear),
+                                lineWidth: isFocused ? 3 : 1
+                            )
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if let personalRating {
+                            PersonalRatingMark(
+                                rating: personalRating,
+                                fontSize: PosterBadgeMetrics.fontSize(posterWidth: 150, scale: 1)
+                                    * (0.13 / 0.06) * 0.90,
+                                accessibilityLabel: "Meine Staffelbewertung \(personalRating) von 10",
+                                inset: 8
+                            )
+                        }
                     }
                 }
+
+                Text(name)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.gray.opacity(isSelected ? 0.9 : 0.72))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 150, alignment: .center)
+            }
         }
         .buttonStyle(SeasonTabButtonStyle())
+        .focusEffectDisabled()
         .focused(focusedID, equals: id)
-    }
-
-    private var tabBackground: Color {
-        if isFocused { return Color.Theme.focusFill }
-        if isSelected { return Color.Theme.restFill }
-        return .clear
     }
 }
 
@@ -57,30 +85,14 @@ struct EpisodeCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         // Stroke drawn inside EpisodeLandscapeCard so it hugs the thumbnail only, not the caption below.
         configuration.label
-            .focusResponse(.card, isFocused: isFocused)
     }
 }
 
 struct SeasonTabButtonStyle: ButtonStyle {
-    @Environment(\.isFocused) private var isFocused
-
     func makeBody(configuration: Configuration) -> some View {
-        // Asymmetric stroke: 50ms fade-in delay, 0 fade-out. A residual wrong-tab transition slipping past the onMoveCommand prime never shows the stroke, the 50ms window lets the DispatchQueue fallback land focus on the right tab first. 50ms is sub-perceptual.
+        // No tvOS lift, scale, tint fill or pressed overlay. The poster's own thin focus stroke
+        // is the only visual state; the label below it remains neutral gray.
         configuration.label
-            // Not `.focusStroke`: this stroke carries its own asymmetric timing, which the shared
-            // modifier has no place for. The width is the same 3.
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(.tint, lineWidth: FocusStroke.width)
-                    .opacity(isFocused ? 1 : 0)
-                    .animation(
-                        isFocused
-                            ? .easeIn(duration: 0.15).delay(0.05)
-                            : .easeOut(duration: 0.1),
-                        value: isFocused
-                    )
-            )
-            .focusResponse(.chip, isFocused: isFocused)
     }
 }
 
@@ -89,11 +101,12 @@ struct SeasonTabButtonStyle: ButtonStyle {
 /// Loading placeholder mirroring EpisodeLandscapeCard's 360x202 thumbnail + caption lines, with one sweeping highlight.
 struct EpisodeSkeletonCard: View {
     @State private var shimmer = false
+    var cardSizeOverride: CGSize? = nil
 
     @Environment(\.dependencies) private var dependencies
     @Environment(\.horizontalSizeClass) private var hSizeClass
     private var cardSize: CGSize {
-        LayoutMetrics.current(hSizeClass)
+        cardSizeOverride ?? LayoutMetrics.current(hSizeClass)
             .tileSize(cardScale: dependencies.appearancePreferences.cardScale)
     }
 
@@ -153,6 +166,7 @@ struct EpisodeSkeletonCard: View {
 struct EpisodeLandscapeCard: View {
     let episode: JellyfinItem
     let imageURL: URL?
+    var cardSizeOverride: CGSize? = nil
 
     /// The episode the page's Play button acts on, resolved by the page's own playTarget so the ring and the button cannot claim different cards.
     var isPlayTarget: Bool = false
@@ -165,6 +179,8 @@ struct EpisodeLandscapeCard: View {
 
     /// Same reason as isPlayed; also the only feedback the context-menu favorite toggle has.
     var isFavorite: Bool = false
+    /// Effective rating supplied by the view model so in-session changes update the badge immediately.
+    var personalRating: Double? = nil
 
     /// The viewer's own mark-watched from this session, which is a different fact from `isPlayed`
     /// and the only one that may hide the resume indicator (`DetailViewModel.wasMarkedPlayedInSession`).
@@ -178,7 +194,7 @@ struct EpisodeLandscapeCard: View {
         dependencies.spoilerPolicy(userID: appState.activeUser?.id)
     }
     private var cardSize: CGSize {
-        LayoutMetrics.current(hSizeClass)
+        cardSizeOverride ?? LayoutMetrics.current(hSizeClass)
             .tileSize(cardScale: dependencies.appearancePreferences.cardScale)
     }
 
@@ -232,6 +248,19 @@ struct EpisodeLandscapeCard: View {
                     posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+                // Personal Jellyfin rating belongs to this episode, not to its parent series.
+                if let rating = personalRating ?? episode.userData?.rating {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill").foregroundStyle(.white)
+                        Text("\(Int(rating.rounded()))")
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(10)
+                        .accessibilityLabel("Meine Bewertung \(Int(rating.rounded())) von 10")
+                }
             }
             .frame(width: artworkSize.width, height: artworkSize.height)
             // The ring's room, inside the card rather than outside it.
@@ -240,8 +269,7 @@ struct EpisodeLandscapeCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     // No separator glyph: the accent colour is what sets the token off the title here.
-                    let token = EpisodeMetadataFormatter.seasonEpisode(season: nil,
-                                                                       episode: episode.indexNumber)
+                    let token = episode.indexNumber.map(String.init) ?? ""
                     if !token.isEmpty {
                         Text(verbatim: token)
                             .font(.caption)
@@ -298,7 +326,7 @@ struct EpisodeLandscapeCard: View {
     private var strokeStyle: AnyShapeStyle {
         switch stroke {
         case .focused: return AnyShapeStyle(appearanceTheme.palette.focus.color)
-        case .playTarget: return AnyShapeStyle(Color.Theme.success.opacity(0.8))
+        case .playTarget: return AnyShapeStyle(appearanceTheme.palette.focus.color.opacity(0.9))
         case .none: return AnyShapeStyle(Color.clear)
         }
     }
