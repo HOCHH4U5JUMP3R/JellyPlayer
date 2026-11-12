@@ -15,6 +15,7 @@ protocol JellyfinItemServiceProtocol: MovieCatalogQuerying {
     func getPlaylistItems(playlistID: String, userID: String, startIndex: Int, limit: Int) async throws -> JellyfinItemsResponse
     func setFavorite(userID: String, itemID: String, isFavorite: Bool) async throws
     func setPlayed(userID: String, itemID: String, isPlayed: Bool) async throws
+    func setUserRating(userID: String, itemID: String, rating: Double?) async throws
     /// The viewer's own rating, 0 to 10; nil clears it.
     func setRating(userID: String, itemID: String, rating: Double?) async throws
     /// Forgets the resume position, which takes the item out of Continue Watching; played state stays.
@@ -24,6 +25,13 @@ protocol JellyfinItemServiceProtocol: MovieCatalogQuerying {
     /// People matching a name, carrying ProviderIds so the caller can tell same-named people apart. People live in their own namespace, so an /Items search never returns them.
     func searchPersons(userID: String, name: String, limit: Int) async throws -> [JellyfinItem]
     func deleteItem(itemID: String) async throws
+}
+
+/// Default for lightweight service doubles that do not exercise rating writes.
+extension JellyfinItemServiceProtocol {
+    func setUserRating(userID: String, itemID: String, rating: Double?) async throws {
+        throw APIError.invalidResponse
+    }
 }
 
 final class JellyfinItemService: JellyfinItemServiceProtocol {
@@ -158,6 +166,10 @@ final class JellyfinItemService: JellyfinItemServiceProtocol {
             ? .markPlayed(userID: userID, itemID: itemID)
             : .unmarkPlayed(userID: userID, itemID: itemID)
         try await client.request(endpoint: endpoint)
+    }
+
+    func setUserRating(userID: String, itemID: String, rating: Double?) async throws {
+        try await setRating(userID: userID, itemID: itemID, rating: rating)
     }
 
     func setRating(userID: String, itemID: String, rating: Double?) async throws {
