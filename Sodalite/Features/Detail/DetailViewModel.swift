@@ -739,6 +739,14 @@ final class DetailViewModel {
         playedOverrides[item.id] ?? (item.userData?.played ?? false)
     }
 
+    /// Whether every episode in a season is watched, using cached season contents and live overrides.
+    /// Empty or not-yet-loaded seasons are not marked.
+    func isSeasonPlayed(_ season: JellyfinItem) -> Bool {
+        guard let cached = episodesCache[season.id] else { return false }
+        let seasonEpisodes = selectedSeasonID == season.id ? episodes : cached
+        return !seasonEpisodes.isEmpty && seasonEpisodes.allSatisfy { isPlayed($0) }
+    }
+
     /// Did the viewer mark this watched in THIS session? A narrower question than ``isPlayed(_:)``,
     /// and the only one the resume indicator may ask. An explicit mark-watched makes the server drop
     /// the item's resume position (`MarkPlayed` resets it), so the capsule has to go before the
