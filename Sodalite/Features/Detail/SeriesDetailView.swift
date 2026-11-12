@@ -114,9 +114,6 @@ struct SeriesDetailView: View {
     /// Whether Menu has a series state to go back to, or has to leave the page. See the type.
     @State private var episodeOrigin = EpisodeStateOrigin()
     @State private var episodeRedirectDone = false
-    /// Last focused region in the season+episode block; the focus bridge reads it to tell which direction a cross-row jump came from without inspecting @FocusState (already nil mid-transition).
-    @State private var lastFocusedArea: FocusArea = .none
-    private enum FocusArea { case none, season, episode }
     /// Bridge season→episode writes the target episode id here; the episode-row ScrollViewReader scrolls it into the LazyHStack then writes focusedEpisodeID, since a focusedEpisodeID write for an unrendered card is a silent no-op (right-side-takes-two-clicks case).
     @State private var pendingEpisodeFocus: String?
     /// The player return sets this alongside pendingEpisodeFocus: the row jumps instead of animating, because the focus write lands mid-animation and the focus engine's own scroll then stops it short of the card.
@@ -1902,7 +1899,8 @@ struct SeriesDetailView: View {
         }
     }
 
-    /// Where a move down into the episode row lands. Every entry path (the focus bridge, the one-shot redirect below it, the return from the player) reads this one resolver so they cannot aim at different cards.
+    /// Where a move down into the episode row lands. The season button, the one-shot redirect,
+    /// and the player return all read this one resolver so they cannot aim at different cards.
     private func episodeEntryTarget(vm: DetailViewModel) -> String? {
         if let lastFocusedEpisodeID,
            vm.episodes.contains(where: { $0.id == lastFocusedEpisodeID }) {
@@ -1994,7 +1992,6 @@ struct SeriesDetailView: View {
                             } else {
                                 lastFocusedSeasonID = newID
                             }
-                            lastFocusedArea = .season
                             episodeRedirectDone = false
                         } else if let oldID {
                             lastFocusedSeasonID = oldID
@@ -2020,7 +2017,6 @@ struct SeriesDetailView: View {
                             if oldEpisode != nil {
                                 lastFocusedEpisodeID = newEpisode
                             }
-                            lastFocusedArea = .episode
                         } else if let oldEpisode {
                             lastFocusedEpisodeID = oldEpisode
                             episodeAim.focusLeft(oldEpisode)
