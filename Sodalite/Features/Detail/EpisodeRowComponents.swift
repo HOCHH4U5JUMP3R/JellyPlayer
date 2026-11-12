@@ -27,7 +27,7 @@ struct SeasonTab: View {
                             .fill(Color.Theme.surface)
                             .overlay(Image(systemName: "tv").font(.title2).foregroundStyle(.tertiary))
                     }
-                    .frame(width: 144, height: 216)
+                    .frame(width: 150, height: 225)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay {
                         RoundedRectangle(cornerRadius: 10)
@@ -64,7 +64,7 @@ struct SeasonTab: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: 144, alignment: .center)
+                .frame(width: 150, alignment: .center)
                 .multilineTextAlignment(.center)
         }
         .scaleEffect(isFocused ? 1.05 : 1)
@@ -248,6 +248,9 @@ struct EpisodeLandscapeCard: View {
             }
         }
         .frame(width: artworkSize.width, height: artworkSize.height)
+        // Clip the COMPLETE artwork composition (image, resume bar, badges and title gradient)
+        // rather than only the source image; otherwise the bottom gradient paints square corners.
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12 + strokeWidth)
             .strokeBorder(strokeStyle, lineWidth: strokeWidth).padding(-strokeWidth)
             .animation(.easeInOut(duration: 0.2), value: isFocused))
@@ -333,12 +336,8 @@ struct EpisodeSynopsisBox: View {
             .padding(.vertical, 12)
             .background(
                 // Material base for the full-bleed backdrop redesign (ExpandableTextBox rationale).
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isFocused ? Color.Theme.focusFill : .clear)
-                }
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
             )
             .focusStroke(cornerRadius: 12, isFocused: isFocused)
             .focusResponse(.inline, isFocused: isFocused)
