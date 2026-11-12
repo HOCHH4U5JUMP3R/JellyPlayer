@@ -839,16 +839,16 @@ struct SeriesDetailView: View {
                         let minutes = Int((Double(runtime) / 600_000_000).rounded())
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
                             Text(minutes.formatted())
-                                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                                 .font(.system(size: 24, weight: .semibold, design: .rounded))
                             Text("MIN.")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .tracking(1)
                         }
                         .foregroundStyle(.white.opacity(0.58))
                     }
                     if let date = formattedDisplayDate() {
                         Text(date)
-                            .font(.system(size: 20, weight: .medium))
+                            .font(.system(size: 24, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.92))
                     }
                     if let officialRating = displayItem.officialRating ?? vm.item.officialRating {
@@ -862,7 +862,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .foregroundStyle(.white)
-                .frame(height: 32, alignment: .leading)
+                .frame(height: 36, alignment: .leading)
 
                 let episodeGenres = displayItem.genres ?? []
                 let visibleGenres = episodeGenres.isEmpty ? (vm.item.genres ?? []) : episodeGenres
@@ -904,6 +904,13 @@ struct SeriesDetailView: View {
                 .frame(height: 30, alignment: .leading)
 
                 heroSynopsis
+            } else if vm.isLoadingSeasons || !vm.hasFullDetail {
+                // Reserve the episode-info footprint until Next Up and the first episode list settle.
+                // The arriving metadata fills these slots without moving the buttons or season rail.
+                Color.clear.frame(height: 36)
+                Color.clear.frame(height: 26)
+                Color.clear.frame(height: 30)
+                Color.clear.frame(height: 52)
             } else {
                 // The series overview is deliberately not repeated below the season rail.
                 EmptyView()
@@ -2045,7 +2052,7 @@ struct SeriesDetailView: View {
                         scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
                     }
                     }
-                    .frame(height: 220)
+                    .frame(height: 280)
                 }
             }
         }
@@ -2172,7 +2179,7 @@ struct SeriesDetailView: View {
                 .padding(.vertical, 32)
             }
         }
-        .frame(height: 220)
+        .frame(height: 280)
         .allowsHitTesting(false)
     }
 
