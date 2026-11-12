@@ -16,7 +16,7 @@ struct SeasonTab: View {
     private var isFocused: Bool { focusedID.wrappedValue == id }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .center, spacing: 5) {
             Button { action() } label: {
                 ZStack(alignment: .topLeading) {
                     AsyncCachedImage(url: imageURL) { image in
@@ -55,7 +55,8 @@ struct SeasonTab: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: 128, alignment: .leading)
+                .frame(width: 128, alignment: .center)
+                .multilineTextAlignment(.center)
         }
     }
 }
@@ -92,7 +93,8 @@ struct SeasonTabButtonStyle: ButtonStyle {
                         value: isFocused
                     )
             )
-            .focusResponse(.chip, isFocused: isFocused)
+            // Keep the focused poster outlined without applying the tvOS chip scale transform;
+            // the first season must remain fully inside the leading viewport edge.
     }
 }
 
@@ -328,7 +330,7 @@ struct EpisodeLandscapeCard: View {
     private var strokeStyle: AnyShapeStyle {
         switch stroke {
         case .focused: return AnyShapeStyle(appearanceTheme.palette.focus.color)
-        case .playTarget: return AnyShapeStyle(Color.Theme.success.opacity(0.8))
+        case .playTarget: return AnyShapeStyle(appearanceTheme.palette.focus.color)
         case .none: return AnyShapeStyle(Color.clear)
         }
     }
