@@ -14,6 +14,7 @@ import Foundation
 /// out of the engine with `.disabled` while focus is not in the row, and this is how the page knows.
 enum DetailAction: Hashable {
     case play
+    case synopsis
     case sync
     case version
     case shuffle
