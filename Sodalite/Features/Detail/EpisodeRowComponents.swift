@@ -7,6 +7,8 @@ import SwiftUI
 struct SeasonTab: View {
     let id: String
     let name: String
+    let imageURL: URL?
+    let personalRating: Double?
     let isSelected: Bool
     var focusedID: FocusState<String?>.Binding
     let action: () -> Void
@@ -15,37 +17,46 @@ struct SeasonTab: View {
 
     var body: some View {
         Button { action() } label: {
-            Text(name)
-                .font(.subheadline)
-                .fontWeight(isSelected ? .bold : .regular)
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(tabBackground)
-                )
-                // A resting edge on the selected tab, so the bar says which season is showing even
-                // where its fill is too quiet to draw its own shape (Sodalite#146 round 4). The
-                // QUIET edge, not the pills' `hairline`: those float over whatever the scraper
-                // found, this sits below the fold on a ground the app draws itself. The fill stays
-                // `restFill` for the same reason it always was, the focus lift here goes to white
-                // rather than to the tint.
-                .overlay {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.Theme.panelEdge, lineWidth: 1)
+            VStack(spacing: 6) {
+                ZStack(alignment: .topLeading) {
+                    AsyncCachedImage(url: imageURL) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.Theme.surface)
+                            .overlay(Image(systemName: "tv").font(.title2).foregroundStyle(.tertiary))
+                    }
+                    .frame(width: 128, height: 192)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(isFocused ? Color.tint : (isSelected ? Color.Theme.panelEdge : .clear),
+                                          lineWidth: isFocused ? FocusStroke.width : 1)
+                    }
+
+                    if let personalRating {
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                            Text(Int(personalRating.rounded()).formatted())
+                        }
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 5)
+                        .background(.black.opacity(0.72), in: Capsule())
+                        .padding(7)
                     }
                 }
+                Text(name)
+                    .font(.caption)
+                    .foregroundStyle(isSelected || isFocused ? .white : .secondary)
+                    .lineLimit(1)
+                    .frame(width: 128)
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(SeasonTabButtonStyle())
         .focused(focusedID, equals: id)
-    }
-
-    private var tabBackground: Color {
-        if isFocused { return Color.Theme.focusFill }
-        if isSelected { return Color.Theme.restFill }
-        return .clear
     }
 }
 
