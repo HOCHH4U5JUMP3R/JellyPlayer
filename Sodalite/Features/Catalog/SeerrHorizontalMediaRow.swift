@@ -20,6 +20,7 @@ struct SeerrHorizontalMediaRow: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(titleFont)
+                .fontWeight(.semibold)
                 .padding(.leading, leadingInset)
                 .padding(.trailing, metrics.rowInset)
 
