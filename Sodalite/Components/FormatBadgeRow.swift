@@ -16,12 +16,13 @@ import SwiftUI
 struct FormatBadgeRow: View {
     let pills: [String]
     var compact: Bool = false
+    var prominent: Bool = false
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(pills, id: \.self) { pill in
                 Text(pill)
-                    .metadataBox(compact: compact)
+                    .metadataBox(compact: compact, prominent: prominent)
             }
         }
         // Sodalite#171: set here and not inherited, because the episode panel and the phone-portrait
