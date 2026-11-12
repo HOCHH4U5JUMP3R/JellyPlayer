@@ -14,14 +14,15 @@ struct DetailViewModelRefreshSeasonsTests {
     /// test.
     final class MockItemService: JellyfinItemServiceProtocol, @unchecked Sendable {
         var seasons: [JellyfinItem] = []
+        var episodeResponses: [String: [JellyfinItem]] = [:]
         var episodesBySeason: [String: [JellyfinItem]] = [:]
 
         func getSeasons(seriesID: String, userID: String) async throws -> JellyfinItemsResponse {
             JellyfinItemsResponse(items: seasons, totalRecordCount: seasons.count)
         }
         func getEpisodes(seriesID: String, seasonID: String, userID: String) async throws -> JellyfinItemsResponse {
-            let items = episodesBySeason[seasonID] ?? []
-            return JellyfinItemsResponse(items: items, totalRecordCount: items.count)
+        var episodeResponses: [String: [JellyfinItem]] = [:]
+        var episodesBySeason: [String: [JellyfinItem]] = [:]
         }
         func getItemDetail(userID: String, itemID: String) async throws -> JellyfinItem { throw ServiceFailure() }
         func getLocalTrailers(userID: String, itemID: String) async throws -> [JellyfinItem] { [] }
@@ -55,10 +56,15 @@ struct DetailViewModelRefreshSeasonsTests {
         try decodeItem("{\"Id\":\"\(id)\",\"Name\":\"\(id)\",\"Type\":\"Season\"}")
     }
 
-    private func episode(_ id: String, seasonID: String) throws -> JellyfinItem {
-        try decodeItem(
-            "{\"Id\":\"\(id)\",\"Name\":\"\(id)\",\"Type\":\"Episode\",\"SeasonId\":\"\(seasonID)\"}"
-        )
+    private func episode(_ id: String, seasonID: String, rating: Double? = nil) throws -> JellyfinItem {
+        var object: [String: Any] = [
+            "Id": id,
+            "Name": id,
+            "Type": "Episode",
+            "SeasonId": seasonID
+        ]
+        if let rating { object["UserData"] = ["Rating": rating] }
+        return try JSONDecoder().decode(JellyfinItem.self, from: JSONSerialization.data(withJSONObject: object))
     }
 
     private func makeViewModel(service: MockItemService) throws -> DetailViewModel {
@@ -92,6 +98,35 @@ struct DetailViewModelRefreshSeasonsTests {
         #expect(vm.currentEpisodeID == nil, "currentEpisodeID still pointed at the deleted episode")
         #expect(vm.cachedPlaybackInfo == nil, "cachedPlaybackInfo still carried the deleted episode")
         #expect(vm.selectedSeasonID == "s1", "the surviving season was not selected")
+    }
+
+    @Test("season rating averages rated episodes only and rounds to a whole star")
+    func seasonRatingUsesRatedEpisodesOnly() async throws {
+        let service = MockItemService()
+        service.episodeResponses["s1"] = [
+            try episode("e1", seasonID: "s1", rating: 7),
+            try episode("e2", seasonID: "s1", rating: 8),
+            try episode("e3", seasonID: "s1")
+        ]
+        let vm = try makeViewModel(service: service)
+
+        await vm.loadEpisodes(seasonID: "s1")
+
+        #expect(vm.personalSeasonRating(for: try season("s1")) == 8)
+    }
+
+    @Test("a season without personally rated episodes has no rating")
+    func seasonWithoutRatingsReturnsNil() async throws {
+        let service = MockItemService()
+        service.episodeResponses["s1"] = [
+            try episode("e1", seasonID: "s1"),
+            try episode("e2", seasonID: "s1")
+        ]
+        let vm = try makeViewModel(service: service)
+
+        await vm.loadEpisodes(seasonID: "s1")
+
+        #expect(vm.personalSeasonRating(for: try season("s1")) == nil)
     }
 
     @Test("deleting an unrelated season leaves the play target alone")
