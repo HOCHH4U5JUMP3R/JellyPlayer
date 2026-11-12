@@ -2161,7 +2161,7 @@ struct SeriesDetailView: View {
 #if os(tvOS)
 private struct InfuseDetailActionButtonStyle: ButtonStyle {
     var isProminent: Bool
-    @Environment(\\.isFocused) private var isFocused
+    @Environment(\.isFocused) private var isFocused
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
