@@ -115,8 +115,6 @@ struct SeriesDetailView: View {
     /// Whether Menu has a series state to go back to, or has to leave the page. See the type.
     @State private var episodeOrigin = EpisodeStateOrigin()
     @State private var episodeRedirectDone = false
-    /// Sticky: set when the episode row had focus so the season bar's onChange distinguishes "scrolled up from episodes" from "tabbing between tabs" and snaps focus back to the playing season (else tvOS lands on whichever tab is geographically above the last episode).
-    @State private var episodesHadFocus = false
     /// Last focused region in the season+episode block; the focus bridge reads it to tell which direction a cross-row jump came from without inspecting @FocusState (already nil mid-transition).
     @State private var lastFocusedArea: FocusArea = .none
     private enum FocusArea { case none, season, episode }
@@ -792,6 +790,7 @@ struct SeriesDetailView: View {
                             guard let newID else { return }
                             if oldID == nil,
                                let rememberedID = lastFocusedCastID,
+                               cast.contains(where: { $0.id == rememberedID }),
                                rememberedID != newID {
                                 DispatchQueue.main.async { focusedCastID = rememberedID }
                                 return
@@ -1944,6 +1943,7 @@ struct SeriesDetailView: View {
                         if let newID {
                             if oldID == nil,
                                let rememberedID = lastFocusedSeasonID,
+                               vm.seasons.contains(where: { $0.id == rememberedID }),
                                rememberedID != newID {
                                 // Restore this rail's previous focus instead of accepting the
                                 // focus engine's nearest card from whichever row we came from.
@@ -1951,7 +1951,6 @@ struct SeriesDetailView: View {
                             } else {
                                 lastFocusedSeasonID = newID
                             }
-                            episodesHadFocus = false
                             lastFocusedArea = .season
                             episodeRedirectDone = false
                         } else if let oldID {
@@ -1978,7 +1977,6 @@ struct SeriesDetailView: View {
                             if oldEpisode != nil {
                                 lastFocusedEpisodeID = newEpisode
                             }
-                            episodesHadFocus = true
                             lastFocusedArea = .episode
                         } else if let oldEpisode {
                             lastFocusedEpisodeID = oldEpisode
@@ -2235,7 +2233,7 @@ struct SeriesDetailView: View {
                                 .frame(width: 144, height: 216)
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color.white.opacity(0.12))
-                                .frame(width: 84, height: 10)
+                                .frame(width: 84, height: 18)
                         }
                     }
                 }
