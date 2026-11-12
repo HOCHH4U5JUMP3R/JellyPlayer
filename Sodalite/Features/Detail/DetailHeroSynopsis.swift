@@ -71,16 +71,15 @@ struct DetailHeroSynopsis: View {
 
     var body: some View {
         #if os(tvOS)
-        Button { onTap?() } label: {
-            synopsisText
-                .padding(.horizontal, 5)
-                .padding(.vertical, 3)
-                .contentShape(Rectangle())
-        }
-            .buttonStyle(.plain)
-            .tint(.white)
-            .foregroundStyle(.white.opacity(0.68))
+        synopsisText
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+            // A focusable text surface, not a Button: tvOS applies button hover/focus
+            // treatment even with .plain in some focus transitions.
+            .focusable()
             .focusEffectDisabled(true)
+            .onTapGesture { onTap?() }
             .onMoveCommand { direction in
                 if direction == .down { onMoveDown?() }
             }
