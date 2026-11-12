@@ -275,8 +275,8 @@ What is planned next is in [ROADMAP.md](ROADMAP.md).
 ## Build from source
 
 ```bash
-git clone https://github.com/superuser404notfound/Sodalite.git
-cd Sodalite
+git clone https://github.com/HOCHH4U5JUMP3R/JellyPlayer.git
+cd JellyPlayer
 open Sodalite.xcodeproj
 ```
 

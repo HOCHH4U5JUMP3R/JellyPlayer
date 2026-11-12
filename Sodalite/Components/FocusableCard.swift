@@ -25,12 +25,26 @@ struct FocusableCard<Content: View>: View {
         }
     }
 
+    @ViewBuilder
     private var baseCard: some View {
-        content(isHighlighted)
-            .focusableSurface()
-            .focused($isFocused)
-            .stableTap(isFocused: isFocused, longPressOpensMenu: opensMenuOnHold, onHold: opensMenuOnHold ? cardMenuWillOpen : nil) { action() }
-            .focusResponse(.card, isFocused: isHighlighted)
+        if let externalFocus, let focusID {
+            content(isHighlighted)
+                .focusableSurface()
+                .focused(externalFocus, equals: focusID)
+                .stableTap(isFocused: isCardFocused, longPressOpensMenu: opensMenuOnHold, onHold: opensMenuOnHold ? cardMenuWillOpen : nil) { action() }
+                .focusResponse(.card, isFocused: isHighlighted)
+        } else {
+            content(isHighlighted)
+                .focusableSurface()
+                .focused($isFocused)
+                .stableTap(isFocused: isFocused, longPressOpensMenu: opensMenuOnHold, onHold: opensMenuOnHold ? cardMenuWillOpen : nil) { action() }
+                .focusResponse(.card, isFocused: isHighlighted)
+        }
+    }
+
+    private var isCardFocused: Bool {
+        if let externalFocus, let focusID { return externalFocus.wrappedValue == focusID }
+        return isFocused
     }
 
     @ViewBuilder
@@ -54,9 +68,9 @@ struct FocusableCard<Content: View>: View {
 
     private var isHighlighted: Bool {
         #if os(iOS)
-        isFocused || (highlightsOnPress && isPressed)
+        isCardFocused || (highlightsOnPress && isPressed)
         #else
-        isFocused
+        isCardFocused
         #endif
     }
 }

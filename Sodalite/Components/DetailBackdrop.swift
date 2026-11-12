@@ -77,8 +77,20 @@ struct DetailBackdrop: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
-            // Light uniform dim for hero-text readability.
-            .overlay(Color.black.opacity(0.15))
+            // Infuse reference: darken the information side while leaving the artwork on the right clear.
+            .overlay {
+                LinearGradient(
+                    stops: [
+                        .init(color: Color(red: 0.12, green: 0.13, blue: 0.14).opacity(0.96), location: 0),
+                        .init(color: Color(red: 0.12, green: 0.13, blue: 0.14).opacity(0.82), location: 0.30),
+                        .init(color: Color(red: 0.12, green: 0.13, blue: 0.14).opacity(0.42), location: 0.54),
+                        .init(color: Color(red: 0.12, green: 0.13, blue: 0.14).opacity(0.10), location: 0.78),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .leading, endPoint: .trailing
+                )
+            }
+            .overlay(Color.black.opacity(0.16))
         }
     }
 }
@@ -92,6 +104,10 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     /// `DetailBackdrop` owns the artwork). Same two URLs that surface passes to the backdrop.
     var heroImageURL: URL? = nil
     var heroPosterURL: URL? = nil
+    /// Gap between the hero title and the primary information column.
+    var primaryTopInset: CGFloat = 20
+    /// Height of the tvOS title area, configurable for compact detail headers.
+    var tvHeroHeight: CGFloat = 150
     /// The same backdrop at `ImageWidth.tallHero`, for the 4:5 crop; nil falls back to `heroImageURL`.
     var heroTallImageURL: URL? = nil
     /// iPhone portrait: a tall 4:5 hero instead of the 16:9 band, the shape Home's banner takes on an
@@ -207,6 +223,8 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     init(
         heroImageURL: URL? = nil,
         heroPosterURL: URL? = nil,
+        primaryTopInset: CGFloat = 20,
+        tvHeroHeight: CGFloat = 150,
         heroTallImageURL: URL? = nil,
         portraitHero: Bool = false,
         @ViewBuilder hero: @escaping () -> Hero = { EmptyView() },
@@ -215,6 +233,8 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     ) {
         self.heroImageURL = heroImageURL
         self.heroPosterURL = heroPosterURL
+        self.primaryTopInset = primaryTopInset
+        self.tvHeroHeight = tvHeroHeight
         self.heroTallImageURL = heroTallImageURL
         self.portraitHero = portraitHero
         self.hero = hero
@@ -239,20 +259,39 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                     Color.clear.frame(height: heroWindow)
                     gradientWithHero
                 } else {
-                    // First page one viewport tall, hero + primary bottom-aligned; the Spacer hands leftover space to the backdrop so the button row ends flush with the fold.
+                    #if os(tvOS)
+                    // Infuse-style 10-foot layout: keep the information column anchored at the
+                    // upper-left of the artwork instead of bottom-aligning it as a single card.
+                    // The open space to the right keeps the backdrop visible and gives the title,
+                    // metadata, ratings and controls a stable reading order.
+                    VStack(alignment: .leading, spacing: 0) {
+                        // The reference uses a top-left title over the artwork, not a bottom-anchored logo.
+                        gradientWithHero
+                            .padding(.top, 34)
+                            .padding(.leading, 42)
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            primary()
+                        }
+                        .padding(.top, primaryTopInset)
+                        .padding(.leading, safeLeading + 42)
+                        .padding(.trailing, safeTrailing)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        // Keep the first page at its natural height. A viewport-sized frame here
+                        // clipped the season's episode rail before it could be rendered.
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    #else
+                    // iPad and iPhone landscape retain their existing viewport treatment.
                     VStack(alignment: .leading, spacing: 0) {
                         Spacer(minLength: 0)
                         gradientWithHero
                         VStack(alignment: .leading, spacing: 0) {
                             primary()
                         }
-                        // Inset the content past the island; the scrim (.frame + .background below)
-                        // stays full-width, so no gray strip / backdrop margin appears.
                         .padding(.leading, safeLeading)
                         .padding(.trailing, safeTrailing)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        // 24 pt matching the panel-to-buttons gap, widened on tvOS to a constant
-                        // band that holds the fold marker (Sodalite#53).
                         .padding(.bottom, ScrollHintPolicy.primaryBottomInset(reservesHint: reservesScrollHint))
                         .overlay(alignment: .bottom) {
                             if reservesScrollHint {
@@ -262,17 +301,14 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                         }
                         .background(Color.Theme.scrim)
                     }
-                    // iPhone landscape: do NOT force the first page to viewport height. In the short
-                    // landscape viewport the content overflows, the panel scrim bleeds past the fold and
-                    // overlaps the content-block scrim -> a doubled-up dark strip under the buttons that
-                    // scrolls with the content. Sizing the block to its content keeps the scrims contiguous.
                     .modifier(FirstPageViewportHeight(active: vSizeClass != .compact))
+                    #endif
                 }
 
                 // Content and filler under ONE ground, so the page colour runs to the bottom edge
                 // instead of ending where the last row does.
                 VStack(alignment: .leading, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 40) {
+                    VStack(alignment: .leading, spacing: 20) {
                         content()
                     }
                     // Height of the real below-fold content. The trailing filler below makes every
@@ -319,7 +355,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                             }
                     }
                 }
-                .background(alignment: .top) { TuckGround(palette: artworkPalette) }
+                .background(Color.clear)
             }
         }
         .background(Color.black.opacity(scrollDim).ignoresSafeArea())
@@ -754,20 +790,34 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     }
 
     // Hero rides as a gradient overlay (not a stacked layer) to keep the sibling structure the focus engine scrolls; drawn on top so the logo stays visible. Full-bleed redesign (Sodalite#15): backdrop stays behind a scrim, text containers carry their own material.
+    private var heroAlignment: Alignment {
+        #if os(tvOS)
+        .topLeading
+        #else
+        .bottomLeading
+        #endif
+    }
+
     private var gradientWithHero: some View {
-        LinearGradient(
-            colors: [.clear, .black.opacity(0.35), .black.opacity(0.55)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 200)
-        .overlay(alignment: .bottomLeading) {
-            hero()
-                .padding(.horizontal, metrics.rowInset)
-                .padding(.leading, safeLeading)
-                .padding(.trailing, safeTrailing)
-                .padding(.bottom, 8)
+        #if os(tvOS)
+        let heroHeight = tvHeroHeight
+        #else
+        let heroHeight: CGFloat = 200
+        #endif
+        #if os(tvOS)
+        return Color.clear.frame(height: heroHeight).overlay(alignment: heroAlignment) {
+            hero().padding(.horizontal, metrics.rowInset).padding(.leading, safeLeading)
+                .padding(.trailing, safeTrailing).padding(.top, 8).padding(.bottom, 8)
         }
+        #else
+        return LinearGradient(
+            colors: [.clear, .black.opacity(0.35), .black.opacity(0.55)],
+            startPoint: .top, endPoint: .bottom
+        ).frame(height: heroHeight).overlay(alignment: heroAlignment) {
+            hero().padding(.horizontal, metrics.rowInset).padding(.leading, safeLeading)
+                .padding(.trailing, safeTrailing).padding(.top, 8).padding(.bottom, 8)
+        }
+        #endif
     }
 }
 
@@ -849,6 +899,8 @@ extension DetailContentOverlay where Primary == EmptyView {
     init(
         heroImageURL: URL? = nil,
         heroPosterURL: URL? = nil,
+        primaryTopInset: CGFloat = 20,
+        tvHeroHeight: CGFloat = 150,
         heroTallImageURL: URL? = nil,
         portraitHero: Bool = false,
         @ViewBuilder hero: @escaping () -> Hero = { EmptyView() },
@@ -857,6 +909,8 @@ extension DetailContentOverlay where Primary == EmptyView {
         self.init(
             heroImageURL: heroImageURL,
             heroPosterURL: heroPosterURL,
+            primaryTopInset: primaryTopInset,
+            tvHeroHeight: tvHeroHeight,
             heroTallImageURL: heroTallImageURL,
             portraitHero: portraitHero,
             hero: hero,
