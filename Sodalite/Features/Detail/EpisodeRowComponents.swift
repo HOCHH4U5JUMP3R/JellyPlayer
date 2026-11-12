@@ -130,23 +130,10 @@ struct EpisodeSkeletonCard: View {
     private var synopsisWidth: CGFloat { cardSize.width - 28 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.Theme.surface)
-                .frame(width: cardSize.width, height: cardSize.height)
-                .overlay(shimmerOverlay.clipShape(RoundedRectangle(cornerRadius: 12)))
-
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.Theme.surface)
-                    .frame(width: min(220, cardSize.width), height: 14)
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.Theme.surface)
-                    .frame(width: min(90, cardSize.width), height: 11)
-            }
-            .frame(width: cardSize.width, alignment: .leading)
-
-        }
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Color.Theme.surface)
+            .frame(width: cardSize.width, height: cardSize.height)
+            .overlay(shimmerOverlay.clipShape(RoundedRectangle(cornerRadius: 12)))
         .onAppear {
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: false)) {
                 shimmer = true
@@ -209,108 +196,63 @@ struct EpisodeLandscapeCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .bottomLeading) {
-                AsyncCachedImage(url: imageURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.Theme.surface)
-                        .overlay(
-                            Image(systemName: "play.rectangle")
-                                .font(.system(size: 30))
-                                .foregroundStyle(.tertiary)
-                        )
-                }
-                .frame(width: artworkSize.width, height: artworkSize.height)
-                // Sodalite#50: veiled before the clip, else the blur bleeds past the tile edge and
-                // eats the focus stroke. Progress bar and badges stay sharp, they are the user's
-                // own state rather than content.
-                .spoilerVeil(for: episode, style: .image)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    // Outer stroke (MediaCard pattern): no inner bite, leaves the progress bar fully visible.
-                    RoundedRectangle(cornerRadius: 12 + strokeWidth)
-                        .strokeBorder(strokeStyle, lineWidth: strokeWidth)
-                        .padding(-strokeWidth)
-                        .animation(.easeInOut(duration: 0.2), value: isFocused)
-                )
-
-                if let fraction = resumeFraction {
-                    ResumeProgressBar(fraction: fraction,
-                                      remaining: remainingLabel,
-                                      posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width)
-                        .frame(width: artworkSize.width, height: artworkSize.height)
-                }
-
-                ArtworkStateBadges(
-                    isFavorite: isFavorite,
-                    isPlayed: isPlayed,
-                    posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-
-                if let personalRating {
-                    HStack(spacing: 5) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 17, weight: .semibold))
-                        Text(Int(personalRating.rounded()).formatted())
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 6)
-                    .background(.black.opacity(0.72), in: Capsule())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(10)
-                }
+        ZStack {
+            AsyncCachedImage(url: imageURL) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle().fill(Color.Theme.surface)
+                    .overlay(Image(systemName: "play.rectangle").font(.system(size: 30)).foregroundStyle(.tertiary))
             }
             .frame(width: artworkSize.width, height: artworkSize.height)
-            // The ring's room, inside the card rather than outside it.
-            .padding(EpisodeCardStroke.ringMargin)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    // No separator glyph: the accent colour is what sets the token off the title here.
-                    let rawToken = EpisodeMetadataFormatter.seasonEpisode(season: nil,
-                                                                          episode: episode.indexNumber)
-                    let token = rawToken.hasPrefix("E") ? String(rawToken.dropFirst()) : rawToken
-                    if !token.isEmpty {
-                        Text(verbatim: token)
-                            .font(.caption)
-                            .foregroundStyle(.tint)
-                            .fontWeight(.semibold)
-                    }
-                    // A veiled name next to its own number token says nothing, so it draws nothing.
-                    if let title = spoilerPolicy.visibleTitle(of: episode) {
-                        Text(title)
-                            .font(.caption)
-                            .lineLimit(1)
-                    } else if token.isEmpty {
-                        Text(spoilerPolicy.displayName(of: episode))
-                            .font(.caption)
-                            .lineLimit(1)
-                    }
+            .spoilerVeil(for: episode, style: .image)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            if let fraction = resumeFraction {
+                ResumeProgressBar(fraction: fraction, remaining: remainingLabel,
+                                  posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width)
+                    .frame(width: artworkSize.width, height: artworkSize.height)
+            }
+            ArtworkStateBadges(isFavorite: isFavorite, isPlayed: isPlayed,
+                               posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            if let personalRating {
+                HStack(spacing: 5) {
+                    Image(systemName: "star.fill").font(.system(size: 17, weight: .semibold))
+                    Text(Int(personalRating.rounded()).formatted()).font(.system(size: 17, weight: .bold, design: .rounded))
                 }
-
-                if let runtime = episode.runTimeTicks {
-                    // The total stays on a started episode too (Sodalite#193): the badge on the
-                    // artwork is the time left, this line is the episode's length, and the badge
-                    // drops out where the locale's label does not fit beside the track.
-                    Text(runtime.ticksToDurationDisplay)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                .foregroundStyle(.white).padding(.horizontal, 9).padding(.vertical, 6)
+                .background(.black.opacity(0.72), in: Capsule())
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10)
+            }
+            VStack(spacing: 3) {
+                let rawToken = EpisodeMetadataFormatter.seasonEpisode(season: nil, episode: episode.indexNumber)
+                let token = rawToken.hasPrefix("E") ? String(rawToken.dropFirst()) : rawToken
+                if let title = spoilerPolicy.visibleTitle(of: episode) {
+                    Text(token.isEmpty ? title : "\(token) · \(title)")
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .lineLimit(2).multilineTextAlignment(.center).foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.95), radius: 4, x: 0, y: 2)
+                } else if !token.isEmpty {
+                    Text(token).font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white).shadow(color: .black.opacity(0.95), radius: 4, x: 0, y: 2)
                 }
             }
-            // Inset with the artwork above it, so the episode number still starts on its left edge.
-            .frame(width: artworkSize.width, alignment: .leading)
-            .padding(.horizontal, EpisodeCardStroke.ringMargin)
+            .padding(.horizontal, 12).padding(.bottom, 10)
+            .frame(width: artworkSize.width, height: artworkSize.height, alignment: .bottom)
+            .background(alignment: .bottom) {
+                LinearGradient(colors: [.clear, .black.opacity(0.82)], startPoint: .center, endPoint: .bottom)
+                    .frame(width: artworkSize.width, height: artworkSize.height * 0.42)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            }
         }
+        .frame(width: artworkSize.width, height: artworkSize.height)
+        .overlay(RoundedRectangle(cornerRadius: 12 + strokeWidth)
+            .strokeBorder(strokeStyle, lineWidth: strokeWidth).padding(-strokeWidth)
+            .animation(.easeInOut(duration: 0.2), value: isFocused))
+        .padding(EpisodeCardStroke.ringMargin)
+        .frame(width: cardSize.width, height: cardSize.height)
     }
 
-    /// Capsule and label go together, and both read the session's own mark-watched rather than
+    /// Capsule and label go together, and both read the session's own mark-watched rather than    /// Capsule and label go together, and both read the session's own mark-watched rather than
     /// `isPlayed`: marking an episode watched in the context menu has to clear the indicator without
     /// a refetch, while a server `played` that came WITH a position is a re-watch and keeps it.
     private var resumeFraction: Double? {

@@ -72,6 +72,9 @@ struct DetailHeroSynopsis: View {
         #if os(tvOS)
         Button { onTap?() } label: { synopsisText }
             .buttonStyle(.plain)
+            .tint(.white)
+            .foregroundStyle(.white.opacity(0.68))
+            .focusEffectDisabled()
         #else
         synopsisText
             .contentShape(Rectangle())
