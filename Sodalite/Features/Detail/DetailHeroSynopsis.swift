@@ -69,9 +69,10 @@ struct DetailHeroSynopsis: View {
                 #endif
                 .onChange(of: text) { isExpanded = false }
                 .onChange(of: isSpoilerHidden) { if $1 { isExpanded = false } }
-        } else if isPending {
-            // Reserved, not a skeleton. The panel already carries a material, and three grey bars
-            // inside it read as more chrome than the fetch they stand in for is worth.
+        } else {
+            // Keep the same reserved footprint even when the settled item has no overview. On
+            // episode pages the selected item changes in place; collapsing this branch made the
+            // hero, buttons and content below it jump between episodes.
             Text(verbatim: " ")
                 .font(.body)
                 .lineLimit(lineCount, reservesSpace: true)
