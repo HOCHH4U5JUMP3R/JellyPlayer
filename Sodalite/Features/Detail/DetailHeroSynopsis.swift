@@ -29,6 +29,7 @@ struct DetailHeroSynopsis: View {
     var expandsInPlace = false
 
     @State private var isExpanded = false
+    @FocusState private var isFocused: Bool
 
     @Environment(\.verticalSizeClass) private var vSizeClass
     @Environment(\.horizontalSizeClass) private var hSizeClass
@@ -70,11 +71,21 @@ struct DetailHeroSynopsis: View {
 
     var body: some View {
         #if os(tvOS)
-        Button { onTap?() } label: { synopsisText }
+        Button { onTap?() } label: {
+            synopsisText
+                .padding(.horizontal, 5)
+                .padding(.vertical, 3)
+                .background {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.white.opacity(isFocused ? 0.09 : 0))
+                }
+                .contentShape(Rectangle())
+        }
             .buttonStyle(.plain)
             .tint(.white)
             .foregroundStyle(.white.opacity(0.68))
             .focusEffectDisabled()
+            .focused($isFocused)
         #else
         synopsisText
             .contentShape(Rectangle())
