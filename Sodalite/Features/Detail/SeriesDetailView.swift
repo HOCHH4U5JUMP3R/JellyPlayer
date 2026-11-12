@@ -849,17 +849,17 @@ struct SeriesDetailView: View {
                         let minutes = Int((Double(runtime) / 600_000_000).rounded())
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
                             Text(minutes.formatted())
-                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                .font(.system(size: 20, weight: .medium, design: .rounded))
                             Text("MIN.")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: 13, weight: .semibold))
                                 .tracking(1)
                         }
                         .foregroundStyle(.white.opacity(0.58))
                     }
                     if let date = formattedDisplayDate() {
                         Text(date)
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.78))
+                            .font(.system(size: 19, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.82))
                     }
                     if let officialRating = displayItem.officialRating ?? vm.item.officialRating {
                         Text(officialRating)
@@ -868,7 +868,7 @@ struct SeriesDetailView: View {
                     }
                     let pills = formatBadgePills()
                     if !pills.isEmpty {
-                        FormatBadgeRow(pills: pills, compact: true)
+                        FormatBadgeRow(pills: pills)
                     }
                 }
                 .foregroundStyle(.white)
@@ -878,8 +878,8 @@ struct SeriesDetailView: View {
                 let visibleGenres = episodeGenres.isEmpty ? (vm.item.genres ?? []) : episodeGenres
                 if !visibleGenres.isEmpty {
                     Text(visibleGenres.joined(separator: "  ·  "))
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.78))
+                        .font(.system(size: 20, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.86))
                         .lineLimit(2)
                 }
 
@@ -889,7 +889,7 @@ struct SeriesDetailView: View {
                             Image("JellyfinMark")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 18, height: 18)
+                                .frame(width: 24, height: 24)
                             Text(communityRating.formatted(.number.precision(.fractionLength(1))))
                         }
                         .foregroundStyle(.white)
@@ -898,14 +898,14 @@ struct SeriesDetailView: View {
                     if let personalRating = vm.rating(of: displayItem) {
                         HStack(spacing: 6) {
                             Image(systemName: "star.fill")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 22, weight: .semibold))
                             Text(Int(personalRating.rounded()).formatted())
                         }
                         .foregroundStyle(.white)
                         .accessibilityLabel("Meine Bewertung \(Int(personalRating.rounded())) von 10")
                     }
                 }
-                .font(.subheadline.weight(.semibold))
+                .font(.system(size: 21, weight: .semibold, design: .rounded))
 
                 heroSynopsis
             } else {
@@ -1807,13 +1807,9 @@ struct SeriesDetailView: View {
 
     /// Up out of the episode row. It used to go straight to the season bar, which skipped the season synopsis sitting between the two (reachable downwards, unreachable upwards). Now the synopsis takes the first stop when there is one, and its own up-move carries on to the season bar.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
-        if seasonOverview(vm: vm) != nil {
-            pendingSeasonOverviewFocus = true
-        } else {
-            // Deferred for the bridge's sake: a @FocusState write on the tick that just committed the bridge's own focus is swallowed.
-            let target = vm.selectedSeasonID
-            deferOnMain(by: 0.03) { focusedSeasonID = target }
-        }
+        // The season synopsis panel is intentionally absent; move straight back to the selected season tab.
+        let target = vm.selectedSeasonID
+        deferOnMain(by: 0.03) { focusedSeasonID = target }
     }
 
     private func seasonSection(vm: DetailViewModel) -> some View {
@@ -1837,6 +1833,7 @@ struct SeriesDetailView: View {
                                     name: season.name,
                                     imageURL: vm.posterURL(for: season),
                                     personalRating: vm.seasonRating(for: season),
+                                    isPlayed: vm.isSeasonPlayed(season),
                                     isSelected: vm.selectedSeasonID == season.id,
                                     focusedID: $focusedSeasonID,
                                     action: {
@@ -1911,35 +1908,7 @@ struct SeriesDetailView: View {
                 }
             }
 
-            // Season synopsis, same box as the series overview. Jellyfin fills Season.Overview from the
-            // metadata provider, so it renders only where the library actually has one. Placed below the
-            // bar (it describes the season the tabs just selected) and above the focus bridge, so an
-            // up-swipe out of the episode row still hits the bridge first and its redirect is unchanged.
-            if let season = vm.selectedSeason, let seasonOverview = seasonOverview(vm: vm) {
-                ExpandableTextBox(
-                    text: seasonOverview,
-                    spoilerItem: season,
-                    // Carry on to the selected tab rather than whatever the geographic picker finds above.
-                    onFocusMovedUp: {
-                        let target = vm.selectedSeasonID
-                        deferOnMain(by: 0.03) { focusedSeasonID = target }
-                    },
-                    // Reading the synopsis counts as coming from above, so the next down-move crosses the bridge into the episode row instead of being bounced back up here.
-                    onFocusChanged: { focused in
-                        if focused { lastFocusedArea = .season }
-                    },
-                    focusRequest: $pendingSeasonOverviewFocus
-                )
-                .padding(.horizontal, metrics.rowInset)
-                // Starts where the first episode card would without a synopsis, below the hero's fade
-                // rather than on it: the bridge and its gap (tvOS only) plus the episode row's own padding.
-                #if os(tvOS)
-                .padding(.top, 24 + 20 + 16)
-                #else
-                .padding(.top, 16)
-                #endif
-            }
-
+remove season synopsis
             // Full-width invisible focus bridge between the season bar and episode row: an up-swipe from a far-right episode lands here before tvOS's picker continues up into the overview/tech-info cards, then redirects by which row the user came from on the next cycle.
             // Height 24pt: tvOS's geographic picker weights frame size on proximity ties and skips sub-10pt focusables near larger ones (1pt missed often, 8pt flaky on fast season-tab→down). 24pt is reliable.
             // tvOS only: touch has no focus picker to redirect, so on iOS the bridge is 24pt of dead

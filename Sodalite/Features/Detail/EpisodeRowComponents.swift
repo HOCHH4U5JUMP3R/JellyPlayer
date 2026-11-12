@@ -9,6 +9,7 @@ struct SeasonTab: View {
     let name: String
     let imageURL: URL?
     let personalRating: Double?
+    let isPlayed: Bool
     let isSelected: Bool
     var focusedID: FocusState<String?>.Binding
     let action: () -> Void
@@ -26,12 +27,20 @@ struct SeasonTab: View {
                             .fill(Color.Theme.surface)
                             .overlay(Image(systemName: "tv").font(.title2).foregroundStyle(.tertiary))
                     }
-                    .frame(width: 128, height: 192)
+                    .frame(width: 144, height: 216)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay {
                         RoundedRectangle(cornerRadius: 10)
                             .strokeBorder(isFocused ? Color.accentColor : (isSelected ? Color.Theme.panelEdge : Color.clear),
                                           lineWidth: isFocused ? FocusStroke.width : 1)
+                    }
+
+                    if isPlayed {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 23, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(7)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }
 
                     if let personalRating {
@@ -52,10 +61,10 @@ struct SeasonTab: View {
             .focused(focusedID, equals: id)
 
             Text(name)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: 128, alignment: .center)
+                .frame(width: 144, alignment: .center)
                 .multilineTextAlignment(.center)
         }
     }
@@ -253,9 +262,9 @@ struct EpisodeLandscapeCard: View {
                 if let personalRating {
                     HStack(spacing: 5) {
                         Image(systemName: "star.fill")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 17, weight: .semibold))
                         Text(Int(personalRating.rounded()).formatted())
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 9)
@@ -272,8 +281,9 @@ struct EpisodeLandscapeCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     // No separator glyph: the accent colour is what sets the token off the title here.
-                    let token = EpisodeMetadataFormatter.seasonEpisode(season: nil,
-                                                                       episode: episode.indexNumber)
+                    let rawToken = EpisodeMetadataFormatter.seasonEpisode(season: nil,
+                                                                          episode: episode.indexNumber)
+                    let token = rawToken.hasPrefix("E") ? String(rawToken.dropFirst()) : rawToken
                     if !token.isEmpty {
                         Text(verbatim: token)
                             .font(.caption)
