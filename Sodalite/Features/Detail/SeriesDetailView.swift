@@ -887,6 +887,7 @@ struct SeriesDetailView: View {
                         Text(date)
                             .font(.system(size: 22, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.58))
+                            .padding(.trailing, 12)
                     }
                     if let officialRating = displayItem.officialRating ?? vm.item.officialRating {
                         Text(officialRating)
@@ -1895,7 +1896,7 @@ struct SeriesDetailView: View {
         // .focusSection (at the bottom) keeps up/down inside the season+episode block, else a far-right episode's up-swipe bypasses the season bar and lands on the overview textbox; the onMoveCommand redirect then snaps to the selected tab.
         let sectionSpacing: CGFloat
         #if os(tvOS)
-        sectionSpacing = 8
+        sectionSpacing = 4
         #else
         sectionSpacing = 20
         #endif
@@ -2067,7 +2068,7 @@ struct SeriesDetailView: View {
                         }
                         // Reserve room for the tvOS focus lift so the top edge and focus ring stay
                         // inside the horizontal ScrollView's clipping bounds.
-                            .padding(.vertical, 32)
+                            .padding(.vertical, 20)
                         }
                         .scrollPosition($episodeRowPosition)
                         .scrollClipDisabled()
@@ -2230,7 +2231,7 @@ struct SeriesDetailView: View {
                         VStack(spacing: 5) {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.Theme.surface)
-                                .frame(width: 144, height: 216)
+                                .frame(width: 150, height: 225)
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color.white.opacity(0.12))
                                 .frame(width: 84, height: 18)
@@ -2259,11 +2260,11 @@ struct SeriesDetailView: View {
                         EpisodeSkeletonCard(sizeOverride: CGSize(width: width, height: width * 9 / 16))
                     }
                 }
-                .padding(.vertical, 32)
+                .padding(.vertical, 20)
             }
             .scrollClipDisabled()
         }
-        .frame(height: 280)
+        .frame(height: 268)
         .allowsHitTesting(false)
     }
 
