@@ -67,6 +67,9 @@ struct SeasonTab: View {
                 .frame(width: 144, alignment: .center)
                 .multilineTextAlignment(.center)
         }
+        .scaleEffect(isFocused ? 1.05 : 1)
+        .zIndex(isFocused ? 1 : 0)
+        .animation(.easeOut(duration: 0.16), value: isFocused)
     }
 }
 
