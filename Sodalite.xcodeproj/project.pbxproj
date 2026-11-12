@@ -7713,7 +7713,7 @@
 				);
 				LM_SKIP_METADATA_EXTRACTION = YES;
 				OTHER_LDFLAGS = "-e _NSExtensionMain";
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.Sodalite.TopShelf;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.Sodalite.TopShelf;
 				PRODUCT_NAME = SodaliteTopShelf;
 				SDKROOT = appletvos;
 				SKIP_INSTALL = YES;
@@ -7736,7 +7736,7 @@
 				);
 				LM_SKIP_METADATA_EXTRACTION = YES;
 				OTHER_LDFLAGS = "-e _NSExtensionMain";
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.Sodalite.TopShelf;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.Sodalite.TopShelf;
 				PRODUCT_NAME = SodaliteTopShelf;
 				SDKROOT = appletvos;
 				SKIP_INSTALL = YES;
@@ -7755,7 +7755,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.SodaliteTests;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.SodaliteTests;
 				PRODUCT_NAME = SodaliteTests;
 				SDKROOT = appletvos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -7783,7 +7783,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.Sodalite;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.Sodalite;
 				PRODUCT_NAME = Sodalite;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -7808,7 +7808,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.Sodalite;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.Sodalite;
 				PRODUCT_NAME = Sodalite;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
@@ -7831,7 +7831,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.Sodalite;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.Sodalite;
 				PRODUCT_NAME = Sodalite;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
@@ -7856,7 +7856,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.Sodalite;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.Sodalite;
 				PRODUCT_NAME = Sodalite;
 				SDKROOT = appletvos;
 				TARGETED_DEVICE_FAMILY = 3;
@@ -7960,7 +7960,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.Sodalite;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.Sodalite;
 				PRODUCT_NAME = Sodalite;
 				SDKROOT = appletvos;
 				TARGETED_DEVICE_FAMILY = 3;
@@ -7977,7 +7977,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.SodaliteTests;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.SodaliteTests;
 				PRODUCT_NAME = SodaliteTests;
 				SDKROOT = appletvos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -8007,7 +8007,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.superuser404.Sodalite;
+				PRODUCT_BUNDLE_IDENTIFIER = de.sirphil.Sodalite;
 				PRODUCT_NAME = Sodalite;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
