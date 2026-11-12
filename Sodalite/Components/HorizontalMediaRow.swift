@@ -42,6 +42,7 @@ struct HorizontalMediaRow: View {
                 }
             }
             .font(titleFont)
+            .fontWeight(.semibold)
             .padding(.leading, leadingInset)
             .padding(.trailing, rowInset)
 
