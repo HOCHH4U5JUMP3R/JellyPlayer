@@ -272,7 +272,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                     // landscape viewport the content overflows, the panel scrim bleeds past the fold and
                     // overlaps the content-block scrim -> a doubled-up dark strip under the buttons that
                     // scrolls with the content. Sizing the block to its content keeps the scrims contiguous.
-                    .modifier(FirstPageViewportHeight(active: vSizeClass != .compact))
+                    .modifier(FirstPageViewportHeight(active: vSizeClass != .compact && !heroAtTop))
                 }
 
                 // Content and filler under ONE ground, so the page colour runs to the bottom edge
