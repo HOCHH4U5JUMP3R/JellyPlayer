@@ -2006,16 +2006,10 @@ struct SeriesDetailView: View {
                     .scrollClipDisabled()
                     .onChange(of: focusedSeasonID) { oldID, newID in
                         if let newID {
-                            if oldID == nil,
-                               let rememberedID = lastFocusedSeasonID,
-                               vm.seasons.contains(where: { $0.id == rememberedID }),
-                               rememberedID != newID {
-                                // Restore this rail's previous focus instead of accepting the
-                                // focus engine's nearest card from whichever row we came from.
-                                DispatchQueue.main.async { focusedSeasonID = rememberedID }
-                            } else {
-                                lastFocusedSeasonID = newID
-                            }
+                            // The selected season is the authoritative vertical entry target.
+                            // Do not restore an older tab here: that overrode an explicit focus
+                            // request from Play/Trailer and sent the remote to the wrong season.
+                            lastFocusedSeasonID = newID
                             episodeRedirectDone = false
                         } else if let oldID {
                             lastFocusedSeasonID = oldID
