@@ -2334,6 +2334,15 @@ struct SeriesDetailView: View {
                         episodeProxy.scrollTo(target, anchor: .center)
                     }
                     .onAppear { scrollToCurrentEpisode(proxy: episodeProxy, vm: vm) }
+                    #else
+                    episodeScrollView(
+                        proxy: episodeProxy,
+                        vm: vm,
+                        playTargetID: playTargetID,
+                        cardSizeOverride: nil,
+                        spacing: hSizeClass == .compact ? metrics.itemSpacing : 24
+                    )
+                    #endif
                 }
             }
         }
