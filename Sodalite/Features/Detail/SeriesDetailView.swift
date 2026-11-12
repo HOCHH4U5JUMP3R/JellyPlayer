@@ -1768,11 +1768,13 @@ struct SeriesDetailView: View {
 
     private func seasonSection(vm: DetailViewModel) -> some View {
         // .focusSection (at the bottom) keeps up/down inside the season+episode block, else a far-right episode's up-swipe bypasses the season bar and lands on the overview textbox; the onMoveCommand redirect then snaps to the selected tab.
+        let sectionSpacing: CGFloat
         #if os(tvOS)
-        VStack(alignment: .leading, spacing: 8) {
+        sectionSpacing = 8
         #else
-        VStack(alignment: .leading, spacing: 20) {
+        sectionSpacing = 20
         #endif
+        VStack(alignment: .leading, spacing: sectionSpacing) {
             if usesSeasonMenu {
                 seasonMenu(vm: vm)
             } else {
