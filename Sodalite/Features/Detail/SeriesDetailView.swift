@@ -877,8 +877,10 @@ struct SeriesDetailView: View {
             HStack(spacing: 16) {
                 if let communityRating = displayItem.communityRating ?? vm.item.communityRating {
                     HStack(spacing: 7) {
-                        Image(systemName: "tv")
-                            .font(.system(size: 17, weight: .semibold))
+                        Image("JellyfinMark")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
                         Text(communityRating.formatted(.number.precision(.fractionLength(1))))
                     }
                     .foregroundStyle(.white)
