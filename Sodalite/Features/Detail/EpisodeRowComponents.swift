@@ -61,7 +61,6 @@ struct SeasonTab: View {
 }
 
 
-
 // MARK: - Button Styles
 
 struct EpisodeCardButtonStyle: ButtonStyle {
