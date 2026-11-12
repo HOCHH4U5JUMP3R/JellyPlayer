@@ -14,8 +14,6 @@ struct HorizontalMediaRow: View {
     /// skip the spoiler blur (Continue Watching set to Backdrop or Thumb).
     var showsSeriesArtwork: Bool = false
     var focusedID: FocusState<String?>.Binding? = nil
-    var itemLabel: ((JellyfinItem) -> String?)? = nil
-    var onShowAll: (() -> Void)? = nil
     /// Per-card server chip (Sodalite#85).
     var itemLabel: ((JellyfinItem) -> String?)? = nil
     /// Set on a capped row: a trailing card that opens the full list.

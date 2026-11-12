@@ -11,6 +11,8 @@ struct FocusableCard<Content: View>: View {
     @ViewBuilder let content: (_ isFocused: Bool) -> Content
 
     @Environment(\.cardMenuWillOpen) private var cardMenuWillOpen
+    var externalFocus: FocusState<String?>.Binding? = nil
+    var focusID: String? = nil
     @FocusState private var isFocused: Bool
     @GestureState private var isPressed = false
 
