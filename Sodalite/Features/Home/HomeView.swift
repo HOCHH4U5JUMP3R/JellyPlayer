@@ -83,7 +83,8 @@ struct HomeView: View {
 
     /// The navigation shell and its content are kept separate from the lifecycle observers below.
     /// This keeps SwiftUI's type checker from having to infer the entire Home screen as one expression.
-    private var homeRoot: some View {
+    private var homeRoot: AnyView {
+        AnyView(
         ThemeNavigationStack {
             Group {
                 if let vm = viewModel {
@@ -149,8 +150,12 @@ struct HomeView: View {
         }
     }
 
+        )
+    }
+
     /// Appearance and foreground/cover refreshes.
-    private var homeLifecycleObservers: some View {
+    private var homeLifecycleObservers: AnyView {
+        AnyView(
         homeRoot
             .onAppear {
                 guard let userID = appState.activeUser?.id else { return }
@@ -186,8 +191,12 @@ struct HomeView: View {
             }
     }
 
+        )
+    }
+
     /// Notifications that change the shape or contents of the Home feed.
-    private var homeContentNotifications: some View {
+    private var homeContentNotifications: AnyView {
+        AnyView(
         homeLifecycleObservers
             .onReceive(NotificationCenter.default.publisher(for: .homeConfigDidChange)) { _ in
                 viewModel?.reloadConfig()
@@ -213,8 +222,12 @@ struct HomeView: View {
             }
     }
 
+        )
+    }
+
     /// Playback progress is patched immediately, then the feed is refreshed when Home is visible.
-    private var homePlaybackNotifications: some View {
+    private var homePlaybackNotifications: AnyView {
+        AnyView(
         homeContentNotifications
             .onReceive(NotificationCenter.default.publisher(for: .playbackProgressDidChange)) { note in
                 let itemID = note.userInfo?[PlaybackProgressKey.itemID] as? String
@@ -253,8 +266,12 @@ struct HomeView: View {
             }
     }
 
+        )
+    }
+
     /// Profile and combined-server changes rebuild or update the current feed.
-    private var homeSessionObservers: some View {
+    private var homeSessionObservers: AnyView {
+        AnyView(
         homePlaybackNotifications
             .onChange(of: appState.activeUser?.id) { _, newValue in
                 guard let userID = newValue else {
@@ -280,8 +297,12 @@ struct HomeView: View {
             }
     }
 
+        )
+    }
+
     /// External reload signals and poster prefetching are deliberately their own modifier layer.
-    private var homeRefreshObservers: some View {
+    private var homeRefreshObservers: AnyView {
+        AnyView(
         homeSessionObservers
             .task(id: appState.requestContentReload) {
                 let signal = appState.requestContentReload
@@ -299,8 +320,12 @@ struct HomeView: View {
             }
     }
 
+        )
+    }
+
     /// Presentation modifiers stay outside the feed/lifecycle expression to keep type checking bounded.
-    private var homeWithAlerts: some View {
+    private var homeWithAlerts: AnyView {
+        AnyView(
         homeRefreshObservers
             .addExternalAddressSheet(isPresented: $showAddURLSheet)
             .alert(
@@ -328,6 +353,9 @@ struct HomeView: View {
             } message: { message in
                 Text(message)
             }
+    }
+
+        )
     }
 
     /// Unplayed on the series is the server's own cascade: every episode loses its played mark,
