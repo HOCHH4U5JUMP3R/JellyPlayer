@@ -691,6 +691,15 @@ final class DetailViewModel {
         return item.userData?.rating
     }
 
+    /// Jellyfin has no season user rating. Derive it from the rated episodes already loaded or prefetched for this season.
+    /// Unrated episodes are excluded; the displayed season score is rounded to a whole star on the same 0–10 scale.
+    func seasonRating(for season: JellyfinItem) -> Double? {
+        guard let episodes = episodesCache[season.id] else { return nil }
+        let values = episodes.compactMap { rating(of: $0) }
+        guard !values.isEmpty else { return nil }
+        return (values.reduce(0, +) / Double(values.count)).rounded()
+    }
+
     /// nil clears the episode's rating. Optimistic, rolled back if the server refuses.
     func setEpisodeRating(_ episode: JellyfinItem, rating newValue: Double?) async {
         guard newValue != rating(of: episode) else { return }
