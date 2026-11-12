@@ -1774,7 +1774,7 @@ struct SeriesDetailView: View {
         #else
         sectionSpacing = 20
         #endif
-        VStack(alignment: .leading, spacing: sectionSpacing) {
+        return VStack(alignment: .leading, spacing: sectionSpacing) {
             if usesSeasonMenu {
                 seasonMenu(vm: vm)
             } else {
