@@ -107,23 +107,23 @@ struct MediaCard: View {
         .overlay(alignment: .bottom) {
             progressOverlay
         }
-        .overlay(alignment: .topTrailing) {
-            VStack(alignment: .trailing, spacing: badgeFontSize * 0.25) {
-                ArtworkStateBadges(
-                    isPlayed: item.userData?.played == true,
+        // The personal rating belongs at top-left; the watched mark keeps its own top-right corner.
+        .overlay(alignment: .topLeading) {
+            if style != .square {
+                PosterBadgeOverlay(
+                    item: item,
+                    fontSize: badgeFontSize,
                     posterWidth: tierPosterWidth,
                     scale: scale
                 )
-                // Music cards are excluded: an album has no picture to describe (Sodalite#79).
-                if style != .square {
-                    PosterBadgeOverlay(
-                        item: item,
-                        fontSize: badgeFontSize,
-                        posterWidth: tierPosterWidth,
-                        scale: scale
-                    )
-                }
             }
+        }
+        .overlay(alignment: .topTrailing) {
+            ArtworkStateBadges(
+                isPlayed: item.userData?.played == true,
+                posterWidth: tierPosterWidth,
+                scale: scale
+            )
         }
         .overlay(
             MediaFocusRing(
@@ -136,7 +136,7 @@ struct MediaCard: View {
     private var itemInfo: some View {
         // Always render the subtitle slot (even empty) so cards keep equal height; poster titles and
         // their year share a centred baseline under the artwork.
-        VStack(alignment: style == .poster ? .center : .leading, spacing: 2) {
+        VStack(alignment: style == .poster ? .center : .leading, spacing: style == .poster ? 4 : 2) {
             if style == .poster {
                 MediaCardMarqueeLabel(
                     text: displayTitle,
@@ -144,12 +144,12 @@ struct MediaCard: View {
                     color: .primary,
                     isActive: isFocused || isHovered
                 )
-                MediaCardMarqueeLabel(
-                    text: displaySubtitle ?? " ",
-                    font: .caption2,
-                    color: .secondary,
-                    isActive: isFocused || isHovered
-                )
+                // Keep the year on its own fixed line; only the title uses the marquee.
+                Text(displaySubtitle ?? " ")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(width: cardWidth, height: 16, alignment: .center)
             } else {
                 Text(displayTitle)
                     .font(.caption)
