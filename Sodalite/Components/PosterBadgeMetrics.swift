@@ -18,8 +18,9 @@ enum PosterBadgeMetrics {
     /// The floor is the smaller tiers: the same third would put the phone at 7.2pt, which is below
     /// anything readable at arm's length, so iPad and iPhone stop at 10pt (the phone barely moves,
     /// from 10.8, while the iPad loses its third and finally sits under its own 12pt card title).
+    /// Original readable badge scale, shared by posters, season covers and episode stills.
     static func fontSize(posterWidth: CGFloat, scale: CGFloat) -> CGFloat {
-        max(10, posterWidth * 0.06 * scale)
+        max(10, posterWidth * 0.09 * scale)
     }
 
     /// Padding around the text of a mark on artwork, as a share of its font size. One pair for the
