@@ -26,6 +26,7 @@ struct MediaCard: View {
     @Environment(\.dependencies) private var dependencies
     @Environment(\.appState) private var appState
     @Environment(\.horizontalSizeClass) private var hSizeClass
+    @State private var isHovered = false
 
     /// Enlarge factor from Appearance settings (1.0 normal), applied to every style so rows stay proportional.
     private var scale: CGFloat { dependencies.appearancePreferences.cardScale }
@@ -71,6 +72,9 @@ struct MediaCard: View {
         .frame(width: cardWidth)
         .accessibilityElement(children: .combine)
         .accessibilityValue(accessibilityProgress)
+        #if !os(tvOS)
+        .onHover { isHovered = $0 }
+        #endif
         #if !os(tvOS)
         .onHover { isHovered = $0 }
         #endif
@@ -241,8 +245,22 @@ private struct MediaCardMarqueeLabel: View {
     let isActive: Bool
 
     @State private var textWidth: CGFloat = 0
+    @State private var scrollOffset: CGFloat = 0
 
     private let gap: CGFloat = 30
+
+    private func updateScroll(width: CGFloat, start: CGFloat, overflows: Bool) {
+        guard isActive, overflows else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { scrollOffset = 0 }
+            return
+        }
+        scrollOffset = start
+        withAnimation(.linear(duration: Double(textWidth + gap) / 28).repeatForever(autoreverses: false)) {
+            scrollOffset = -(textWidth + gap) + start
+        }
+    }
 
     private var label: some View {
         Text(text)
@@ -265,12 +283,14 @@ private struct MediaCardMarqueeLabel: View {
                         label
                     }
                     .fixedSize(horizontal: true, vertical: false)
-                    .offset(x: -(textWidth + gap) + start)
-                    .animation(
-                        .linear(duration: Double(textWidth + gap) / 28)
-                            .repeatForever(autoreverses: false),
-                        value: isActive
-                    )
+                    .offset(x: scrollOffset)
+                    .onAppear { updateScroll(width: width, start: start, overflows: overflows) }
+                    .onChange(of: isActive) { _, _ in
+                        updateScroll(width: width, start: start, overflows: overflows)
+                    }
+                    .onChange(of: textWidth) { _, _ in
+                        updateScroll(width: width, start: start, overflows: overflows)
+                    }
                 } else {
                     Text(text)
                         .font(font)
@@ -296,7 +316,7 @@ private struct MediaCardMarqueeLabel: View {
             }
         }
         .onPreferenceChange(MediaCardTextWidthKey.self) { textWidth = $0 }
-        .frame(height: font == .caption ? 16 : 14)
+        .frame(height: 16)
         .accessibilityLabel(Text(text))
     }
 }
