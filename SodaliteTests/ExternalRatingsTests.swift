@@ -12,6 +12,17 @@ struct ExternalRatingsTests {
         #expect(shown == RatingDisplay(tmdb: 7.8, imdb: 7.6, community: 7.8, rottenTomatoes: 91))
     }
 
+    @Test func seriesCanDisplayATVDBScoreAlongsideCommunity() {
+        let shown = RatingDisplay.resolve(
+            communityRating: 7.1, criticRating: 84,
+            external: ExternalRatings(tvdb: 8.4, rottenTomatoes: 84),
+            awaitingExternal: false
+        )
+        #expect(shown.community == 7.1)
+        #expect(shown.tvdb == 8.4)
+        #expect(shown.rottenTomatoes == 84)
+    }
+
     @Test func starStandsInWithoutNamedScores() {
         let none = RatingDisplay.resolve(communityRating: 6.5, criticRating: 40, external: nil, awaitingExternal: false)
         #expect(none == RatingDisplay(tmdb: nil, imdb: nil, community: 6.5, rottenTomatoes: 40))
