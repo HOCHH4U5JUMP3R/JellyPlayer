@@ -203,8 +203,8 @@ final class AppearancePreferences {
     }
 
     /// The viewer's own rating (Sodalite#48) on movie/series posters, season covers and episode
-    /// artwork. Series scores are calculated from rated episodes because Jellyfin has no series
-    /// UserData.Rating field; movie and episode scores come directly from their own UserData.
+    /// artwork. Series scores are calculated from rated episodes because Jellyfin provides no
+    /// aggregate series rating; movie and episode scores come directly from their own UserData.
     var showPosterRating: Bool {
         didSet { store.set(showPosterRating, forKey: Keys.showPosterRating) }
     }
