@@ -13,9 +13,9 @@ import Observation
 @MainActor
 final class PosterBadgeStore {
 
-    /// Movies and episodes answer for themselves; a series has no streams of its own, so it is
-    /// sampled from its newest episode. Everything else (collections, folders, playlists, music)
-    /// is never asked about.
+    /// Movie and episode stream badges answer for themselves; series stream badges are sampled
+    /// from a recent episode. Series personal ratings are calculated from all rated episodes,
+    /// grouped by season, because Jellyfin has no series rating field.
     private static let batchSize = 40
 
     /// The library service and user an item's server answers through. A nil user means the
