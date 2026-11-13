@@ -73,7 +73,7 @@ final class PosterBadgeStore {
         guard badgesEnabled || ratingsEnabled else { return }
 
         var direct: [JellyfinItem] = []
-        var series: [JellyfinItem] = []
+        var series: [(item: JellyfinItem, needsBadges: Bool, needsRating: Bool)] = []
         var seen: Set<String> = []
         for item in items where seen.insert(item.originKey).inserted {
             switch item.type {
@@ -89,7 +89,9 @@ final class PosterBadgeStore {
                     && enriched[item.originKey] == nil && !inFlight.contains(item.originKey)
                 let needsRating = ratingsEnabled && !resolvedSeriesRatings.contains(ratingKey)
                     && !ratingInFlight.contains(ratingKey)
-                if needsBadges || needsRating { series.append(item) }
+                if needsBadges || needsRating {
+                    series.append((item: item, needsBadges: needsBadges, needsRating: needsRating))
+                }
             default:
                 continue
             }
@@ -97,14 +99,9 @@ final class PosterBadgeStore {
         guard !direct.isEmpty || !series.isEmpty else { return }
 
         let directKeys = Set(direct.map(\.originKey))
-        let seriesBadgeKeys = Set(series.filter {
-            isBadgeEnabled() && $0.mediaStreams == nil && enriched[$0.originKey] == nil
-        }.map(\.originKey))
-        let seriesRatingKeys = Set(series.filter {
-            let targetUserID = route($0.serverID).userID ?? userID
-            return isRatingEnabled() && !resolvedSeriesRatings.contains("\($0.originKey)|\(targetUserID)")
-        }.map {
-            "\($0.originKey)|\(route($0.serverID).userID ?? userID)"
+        let seriesBadgeKeys = Set(series.filter(\.needsBadges).map { $0.item.originKey })
+        let seriesRatingKeys = Set(series.filter(\.needsRating).map {
+            "\($0.item.originKey)|\(route($0.item.serverID).userID ?? userID)"
         })
         inFlight.formUnion(directKeys)
         inFlight.formUnion(seriesBadgeKeys)
@@ -124,16 +121,15 @@ final class PosterBadgeStore {
             }
         }
 
-        for item in series {
+        for work in series {
             guard !Task.isCancelled, isBadgeEnabled() || isRatingEnabled() else { return }
+            let item = work.item
             let target = route(item.serverID)
             let targetUserID = target.userID ?? userID
             let ratingKey = "\(item.originKey)|\(targetUserID)"
-            let needsRating = isRatingEnabled() && !resolvedSeriesRatings.contains(ratingKey)
-            let needsBadges = isBadgeEnabled() && item.mediaStreams == nil && enriched[item.originKey] == nil
             await enqueueSample(item.id, originKey: item.originKey, ratingKey: ratingKey,
                                 serverID: item.serverID, library: target.library, userID: targetUserID,
-                                enrichBadges: needsBadges, enrichRating: needsRating)
+                                enrichBadges: work.needsBadges, enrichRating: work.needsRating)
         }
     }
 
