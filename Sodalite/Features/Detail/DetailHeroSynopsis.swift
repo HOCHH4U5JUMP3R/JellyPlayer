@@ -62,6 +62,9 @@ struct DetailHeroSynopsis: View {
                 .lineLimit(isExpanded ? .max : lineCount, reservesSpace: !isExpanded)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                #if !os(tvOS)
+                .textSelection(.enabled)
+                #endif
                 .spoilerVeil(isHidden: isSpoilerHidden, style: .text)
                 .onChange(of: text) { isExpanded = false }
                 .onChange(of: isSpoilerHidden) { if $1 { isExpanded = false } }

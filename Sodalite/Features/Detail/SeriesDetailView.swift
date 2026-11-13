@@ -947,8 +947,16 @@ struct SeriesDetailView: View {
                 Color.clear.frame(height: 30)
                 Color.clear.frame(height: 52)
             } else {
-                // The series overview is deliberately not repeated below the season rail.
-                EmptyView()
+                // Series-level ratings use the same source row as movie details; the season rail
+                // remains below this panel and no season-specific fields are added here.
+                ItemMetadataRow(
+                    item: vm.item,
+                    showRuntime: false,
+                    extras: seasonCount(vm: vm),
+                    externalRatings: vm.externalRatings,
+                    awaitingExternalRatings: vm.isAwaitingExternalRatings,
+                    personalRating: vm.rating
+                )
             }
             #else
             if isShowingEpisode {
@@ -982,7 +990,8 @@ struct SeriesDetailView: View {
                         showRuntime: false,
                         extras: seasonCount(vm: vm),
                         externalRatings: vm.externalRatings,
-                        awaitingExternalRatings: vm.isAwaitingExternalRatings
+                        awaitingExternalRatings: vm.isAwaitingExternalRatings,
+                        personalRating: vm.rating
                     )
                 }
             }

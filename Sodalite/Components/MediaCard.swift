@@ -26,6 +26,7 @@ struct MediaCard: View {
     @Environment(\.dependencies) private var dependencies
     @Environment(\.appState) private var appState
     @Environment(\.horizontalSizeClass) private var hSizeClass
+    @State private var isHovered = false
 
     /// Enlarge factor from Appearance settings (1.0 normal), applied to every style so rows stay proportional.
     private var scale: CGFloat { dependencies.appearancePreferences.cardScale }
@@ -71,6 +72,9 @@ struct MediaCard: View {
         .frame(width: cardWidth)
         .accessibilityElement(children: .combine)
         .accessibilityValue(accessibilityProgress)
+        #if !os(tvOS)
+        .onHover { isHovered = $0 }
+        #endif
     }
 
     private var posterImage: some View {
@@ -103,23 +107,23 @@ struct MediaCard: View {
         .overlay(alignment: .bottom) {
             progressOverlay
         }
-        .overlay(alignment: .topLeading) {
-            // Music cards are excluded: an album has no picture to describe (Sodalite#79).
-            if style != .square {
-                PosterBadgeOverlay(
-                    item: item,
-                    fontSize: badgeFontSize,
+        .overlay(alignment: .topTrailing) {
+            VStack(alignment: .trailing, spacing: badgeFontSize * 0.25) {
+                ArtworkStateBadges(
+                    isPlayed: item.userData?.played == true,
                     posterWidth: tierPosterWidth,
                     scale: scale
                 )
+                // Music cards are excluded: an album has no picture to describe (Sodalite#79).
+                if style != .square {
+                    PosterBadgeOverlay(
+                        item: item,
+                        fontSize: badgeFontSize,
+                        posterWidth: tierPosterWidth,
+                        scale: scale
+                    )
+                }
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            ArtworkStateBadges(
-                isPlayed: item.userData?.played == true,
-                posterWidth: tierPosterWidth,
-                scale: scale
-            )
         }
         .overlay(
             MediaFocusRing(
@@ -130,17 +134,34 @@ struct MediaCard: View {
     }
 
     private var itemInfo: some View {
-        // Always render the subtitle slot (even empty) so cards keep equal height; otherwise subtitle-less items stagger title y-positions across the row.
-        VStack(alignment: .leading, spacing: 2) {
-            Text(displayTitle)
-                .font(.caption)
-                .lineLimit(1)
+        // Always render the subtitle slot (even empty) so cards keep equal height; poster titles and
+        // their year share a centred baseline under the artwork.
+        VStack(alignment: style == .poster ? .center : .leading, spacing: 2) {
+            if style == .poster {
+                MediaCardMarqueeLabel(
+                    text: displayTitle,
+                    font: .caption,
+                    color: .primary,
+                    isActive: isFocused || isHovered
+                )
+                MediaCardMarqueeLabel(
+                    text: displaySubtitle ?? " ",
+                    font: .caption2,
+                    color: .secondary,
+                    isActive: isFocused || isHovered
+                )
+            } else {
+                Text(displayTitle)
+                    .font(.caption)
+                    .lineLimit(1)
 
-            Text(displaySubtitle ?? " ")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+                Text(displaySubtitle ?? " ")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
+        .frame(width: cardWidth, alignment: style == .poster ? .center : .leading)
     }
 
     private var displayTitle: String {
@@ -208,5 +229,98 @@ struct MediaCard: View {
         case .folder: "folder"
         default: "photo"
         }
+    }
+}
+
+
+/// A poster title stays centred and truncated at rest, then scrolls continuously while its card
+/// is focused/hovered. Measuring the intrinsic width avoids guessed character counts across locales.
+private struct MediaCardMarqueeLabel: View {
+    let text: String
+    let font: Font
+    let color: Color
+    let isActive: Bool
+
+    @State private var textWidth: CGFloat = 0
+    @State private var scrollOffset: CGFloat = 0
+
+    private let gap: CGFloat = 30
+
+    private func updateScroll(start: CGFloat, overflows: Bool) {
+        guard isActive, overflows else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { scrollOffset = 0 }
+            return
+        }
+        scrollOffset = start
+        withAnimation(.linear(duration: Double(textWidth + gap) / 28).repeatForever(autoreverses: false)) {
+            scrollOffset = -(textWidth + gap) + start
+        }
+    }
+
+    private var label: some View {
+        Text(text)
+            .font(font)
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let start = max(0, (width - textWidth) / 2)
+            let overflows = textWidth > width + 1
+
+            Group {
+                if overflows && isActive {
+                    HStack(spacing: gap) {
+                        label
+                        label
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
+                    .offset(x: scrollOffset)
+                    .onAppear { updateScroll(start: start, overflows: overflows) }
+                    .onChange(of: isActive) { _, _ in
+                        updateScroll(width: width, start: start, overflows: overflows)
+                    }
+                    .onChange(of: textWidth) { _, _ in
+                        updateScroll(width: width, start: start, overflows: overflows)
+                    }
+                } else {
+                    Text(text)
+                        .font(font)
+                        .foregroundStyle(color)
+                        .lineLimit(1)
+                        .frame(width: width, alignment: .center)
+                        .offset(x: overflows ? start : 0)
+                }
+            }
+            .frame(width: width, alignment: .leading)
+            .clipped()
+            .background {
+                label
+                    .background {
+                        GeometryReader { textGeometry in
+                            Color.clear.preference(
+                                key: MediaCardTextWidthKey.self,
+                                value: textGeometry.size.width
+                            )
+                        }
+                    }
+                    .hidden()
+            }
+        }
+        .onPreferenceChange(MediaCardTextWidthKey.self) { textWidth = $0 }
+        .frame(height: 16)
+        .accessibilityLabel(Text(text))
+    }
+}
+
+private struct MediaCardTextWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

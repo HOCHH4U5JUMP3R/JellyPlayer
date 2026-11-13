@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Poster-corner rating and technical badges. The personal score is a circle matching the watched
-/// mark; technical pills remain stacked below it.
+/// The viewer's own rating and technical pills, in the same top-right corner as the watched mark.
+/// The score keeps the original dark capsule treatment; only its placement follows the state badge.
 struct PosterBadgeOverlay: View {
     let item: JellyfinItem
     let fontSize: CGFloat
@@ -18,46 +18,9 @@ struct PosterBadgeOverlay: View {
             ? dependencies.posterBadgeStore.rating(for: item, userID: appState.activeUser?.id)
             : nil
 
-        if let rating {
-            VStack(alignment: .leading, spacing: fontSize * 0.2) {
-                PosterRatingBadge(rating: rating, posterWidth: posterWidth, scale: scale)
-                if !pills.isEmpty {
-                    PosterBadgePills(pills: pills, fontSize: fontSize)
-                }
-            }
-            .padding(PosterBadgeMetrics.checkInset(posterWidth: posterWidth, scale: scale))
-        } else if !pills.isEmpty {
-            PosterBadgePills(pills: pills, fontSize: fontSize)
+        if !pills.isEmpty || rating != nil {
+            PosterBadgePills(pills: pills, fontSize: fontSize, rating: rating)
+                .padding(PosterBadgeMetrics.checkInset(posterWidth: posterWidth, scale: scale))
         }
-    }
-}
-
-/// Shared rating mark for movie/series posters, season covers and episode artwork.
-struct PosterRatingBadge: View {
-    let rating: Double
-    let posterWidth: CGFloat
-    let scale: CGFloat
-
-    @Environment(\.appearanceTheme) private var appearanceTheme
-
-    private var diameter: CGFloat {
-        PosterBadgeMetrics.checkDiameter(posterWidth: posterWidth, scale: scale)
-    }
-
-    var body: some View {
-        HStack(spacing: diameter * 0.035) {
-            Image(systemName: "star.fill")
-                .font(.system(size: diameter * 0.27, weight: .bold))
-            Text(PosterBadgePills.ratingText(rating))
-                .font(.system(size: diameter * 0.30, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .foregroundStyle(appearanceTheme.palette.foreground.color)
-        .frame(width: diameter, height: diameter)
-        .background(.tint, in: Circle())
-        .shadow(color: .black.opacity(0.45), radius: diameter * 0.12, y: diameter * 0.05)
-        .accessibilityLabel(Text(RatingPickerSheet.label(rating)))
     }
 }

@@ -20,10 +20,12 @@ struct ItemMetadataRow: View {
     /// Bordered segments, appended last. The format pills are the case: boxes with edges, which
     /// separate themselves. Inside the run `FormatBadgeRow` already separates by spacing.
     var badges: [AnyView] = []
-    /// Named scores from Jellyseerr; they replace the server's anonymous star when present.
+    /// External source scores shown alongside Jellyfin Community.
     var externalRatings: ExternalRatings? = nil
-    /// A Jellyseerr ratings fetch is still out, so the star waits for it.
+    /// A Jellyseerr ratings fetch is still out.
     var awaitingExternalRatings: Bool = false
+    /// The viewer's own rating, separate from Jellyfin Community.
+    var personalRating: Double? = nil
 
     @Environment(\.dependencies) private var dependencies
 
@@ -85,19 +87,27 @@ struct ItemMetadataRow: View {
             awaitingExternal: awaitingExternalRatings
         )
         if dependencies.appearancePreferences.showCommunityRating {
-            if let tmdb = ratings.tmdb {
-                out.append(Segment(view: AnyView(NamedScoreLabel(source: "TMDB", score: tmdb))))
+            if let community = ratings.community {
+                out.append(Segment(view: AnyView(StarScoreLabel(score: community))))
             }
-            if let imdb = ratings.imdb {
-                out.append(Segment(view: AnyView(NamedScoreLabel(source: "IMDb", score: imdb))))
-            }
-            if let star = ratings.community {
-                out.append(Segment(view: AnyView(StarScoreLabel(score: star))))
+            if item.type == .movie {
+                if let imdb = ratings.imdb {
+                    out.append(Segment(view: AnyView(NamedScoreLabel(source: "IMDb", score: imdb))))
+                }
+                if let tmdb = ratings.tmdb {
+                    out.append(Segment(view: AnyView(NamedScoreLabel(source: "TMDB", score: tmdb))))
+                }
+            } else if item.type == .series {
+                // TVDB's logo remains in the source row even before its API score is configured.
+                out.append(Segment(view: AnyView(NamedScoreLabel(source: "TVDB", score: ratings.tvdb))))
             }
         }
         if let critic = ratings.rottenTomatoes,
            dependencies.appearancePreferences.showCriticRating {
             out.append(Segment(view: AnyView(RottenTomatoesLabel(score: critic))))
+        }
+        if let personalRating {
+            out.append(Segment(view: AnyView(PersonalRatingLabel(score: personalRating))))
         }
 
         out.append(contentsOf: extras.map { Segment(view: $0) })

@@ -3,13 +3,24 @@ import Testing
 @testable import Sodalite
 
 struct ExternalRatingsTests {
-    @Test func namedScoresReplaceTheStar() {
+    @Test func namedScoresKeepTheCommunityScoreVisible() {
         let shown = RatingDisplay.resolve(
             communityRating: 7.8, criticRating: nil,
             external: ExternalRatings(tmdb: 7.8, imdb: 7.6, rottenTomatoes: 91),
             awaitingExternal: false
         )
-        #expect(shown == RatingDisplay(tmdb: 7.8, imdb: 7.6, community: nil, rottenTomatoes: 91))
+        #expect(shown == RatingDisplay(tmdb: 7.8, imdb: 7.6, community: 7.8, rottenTomatoes: 91))
+    }
+
+    @Test func seriesCanDisplayATVDBScoreAlongsideCommunity() {
+        let shown = RatingDisplay.resolve(
+            communityRating: 7.1, criticRating: 84,
+            external: ExternalRatings(tvdb: 8.4, rottenTomatoes: 84),
+            awaitingExternal: false
+        )
+        #expect(shown.community == 7.1)
+        #expect(shown.tvdb == 8.4)
+        #expect(shown.rottenTomatoes == 84)
     }
 
     @Test func starStandsInWithoutNamedScores() {
@@ -25,9 +36,9 @@ struct ExternalRatingsTests {
         #expect(rtOnly.rottenTomatoes == 80)
     }
 
-    @Test func starWaitsForAPendingFetch() {
+    @Test func communityScoreStaysVisibleWhileExternalFetchIsPending() {
         let shown = RatingDisplay.resolve(communityRating: 6.5, criticRating: 55, external: nil, awaitingExternal: true)
-        #expect(shown.community == nil)
+        #expect(shown.community == 6.5)
         #expect(shown.rottenTomatoes == 55)
     }
 
