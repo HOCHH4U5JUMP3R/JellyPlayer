@@ -256,12 +256,14 @@ struct PosterBadgeStoreTests {
         library.respond = { _ in
             try JSONDecoder().decode(
                 JellyfinItemsResponse.self,
-                from: Data(#"{"Items":[
+                from: Data(#"""
+                {"Items":[
                     {"Id":"e1","Name":"E1","Type":"Episode","ParentIndexNumber":1,"UserData":{"Rating":7}},
                     {"Id":"e2","Name":"E2","Type":"Episode","ParentIndexNumber":1,"UserData":{"Rating":8}},
                     {"Id":"e3","Name":"E3","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":9}},
                     {"Id":"e4","Name":"E4","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":10}}
-                ],"TotalRecordCount":4}"#.utf8)
+                ],"TotalRecordCount":4}
+                """#.utf8)
             )
         }
         let store = store(library, enabled: false, ratingEnabled: true)
