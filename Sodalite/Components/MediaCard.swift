@@ -75,9 +75,6 @@ struct MediaCard: View {
         #if !os(tvOS)
         .onHover { isHovered = $0 }
         #endif
-        #if !os(tvOS)
-        .onHover { isHovered = $0 }
-        #endif
     }
 
     private var posterImage: some View {
