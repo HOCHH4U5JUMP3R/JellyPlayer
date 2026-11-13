@@ -97,8 +97,23 @@ final class PosterBadgeStore {
         guard !direct.isEmpty || !series.isEmpty else { return }
 
         let directKeys = Set(direct.map(\.originKey))
+        let seriesBadgeKeys = Set(series.filter {
+            isBadgeEnabled() && $0.mediaStreams == nil && enriched[$0.originKey] == nil
+        }.map(\.originKey))
+        let seriesRatingKeys = Set(series.filter {
+            let targetUserID = route($0.serverID).userID ?? userID
+            return isRatingEnabled() && !resolvedSeriesRatings.contains("\($0.originKey)|\(targetUserID)")
+        }.map {
+            "\($0.originKey)|\(route($0.serverID).userID ?? userID)"
+        })
         inFlight.formUnion(directKeys)
-        defer { inFlight.subtract(directKeys) }
+        inFlight.formUnion(seriesBadgeKeys)
+        ratingInFlight.formUnion(seriesRatingKeys)
+        defer {
+            inFlight.subtract(directKeys)
+            inFlight.subtract(seriesBadgeKeys)
+            ratingInFlight.subtract(seriesRatingKeys)
+        }
 
         for (serverID, group) in Dictionary(grouping: direct, by: \.serverID) {
             let target = route(serverID)
@@ -109,17 +124,6 @@ final class PosterBadgeStore {
             }
         }
 
-        let seriesBadgeKeys = Set(series.filter { isBadgeEnabled() && $0.mediaStreams == nil && enriched[$0.originKey] == nil }.map(\.originKey))
-        let seriesRatingKeys = Set(series.filter {
-            let targetUserID = route($0.serverID).userID ?? userID
-            return isRatingEnabled() && !resolvedSeriesRatings.contains("\($0.originKey)|\(targetUserID)")
-        }.map {
-            "\($0.originKey)|\(route($0.serverID).userID ?? userID)"
-        })
-        defer {
-            inFlight.subtract(seriesBadgeKeys)
-            ratingInFlight.subtract(seriesRatingKeys)
-        }
         for item in series {
             guard !Task.isCancelled, isBadgeEnabled() || isRatingEnabled() else { return }
             let target = route(item.serverID)
@@ -127,8 +131,6 @@ final class PosterBadgeStore {
             let ratingKey = "\(item.originKey)|\(targetUserID)"
             let needsRating = isRatingEnabled() && !resolvedSeriesRatings.contains(ratingKey)
             let needsBadges = isBadgeEnabled() && item.mediaStreams == nil && enriched[item.originKey] == nil
-            if needsRating { ratingInFlight.insert(ratingKey) }
-            if needsBadges { inFlight.insert(item.originKey) }
             await enqueueSample(item.id, originKey: item.originKey, ratingKey: ratingKey,
                                 serverID: item.serverID, library: target.library, userID: targetUserID,
                                 enrichBadges: needsBadges, enrichRating: needsRating)
