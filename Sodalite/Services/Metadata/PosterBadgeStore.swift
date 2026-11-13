@@ -64,7 +64,7 @@ final class PosterBadgeStore {
         guard item.type == .series else { return item.userData?.rating }
         let resolvedUserID = route(item.serverID).userID ?? userID ?? ""
         guard !resolvedUserID.isEmpty else { return nil }
-        return seriesRatings["\\(item.originKey)|\\(resolvedUserID)"]
+        return seriesRatings["\(item.originKey)|\(resolvedUserID)"]
     }
 
     func enrich(userID: String, _ items: [JellyfinItem]) async {
@@ -109,6 +109,17 @@ final class PosterBadgeStore {
             }
         }
 
+        let seriesBadgeKeys = Set(series.filter { isBadgeEnabled() && $0.mediaStreams == nil && enriched[$0.originKey] == nil }.map(\.originKey))
+        let seriesRatingKeys = Set(series.filter {
+            let targetUserID = route($0.serverID).userID ?? userID
+            return isRatingEnabled() && !resolvedSeriesRatings.contains("\($0.originKey)|\(targetUserID)")
+        }.map {
+            "\($0.originKey)|\(route($0.serverID).userID ?? userID)"
+        })
+        defer {
+            inFlight.subtract(seriesBadgeKeys)
+            ratingInFlight.subtract(seriesRatingKeys)
+        }
         for item in series {
             guard !Task.isCancelled, isBadgeEnabled() || isRatingEnabled() else { return }
             let target = route(item.serverID)
@@ -204,7 +215,7 @@ final class PosterBadgeStore {
                 inFlight.remove(originKey)
                 return
             }
-            enriched["\\(serverID ?? "")|\\(seriesID)"] = response.items.first.map {
+            enriched["\(serverID ?? "")|\(seriesID)"] = response.items.first.map {
                 MediaBadgeResolver.badges(width: $0.width, height: $0.height, streams: $0.mediaStreams)
             } ?? MediaBadges()
             inFlight.remove(originKey)
