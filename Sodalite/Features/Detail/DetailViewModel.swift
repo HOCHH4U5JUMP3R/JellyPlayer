@@ -709,13 +709,6 @@ final class DetailViewModel {
         return PosterRatingCalculator.roundedAverage(episodes.compactMap { rating(of: $0) })
     }
 
-    /// The series score is the average of its rounded season scores, matching Scrob. Wait until
-    /// every season has been prefetched so a partial cache never produces a temporary wrong score.
-    var seriesRating: Double? {
-        guard !seasons.isEmpty, seasons.allSatisfy({ episodesCache[$0.id] != nil }) else { return nil }
-        return PosterRatingCalculator.roundedAverage(seasons.compactMap { seasonRating(for: $0) })
-    }
-
     /// nil clears the episode's rating. Optimistic, rolled back if the server refuses.
     func setEpisodeRating(_ episode: JellyfinItem, rating newValue: Double?) async {
         guard newValue != rating(of: episode) else { return }
