@@ -98,9 +98,8 @@ struct ItemMetadataRow: View {
                     out.append(Segment(view: AnyView(NamedScoreLabel(source: "TMDB", score: tmdb))))
                 }
             } else if item.type == .series {
-                if let tvdb = ratings.tvdb {
-                    out.append(Segment(view: AnyView(NamedScoreLabel(source: "TVDB", score: tvdb))))
-                }
+                // TVDB's logo remains in the source row even before its API score is configured.
+                out.append(Segment(view: AnyView(NamedScoreLabel(source: "TVDB", score: ratings.tvdb))))
             }
         }
         if let critic = ratings.rottenTomatoes,
