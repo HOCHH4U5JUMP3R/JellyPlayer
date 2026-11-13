@@ -982,7 +982,8 @@ struct SeriesDetailView: View {
                         showRuntime: false,
                         extras: seasonCount(vm: vm),
                         externalRatings: vm.externalRatings,
-                        awaitingExternalRatings: vm.isAwaitingExternalRatings
+                        awaitingExternalRatings: vm.isAwaitingExternalRatings,
+                        personalRating: vm.rating
                     )
                 }
             }
