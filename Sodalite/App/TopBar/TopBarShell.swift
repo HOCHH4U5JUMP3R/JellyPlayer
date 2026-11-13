@@ -32,6 +32,8 @@ struct TopBarShell<Content: View>: View {
     /// Bumped per tab when Menu brings the viewer up to the bar, which the page answers by
     /// scrolling to its top (see `drivesShellBar`).
     @State private var scrollToTopRequests: [ShellTab: Int] = [:]
+    /// Bumped when the top bar hands focus to a page whose first stop is UIKit (the system search keyboard).
+    @State private var pageFocusRequests: [ShellTab: Int] = [:]
     /// The page on screen. It trails `selectedTab` by one update so the switch can run in an
     /// animation that knows its direction, including the first visit that builds the page.
     @State private var shownTab: ShellTab?
@@ -112,6 +114,7 @@ struct TopBarShell<Content: View>: View {
             .environment(\.shellBarInset, TopBarMetrics.contentInset)
             .environment(\.shellBarScroll, ShellBarScroll(ride: ride, tab: tab))
             .environment(\.shellBarScrollToTop, scrollToTopRequests[tab] ?? 0)
+            .environment(\.shellPageFocusRequest, pageFocusRequests[tab] ?? 0)
             .environment(\.shellBarHoldsFocus, isSelected && focusIsInBar)
             .onPreferenceChange(ShellChromeHiddenKey.self) { hidden in
                 chromeHidden[tab] = hidden
@@ -148,6 +151,7 @@ struct TopBarShell<Content: View>: View {
                         // focus on the tab (measured); a reset in the shell's scope lands on the
                         // page that prefers default focus, which is the selected one.
                         resetFocus(in: shellFocus)
+                        pageFocusRequests[tab, default: 0] += 1
                     }
                 )
             }
@@ -222,6 +226,8 @@ extension EnvironmentValues {
     @Entry var shellBarScroll: ShellBarScroll?
     /// Changes when the top bar asks the page under it to scroll back to its top.
     @Entry var shellBarScrollToTop = 0
+    /// Changes when the top bar hands focus to a page whose first focus target is UIKit.
+    @Entry var shellPageFocusRequest = 0
     /// The room the top bar takes above a tab's root page, zero everywhere else. Claimed once, by
     /// the page's root, and zeroed for everything inside it, so a pushed screen, a sheet or a cover
     /// never inherits it.
