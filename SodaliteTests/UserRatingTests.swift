@@ -27,13 +27,15 @@ struct UserRatingTests {
     }
 
     @Test func seriesRatingUsesRoundedSeasonAveragesRatherThanOneFlatEpisodeAverage() throws {
-        let episodes = try JSONDecoder().decode([JellyfinItem].self, from: Data(#"[
+        let episodes = try JSONDecoder().decode([JellyfinItem].self, from: Data(#"""
+        [
             {"Id":"e1","Name":"E1","Type":"Episode","ParentIndexNumber":1,"UserData":{"Rating":7}},
             {"Id":"e2","Name":"E2","Type":"Episode","ParentIndexNumber":1,"UserData":{"Rating":8}},
             {"Id":"e3","Name":"E3","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":9}},
             {"Id":"e4","Name":"E4","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":10}},
             {"Id":"e5","Name":"E5","Type":"Episode","ParentIndexNumber":3,"UserData":{}}
-        ]"#.utf8))
+        ]
+        """#.utf8))
         // Season 1 rounds from 7.5 to 8; season 2 rounds from 9.5 to 10;
         // season 3 is unrated and excluded; the series rounds (8 + 10) / 2 to 9.
         #expect(PosterRatingCalculator.seriesRating(episodes: episodes) == 9)
