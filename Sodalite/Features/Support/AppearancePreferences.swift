@@ -202,9 +202,9 @@ final class AppearancePreferences {
         didSet { store.set(showPosterProgress, forKey: Keys.showPosterProgress) }
     }
 
-    /// The viewer's own rating (Sodalite#48) as a star pill at the top of the poster corner. Off by
-    /// default: most cards carry none, and the corner belongs to the copy's facts first. Costs no
-    /// request, the rating rides in the UserData every card query already fetches.
+    /// The viewer's own rating (Sodalite#48) on movie/series posters, season covers and episode
+    /// artwork. Series scores are calculated from rated episodes because Jellyfin has no series
+    /// UserData.Rating field; movie and episode scores come directly from their own UserData.
     var showPosterRating: Bool {
         didSet { store.set(showPosterRating, forKey: Keys.showPosterRating) }
     }
