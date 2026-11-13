@@ -14,6 +14,8 @@ struct SeasonTab: View {
     var focusedID: FocusState<String?>.Binding
     let action: () -> Void
 
+    @Environment(\.dependencies) private var dependencies
+
     private var isFocused: Bool { focusedID.wrappedValue == id }
 
     var body: some View {
@@ -43,17 +45,9 @@ struct SeasonTab: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }
 
-                    if let personalRating {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star.fill")
-                            Text(Int(personalRating.rounded()).formatted())
-                        }
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 5)
-                        .background(.black.opacity(0.72), in: Capsule())
-                        .padding(7)
+                    if dependencies.appearancePreferences.showPosterRating, let personalRating {
+                        PosterRatingBadge(rating: personalRating, posterWidth: 150, scale: 1)
+                            .padding(PosterBadgeMetrics.checkInset(posterWidth: 150, scale: 1))
                     }
                 }
             }
