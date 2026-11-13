@@ -283,7 +283,7 @@ private struct MediaCardMarqueeLabel: View {
                     .offset(x: scrollOffset)
                     .onAppear { updateScroll(start: start, overflows: overflows) }
                     .onChange(of: isActive) { _, _ in
-                        updateScroll(width: width, start: start, overflows: overflows)
+                        updateScroll(start: start, overflows: overflows)
                     }
                     .onChange(of: textWidth) { _, _ in
                         updateScroll(width: width, start: start, overflows: overflows)
