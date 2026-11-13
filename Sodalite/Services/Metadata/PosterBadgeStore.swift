@@ -99,8 +99,8 @@ final class PosterBadgeStore {
         guard !direct.isEmpty || !series.isEmpty else { return }
 
         let directKeys = Set(direct.map(\.originKey))
-        let seriesBadgeKeys = Set(series.filter(\.needsBadges).map { $0.item.originKey })
-        let seriesRatingKeys = Set(series.filter(\.needsRating).map {
+        let seriesBadgeKeys = Set(series.filter { $0.needsBadges }.map { $0.item.originKey })
+        let seriesRatingKeys = Set(series.filter { $0.needsRating }.map {
             "\($0.item.originKey)|\(route($0.item.serverID).userID ?? userID)"
         })
         inFlight.formUnion(directKeys)
