@@ -211,14 +211,17 @@ struct EpisodeLandscapeCard: View {
             ArtworkStateBadges(isFavorite: isFavorite, isPlayed: isPlayed,
                                posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            if let personalRating {
-                HStack(spacing: 5) {
-                    Image(systemName: "star.fill").font(.system(size: 17, weight: .semibold))
-                    Text(Int(personalRating.rounded()).formatted()).font(.system(size: 17, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(.white).padding(.horizontal, 9).padding(.vertical, 6)
-                .background(.black.opacity(0.72), in: Capsule())
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10)
+            if dependencies.appearancePreferences.showPosterRating, let personalRating {
+                PosterRatingBadge(
+                    rating: personalRating,
+                    posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width,
+                    scale: dependencies.appearancePreferences.cardScale
+                )
+                .padding(PosterBadgeMetrics.checkInset(
+                    posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width,
+                    scale: dependencies.appearancePreferences.cardScale
+                ))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             VStack(spacing: 3) {
                 let rawToken = EpisodeMetadataFormatter.seasonEpisode(season: nil, episode: episode.indexNumber)
