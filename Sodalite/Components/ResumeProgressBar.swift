@@ -122,7 +122,7 @@ struct ResumeProgressBar: View {
     var body: some View {
         row
             // Keep the horizontal alignment with the watched mark, but bring the bar down by
-            // one track height so it sits closer to the lower artwork edge.
+            // two track heights so it sits closer to the lower artwork edge.
             .padding(.horizontal, inset)
             .padding(.bottom, max(0, inset - (trackHeight * 2)))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
