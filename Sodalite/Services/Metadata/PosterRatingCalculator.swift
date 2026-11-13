@@ -17,7 +17,7 @@ enum PosterRatingCalculator {
         }, by: { $0.0 })
 
         let seasonRatings = ratedBySeason.values.compactMap { values in
-            roundedAverage(values.map(\.1))
+            roundedAverage(values.map { $0.1 })
         }
         return roundedAverage(seasonRatings)
     }
