@@ -391,7 +391,11 @@ struct MovieDetailView: View {
                 heroTallImageURL: vm.backdropURL(for: vm.item, maxWidth: ImageWidth.tallHero),
                 portraitHero: vm.item.type == .movie,
                 hero: {
-                DetailHeroLogo(viewModel: vm)
+                Text(dependencies.spoilerPolicy(userID: appState.activeUser?.id).displayName(of: vm.item))
+                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }, primary: {
                 // Glass panel + action buttons as the bottom-aligned first-page block (Sodalite#15 round 6), mirroring SeriesDetailView.
                 VStack(alignment: .leading, spacing: 24) {
@@ -488,7 +492,7 @@ struct MovieDetailView: View {
 
     private func glassPanel(vm: DetailViewModel) -> some View {
         // Centred on the upright iPhone, like the logo above it and the buttons below.
-        VStack(alignment: isPhonePortrait ? .center : .leading, spacing: 16) {
+        VStack(alignment: isPhonePortrait ? .center : .leading, spacing: 10) {
             // Title/logo lives in the hero slot (see DetailContentOverlay); panel opens into the metadata row.
             if vm.item.type == .episode, let series = vm.item.seriesName {
                 Text(episodeSubtitle(vm: vm, seriesName: series))
