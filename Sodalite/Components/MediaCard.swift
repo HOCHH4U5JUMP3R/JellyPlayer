@@ -106,7 +106,12 @@ struct MediaCard: View {
         .overlay(alignment: .topLeading) {
             // Music cards are excluded: an album has no picture to describe (Sodalite#79).
             if style != .square {
-                PosterBadgeOverlay(item: item, fontSize: badgeFontSize)
+                PosterBadgeOverlay(
+                    item: item,
+                    fontSize: badgeFontSize,
+                    posterWidth: tierPosterWidth,
+                    scale: scale
+                )
             }
         }
         .overlay(alignment: .topTrailing) {
