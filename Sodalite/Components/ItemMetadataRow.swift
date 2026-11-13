@@ -20,7 +20,7 @@ struct ItemMetadataRow: View {
     /// Bordered segments, appended last. The format pills are the case: boxes with edges, which
     /// separate themselves. Inside the run `FormatBadgeRow` already separates by spacing.
     var badges: [AnyView] = []
-    /// Named scores from Jellyseerr; they replace the server's anonymous star when present.
+    /// External source scores shown alongside Jellyfin Community.
     var externalRatings: ExternalRatings? = nil
     /// A Jellyseerr ratings fetch is still out.
     var awaitingExternalRatings: Bool = false
