@@ -38,7 +38,7 @@ struct SeasonTab: View {
                     }
 
                     ArtworkStateBadges(isPlayed: isPlayed, posterWidth: 150)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity, alignment: Alignment.topTrailing)
 
                     if dependencies.appearancePreferences.showPosterRating, let personalRating {
                         PosterRatingBadge(rating: personalRating, posterWidth: 150, scale: 1)
@@ -216,7 +216,7 @@ struct EpisodeLandscapeCard: View {
                     posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width,
                     scale: dependencies.appearancePreferences.cardScale
                 ))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity, alignment: Alignment.topLeading)
             }
             VStack(spacing: 3) {
                 let rawToken = EpisodeMetadataFormatter.seasonEpisode(season: nil, episode: episode.indexNumber)
