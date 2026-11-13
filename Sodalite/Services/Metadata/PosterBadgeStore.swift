@@ -15,7 +15,7 @@ final class PosterBadgeStore {
 
     /// Movie and episode stream badges answer for themselves; series stream badges are sampled
     /// from a recent episode. Series personal ratings are calculated from all rated episodes,
-    /// grouped by season, because Jellyfin has no series rating field.
+    /// grouped by season, because Jellyfin provides no aggregate series rating.
     private static let batchSize = 40
 
     /// The library service and user an item's server answers through. A nil user means the
