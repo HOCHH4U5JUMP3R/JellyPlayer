@@ -511,7 +511,7 @@ struct MovieDetailView: View {
                 // dragged the studios line out with it (measured on the iPhone, 2026-09-14).
                 if isPhonePortrait {
                     VStack(spacing: 8) {
-                        ItemMetadataRow(item: vm.item, externalRatings: vm.externalRatings, awaitingExternalRatings: vm.isAwaitingExternalRatings)
+                        ItemMetadataRow(item: vm.item, externalRatings: vm.externalRatings, awaitingExternalRatings: vm.isAwaitingExternalRatings, personalRating: vm.rating)
                         let pills = formatBadgePills(vm: vm)
                         if !pills.isEmpty {
                             FormatBadgeRow(pills: pills)
@@ -526,10 +526,11 @@ struct MovieDetailView: View {
                             item: vm.item,
                             badges: formatBadges(vm: vm),
                             externalRatings: vm.externalRatings,
-                            awaitingExternalRatings: vm.isAwaitingExternalRatings
+                            awaitingExternalRatings: vm.isAwaitingExternalRatings,
+                            personalRating: vm.rating
                         )
                         VStack(alignment: .leading, spacing: 8) {
-                            ItemMetadataRow(item: vm.item, externalRatings: vm.externalRatings, awaitingExternalRatings: vm.isAwaitingExternalRatings)
+                            ItemMetadataRow(item: vm.item, externalRatings: vm.externalRatings, awaitingExternalRatings: vm.isAwaitingExternalRatings, personalRating: vm.rating)
                             let pills = formatBadgePills(vm: vm)
                             if !pills.isEmpty {
                                 FormatBadgeRow(pills: pills)
