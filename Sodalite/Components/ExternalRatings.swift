@@ -13,7 +13,7 @@ struct ExternalRatings: Equatable, Sendable {
 struct RatingDisplay: Equatable {
     var tmdb: Double?
     var imdb: Double?
-    var tvdb: Double?
+    var tvdb: Double? = nil
     var community: Double?
     var rottenTomatoes: Int?
 
