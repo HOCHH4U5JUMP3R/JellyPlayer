@@ -5,6 +5,9 @@ struct SearchView: View {
     @Environment(\.dependencies) private var dependencies
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.shellPaysLeadingInset) private var shellPaysLeading
+    #if os(tvOS)
+    @Environment(\.shellPageFocusRequest) private var pageFocusRequest
+    #endif
     private var metrics: LayoutMetrics { LayoutMetrics.current(hSizeClass) }
     /// The edge the section headings and their rows share with every other tab (Sodalite#140).
     private var leadingInset: CGFloat { metrics.rowLeading(shellPaysLeading: shellPaysLeading) }
@@ -45,15 +48,21 @@ struct SearchView: View {
             VStack(spacing: 0) {
                 #if os(tvOS)
                 if let vm = viewModel {
-                    InlineSearchContainer(
-                        text: Bindable(vm).query,
-                        placeholder: String(localized: "search.placeholder", defaultValue: "Search")
-                    ) {
-                        resultsArea(vm: vm)
-                    }
-                    .onChange(of: vm.query) { _, _ in
-                        vm.scheduleSearch()
-                    }
+                    // Use SwiftUI's system search rather than hosting UISearchController ourselves.
+                    // tvOS 26 has an Apple focus-engine bug that leaves the hosted keyboard stuck
+                    // on its first key; .searchable uses the system's own focus routing and works
+                    // on both tvOS 26 and 27.
+                    resultsArea(vm: vm)
+                        .searchable(
+                            text: Bindable(vm).query,
+                            prompt: Text(String(localized: "search.placeholder", defaultValue: "Search"))
+                        )
+                        .autocorrectionDisabled()
+                        .focusSection()
+                        .onChange(of: vm.query) { _, _ in
+                            vm.scheduleSearch()
+                        }
+                        .background(SearchKeyboardFocuser(request: pageFocusRequest))
                 } else {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -439,3 +448,39 @@ struct SearchView: View {
         )
     }
 }
+#if os(tvOS)
+/// The top bar's focus reset only reaches SwiftUI views. The native search keyboard is hosted
+/// inside UISearchContainerViewController, so explicitly request it when the bar hands off focus.
+private struct SearchKeyboardFocuser: UIViewRepresentable {
+    let request: Int
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        guard context.coordinator.handled != request else { return }
+        context.coordinator.handled = request
+        DispatchQueue.main.async {
+            var responder: UIResponder? = view
+            while let current = responder, !(current is UISearchContainerViewController) {
+                responder = current.next
+            }
+            guard let container = responder as? UISearchContainerViewController,
+                  let system = UIFocusSystem.focusSystem(for: container) else { return }
+            system.requestFocusUpdate(to: container.searchController)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(handled: request)
+    }
+
+    final class Coordinator {
+        var handled: Int
+        init(handled: Int) { self.handled = handled }
+    }
+}
+#endif
