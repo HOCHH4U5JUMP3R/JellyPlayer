@@ -115,6 +115,13 @@ struct FilteredGridView: View {
     /// Home videos are 16:9 stills, so a folder grid lays out wide cards. Anything else takes the
     /// shape the server reports for its covers (`ArtworkShape`), so a folder of landscape box sets
     /// opens as a landscape grid.
+    /// Movie and series overviews use the tighter top spacing seen after the first scroll cycle,
+    /// from the first frame onward.
+    private var isMovieOrSeriesOverview: Bool {
+        let types = query.includeItemTypes ?? []
+        return types.contains(.movie) || types.contains(.series)
+    }
+
     private var cardStyle: MediaCardStyle {
         if browsesFolders { return .landscape }
         // The head decides: the shape is the folder's, not each cover's, and reading only the
@@ -179,7 +186,7 @@ struct FilteredGridView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, metrics.gridInset)
-                        .padding(.top, 20)
+                        .padding(.top, isMovieOrSeriesOverview ? 8 : 20)
 
                     // Watch-status filter (Sodalite#17). Native segmented
                     // control per the app's section-picker convention
@@ -319,7 +326,8 @@ struct FilteredGridView: View {
                         }
                         .padding(.horizontal, metrics.gridInset)
                         .padding(.trailing, showsRail ? Self.railClearance : 0)
-                        .padding(.vertical, 40)
+                        .padding(.top, isMovieOrSeriesOverview ? 20 : 40)
+                        .padding(.bottom, 40)
                         #if os(iOS)
                         .scrollTargetLayout()
                         .onScrollTargetVisibilityChange(idType: Int.self) { ids in

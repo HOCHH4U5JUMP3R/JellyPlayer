@@ -26,7 +26,7 @@ struct PosterBadgeOverlay: View {
 }
 
 
-/// Compact personal-rating capsule for episode and season artwork.
+/// Shared personal-rating capsule for posters, season covers and episode artwork.
 /// It occupies the top-left corner; the watched/favourite mark stays independently top-right.
 struct PosterRatingBadge: View {
     let rating: Double
@@ -38,19 +38,8 @@ struct PosterRatingBadge: View {
     }
 
     var body: some View {
-        HStack(spacing: fontSize * 0.28) {
-            Image(systemName: "star.fill")
-                .foregroundStyle(.yellow)
-            Text(PosterBadgePills.ratingText(rating))
-                .monospacedDigit()
-        }
-        .font(.system(size: fontSize, weight: .semibold))
-        .foregroundStyle(.white)
-        .padding(.horizontal, fontSize * PosterBadgeMetrics.pillHorizontalPadding)
-        .padding(.vertical, fontSize * PosterBadgeMetrics.pillVerticalPadding)
-        .background(Color.Theme.scrim, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.Theme.hairline, lineWidth: 1))
-        .fixedSize()
-        .accessibilityLabel(Text(RatingPickerSheet.label(rating)))
+        PosterBadgePills(pills: [], fontSize: fontSize, rating: rating)
+            .fixedSize()
+            .accessibilityLabel(Text(RatingPickerSheet.label(rating)))
     }
 }

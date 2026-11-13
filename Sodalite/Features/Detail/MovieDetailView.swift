@@ -398,7 +398,7 @@ struct MovieDetailView: View {
                     .minimumScaleFactor(0.75)
             }, primary: {
                 // Glass panel + action buttons as the bottom-aligned first-page block (Sodalite#15 round 6), mirroring SeriesDetailView.
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
                     glassPanel(vm: vm)
                     actionButtonRow(vm: vm)
                     if isPhonePortrait { heroSynopsis(vm: vm) }
@@ -493,6 +493,16 @@ struct MovieDetailView: View {
     private func glassPanel(vm: DetailViewModel) -> some View {
         // Centred on the upright iPhone, like the logo above it and the buttons below.
         VStack(alignment: isPhonePortrait ? .center : .leading, spacing: 10) {
+            #if os(tvOS)
+            // Match the series page: a compact metadata row in the glass panel, with the synopsis
+            // available from More Details rather than adding a second block to the hero.
+            ItemMetadataRow(
+                item: vm.item,
+                externalRatings: vm.externalRatings,
+                awaitingExternalRatings: vm.isAwaitingExternalRatings,
+                personalRating: vm.rating
+            )
+            #else
             // Title/logo lives in the hero slot (see DetailContentOverlay); panel opens into the metadata row.
             if vm.item.type == .episode, let series = vm.item.seriesName {
                 Text(episodeSubtitle(vm: vm, seriesName: series))
@@ -544,17 +554,10 @@ struct MovieDetailView: View {
             // below the fold keeps the full text; this is the teaser that decides whether they
             // scroll to it. The upright iPhone has it under the buttons instead.
             if !isPhonePortrait { heroSynopsis(vm: vm) }
+            #endif
         }
-        .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
-        // The upright iPhone draws no panel (Blexbi): its column sits on the page's own ground
-        // under the poster, not over the backdrop, so the glass only boxed the text in.
-        .padding(isPhonePortrait ? 0 : 30)
-        .background {
-            if !isPhonePortrait {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-            }
-        }
+        .frame(maxWidth: isPhonePortrait ? .infinity : 880,
+               alignment: isPhonePortrait ? .center : .leading)
     }
 
     private func heroSynopsis(vm: DetailViewModel) -> some View {

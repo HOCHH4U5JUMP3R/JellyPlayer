@@ -5,21 +5,10 @@ import SwiftUI
 /// Sizing a pill off its own card would put a 32pt pill on a landscape card next to a 20pt one on
 /// the poster beside it, so every mark on artwork reads the tier's poster width instead.
 enum PosterBadgeMetrics {
-    /// The text size of the corner pills. The remaining-time badge beside the resume capsule stands
-    /// one step above it, see ``remainingLabelSize(posterWidth:scale:)``.
-    ///
-    /// This shipped at 0.09, which is 19.8pt on the TV, and the reporter who asked for the pills
-    /// came back with "slightly too big, reduce by about a third" (Sodalite#79). 0.06 is that third:
-    /// 13.2pt on Apple TV, about half the 25pt card title under the poster, against 40 percent of
-    /// the card width for the widest pill before and 27 after. Rendered on the tvOS simulator at
-    /// 0.09, 0.08, 0.07 and 0.06 over a bright, busy still, with the watched disc and the resume row
-    /// in frame, because the corner is judged as an ensemble and not one pill at a time.
-    ///
-    /// The floor is the smaller tiers: the same third would put the phone at 7.2pt, which is below
-    /// anything readable at arm's length, so iPad and iPhone stop at 10pt (the phone barely moves,
-    /// from 10.8, while the iPad loses its third and finally sits under its own 12pt card title).
+    /// Readable rating and technical-badge text, sized against the tier's poster width.
+    /// The 0.09 ratio restores the original badge scale and keeps season/episode artwork consistent.
     static func fontSize(posterWidth: CGFloat, scale: CGFloat) -> CGFloat {
-        max(10, posterWidth * 0.06 * scale)
+        max(10, posterWidth * 0.09 * scale)
     }
 
     /// Padding around the text of a mark on artwork, as a share of its font size. One pair for the
