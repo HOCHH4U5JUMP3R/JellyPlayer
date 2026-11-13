@@ -246,7 +246,7 @@ private struct MediaCardMarqueeLabel: View {
 
     private let gap: CGFloat = 30
 
-    private func updateScroll(width: CGFloat, start: CGFloat, overflows: Bool) {
+    private func updateScroll(start: CGFloat, overflows: Bool) {
         guard isActive, overflows else {
             var transaction = Transaction()
             transaction.disablesAnimations = true
@@ -281,7 +281,7 @@ private struct MediaCardMarqueeLabel: View {
                     }
                     .fixedSize(horizontal: true, vertical: false)
                     .offset(x: scrollOffset)
-                    .onAppear { updateScroll(width: width, start: start, overflows: overflows) }
+                    .onAppear { updateScroll(start: start, overflows: overflows) }
                     .onChange(of: isActive) { _, _ in
                         updateScroll(width: width, start: start, overflows: overflows)
                     }
