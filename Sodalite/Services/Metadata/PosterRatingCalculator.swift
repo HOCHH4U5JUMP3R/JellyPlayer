@@ -1,6 +1,6 @@
 import Foundation
 
-/// Scrob-compatible personal rating aggregation for artwork that has no Jellyfin UserData.Rating.
+/// Scrob-compatible aggregation for series ratings, which Jellyfin does not calculate for us.
 enum PosterRatingCalculator {
     /// Unrated episodes/seasons are omitted from their respective averages.
     static func roundedAverage(_ values: [Double]) -> Double? {
