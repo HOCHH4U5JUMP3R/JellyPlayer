@@ -706,9 +706,14 @@ final class DetailViewModel {
     /// Unrated episodes are excluded; the displayed season score is rounded to a whole star on the same 0–10 scale.
     func seasonRating(for season: JellyfinItem) -> Double? {
         guard let episodes = episodesCache[season.id] else { return nil }
-        let values = episodes.compactMap { rating(of: $0) }
-        guard !values.isEmpty else { return nil }
-        return (values.reduce(0, +) / Double(values.count)).rounded()
+        return PosterRatingCalculator.roundedAverage(episodes.compactMap { rating(of: $0) })
+    }
+
+    /// The series score is the average of its rounded season scores, matching Scrob. Wait until
+    /// every season has been prefetched so a partial cache never produces a temporary wrong score.
+    var seriesRating: Double? {
+        guard !seasons.isEmpty, seasons.allSatisfy({ episodesCache[$0.id] != nil }) else { return nil }
+        return PosterRatingCalculator.roundedAverage(seasons.compactMap { seasonRating(for: $0) })
     }
 
     /// nil clears the episode's rating. Optimistic, rolled back if the server refuses.
