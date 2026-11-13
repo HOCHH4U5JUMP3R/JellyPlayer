@@ -556,16 +556,8 @@ struct MovieDetailView: View {
             if !isPhonePortrait { heroSynopsis(vm: vm) }
             #endif
         }
-        .frame(maxWidth: .infinity, alignment: isPhonePortrait ? .center : .leading)
-        // The upright iPhone draws no panel (Blexbi): its column sits on the page's own ground
-        // under the poster, not over the backdrop, so the glass only boxed the text in.
-        .padding(isPhonePortrait ? 0 : 30)
-        .background {
-            if !isPhonePortrait {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-            }
-        }
+        .frame(maxWidth: isPhonePortrait ? .infinity : 880,
+               alignment: isPhonePortrait ? .center : .leading)
     }
 
     private func heroSynopsis(vm: DetailViewModel) -> some View {
