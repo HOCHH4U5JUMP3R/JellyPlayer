@@ -4,7 +4,7 @@ import SwiftUI
 struct ExternalRatings: Equatable, Sendable {
     var tmdb: Double?
     var imdb: Double?
-    var tvdb: Double?
+    var tvdb: Double? = nil
     var rottenTomatoes: Int?
 }
 
