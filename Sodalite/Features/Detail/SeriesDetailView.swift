@@ -676,7 +676,6 @@ struct SeriesDetailView: View {
             heroPosterURL: vm.seriesHeroPosterURL(for: vm.item, episode: initialEpisode),
             heroTallImageURL: tallBackdropURL,
             portraitHero: true,
-            heroAtTop: true,
             hero: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(vm.item.name)
