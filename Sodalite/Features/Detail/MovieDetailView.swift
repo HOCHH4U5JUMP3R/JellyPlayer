@@ -398,8 +398,9 @@ struct MovieDetailView: View {
                     .minimumScaleFactor(0.75)
             }, primary: {
                 // Glass panel + action buttons as the bottom-aligned first-page block (Sodalite#15 round 6), mirroring SeriesDetailView.
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
                     glassPanel(vm: vm)
+                        .id(Self.pageTopAnchor)
                     actionButtonRow(vm: vm)
                     if isPhonePortrait { heroSynopsis(vm: vm) }
                 // Sodalite#146 round 2. A page whose ONLY content below the fold is this one
