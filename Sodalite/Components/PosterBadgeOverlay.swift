@@ -38,6 +38,8 @@ struct PosterRatingBadge: View {
     let posterWidth: CGFloat
     let scale: CGFloat
 
+    @Environment(\.appearanceTheme) private var appearanceTheme
+
     private var diameter: CGFloat {
         PosterBadgeMetrics.checkDiameter(posterWidth: posterWidth, scale: scale)
     }
@@ -52,10 +54,9 @@ struct PosterRatingBadge: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(appearanceTheme.palette.foreground.color)
         .frame(width: diameter, height: diameter)
-        .background(Color.Theme.scrim, in: Circle())
-        .overlay(Circle().strokeBorder(Color.Theme.hairline, lineWidth: 1))
+        .background(.tint, in: Circle())
         .shadow(color: .black.opacity(0.45), radius: diameter * 0.12, y: diameter * 0.05)
         .accessibilityLabel(Text(RatingPickerSheet.label(rating)))
     }
