@@ -95,8 +95,12 @@ struct PosterBadgeStoreTests {
         func getStudios(userID: String) async throws -> [NamedItem] { [] }
     }
 
-    private func store(_ library: LibraryFake, enabled: Bool = true) -> PosterBadgeStore {
-        PosterBadgeStore(route: { _ in (library, "u1") }, isEnabled: { enabled })
+    private func store(_ library: LibraryFake, enabled: Bool = true, ratingEnabled: Bool = false) -> PosterBadgeStore {
+        PosterBadgeStore(
+            route: { _ in (library, "u1") },
+            isBadgeEnabled: { enabled },
+            isRatingEnabled: { ratingEnabled }
+        )
     }
 
     // MARK: - The free half
