@@ -131,7 +131,7 @@ struct AppearanceSettingsView: View {
                                set: { appearance.showPosterBadges = $0 })
             )
 
-            // Sodalite#48. Off by default, see AppearancePreferences.showPosterRating.
+            // Sodalite#48. One switch for movie/series posters, season covers and episode artwork.
             boolRow(
                 icon: "star.circle",
                 title: "settings.appearance.posterRating",
