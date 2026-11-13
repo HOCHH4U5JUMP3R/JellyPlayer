@@ -20,7 +20,7 @@ struct PosterBadgePills: View {
     }
 
     private func ratingPill(_ rating: Double) -> some View {
-        pill(Text("\(Text(Image(systemName: "star.fill")).foregroundStyle(.tint)) \(Self.ratingText(rating))"))
+        pill(Text("\(Text(Image(systemName: "star.fill")).foregroundStyle(.white)) \(Self.ratingText(rating))"))
             .monospacedDigit()
             .accessibilityLabel(Text(RatingPickerSheet.label(rating)))
     }
