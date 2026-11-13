@@ -121,9 +121,10 @@ struct ResumeProgressBar: View {
 
     var body: some View {
         row
-            // The same inset as the watched badge opposite, so the two overlays line up on the
-            // card's margin instead of each keeping their own.
-            .padding(inset)
+            // Keep the horizontal alignment with the watched mark, but bring the bar down by
+            // one track height so it sits closer to the lower artwork edge.
+            .padding(.horizontal, inset)
+            .padding(.bottom, max(0, inset - trackHeight))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 
