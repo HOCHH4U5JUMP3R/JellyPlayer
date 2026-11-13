@@ -19,8 +19,12 @@ private struct PosterBadgeEnrichment: ViewModifier {
         content
             // The setting is part of the id so switching it on fills the corners in without a
             // reload; the ids so a row that swapped its content enriches the new one.
-            .task(id: EnrichmentKey(itemIDs: items.map(\.id),
-                                    enabled: dependencies.appearancePreferences.showPosterBadges)) {
+            .task(id: EnrichmentKey(
+                itemIDs: items.map(\.id),
+                badgesEnabled: dependencies.appearancePreferences.showPosterBadges,
+                ratingsEnabled: dependencies.appearancePreferences.showPosterRating,
+                userID: appState.activeUser?.id
+            )) {
                 guard let userID = appState.activeUser?.id else { return }
                 await dependencies.posterBadgeStore.enrich(userID: userID, items)
             }
@@ -28,6 +32,8 @@ private struct PosterBadgeEnrichment: ViewModifier {
 
     private struct EnrichmentKey: Equatable {
         let itemIDs: [String]
-        let enabled: Bool
+        let badgesEnabled: Bool
+        let ratingsEnabled: Bool
+        let userID: String?
     }
 }

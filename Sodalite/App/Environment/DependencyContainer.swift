@@ -224,7 +224,8 @@ final class DependencyContainer {
                 else { return (libraryService, nil) }
                 return (session.libraryService, session.userID)
             },
-            isEnabled: { profileSettings.current.appearance.showPosterBadges }
+            isBadgeEnabled: { profileSettings.current.appearance.showPosterBadges },
+            isRatingEnabled: { profileSettings.current.appearance.showPosterRating }
         )
         // Static=true, so the probe always opens the original file and never a transcode.
         let playbackService = self.jellyfinPlaybackService

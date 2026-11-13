@@ -26,6 +26,21 @@ struct UserRatingTests {
         #expect(item.userData?.rating == 8)
     }
 
+    @Test func seriesRatingUsesRoundedSeasonAveragesRatherThanOneFlatEpisodeAverage() throws {
+        let episodes = try JSONDecoder().decode([JellyfinItem].self, from: Data(#"""
+        [
+            {"Id":"e1","Name":"E1","Type":"Episode","ParentIndexNumber":1,"UserData":{"Rating":1}},
+            {"Id":"e2","Name":"E2","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":9}},
+            {"Id":"e3","Name":"E3","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":9}},
+            {"Id":"e4","Name":"E4","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":9}},
+            {"Id":"e5","Name":"E5","Type":"Episode","ParentIndexNumber":3,"UserData":{}}
+        ]
+        """#.utf8))
+        // Season 1 scores 1, season 2 scores 9; the unrated third season is excluded.
+        // The series is (1 + 9) / 2 = 5, unlike the flat episode average of 7.
+        #expect(PosterRatingCalculator.seriesRating(episodes: episodes) == 5)
+    }
+
     @Test func resumePatchKeepsTheRating() throws {
         var item = try decodeItem(#"{"Id":"m1","Name":"Film","Type":"Movie","RunTimeTicks":1000,"UserData":{"Rating":7.5}}"#)
         item.setResumePosition(100)

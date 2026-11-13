@@ -14,6 +14,8 @@ struct SeasonTab: View {
     var focusedID: FocusState<String?>.Binding
     let action: () -> Void
 
+    @Environment(\.dependencies) private var dependencies
+
     private var isFocused: Bool { focusedID.wrappedValue == id }
 
     var body: some View {
@@ -35,25 +37,12 @@ struct SeasonTab: View {
                                           lineWidth: (isFocused || isSelected) ? FocusStroke.width : 0)
                     }
 
-                    if isPlayed {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 23, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(7)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    }
+                    ArtworkStateBadges(isPlayed: isPlayed, posterWidth: 150)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
 
-                    if let personalRating {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star.fill")
-                            Text(Int(personalRating.rounded()).formatted())
-                        }
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 5)
-                        .background(.black.opacity(0.72), in: Capsule())
-                        .padding(7)
+                    if dependencies.appearancePreferences.showPosterRating, let personalRating {
+                        PosterRatingBadge(rating: personalRating, posterWidth: 150, scale: 1)
+                            .padding(PosterBadgeMetrics.checkInset(posterWidth: 150, scale: 1))
                     }
                 }
             }
@@ -217,14 +206,17 @@ struct EpisodeLandscapeCard: View {
             ArtworkStateBadges(isFavorite: isFavorite, isPlayed: isPlayed,
                                posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            if let personalRating {
-                HStack(spacing: 5) {
-                    Image(systemName: "star.fill").font(.system(size: 17, weight: .semibold))
-                    Text(Int(personalRating.rounded()).formatted()).font(.system(size: 17, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(.white).padding(.horizontal, 9).padding(.vertical, 6)
-                .background(.black.opacity(0.72), in: Capsule())
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10)
+            if dependencies.appearancePreferences.showPosterRating, let personalRating {
+                PosterRatingBadge(
+                    rating: personalRating,
+                    posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width,
+                    scale: dependencies.appearancePreferences.cardScale
+                )
+                .padding(PosterBadgeMetrics.checkInset(
+                    posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width,
+                    scale: dependencies.appearancePreferences.cardScale
+                ))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             VStack(spacing: 3) {
                 let rawToken = EpisodeMetadataFormatter.seasonEpisode(season: nil, episode: episode.indexNumber)

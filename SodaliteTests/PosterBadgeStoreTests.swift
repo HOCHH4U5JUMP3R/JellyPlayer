@@ -95,8 +95,12 @@ struct PosterBadgeStoreTests {
         func getStudios(userID: String) async throws -> [NamedItem] { [] }
     }
 
-    private func store(_ library: LibraryFake, enabled: Bool = true) -> PosterBadgeStore {
-        PosterBadgeStore(route: { _ in (library, "u1") }, isEnabled: { enabled })
+    private func store(_ library: LibraryFake, enabled: Bool = true, ratingEnabled: Bool = false) -> PosterBadgeStore {
+        PosterBadgeStore(
+            route: { _ in (library, "u1") },
+            isBadgeEnabled: { enabled },
+            isRatingEnabled: { ratingEnabled }
+        )
     }
 
     // MARK: - The free half
@@ -244,6 +248,32 @@ struct PosterBadgeStoreTests {
         #expect(query.sortOrder == "Descending")
         #expect(query.fields == "MediaStreams")
         #expect(store.badges(for: series).dynamicRange == .hdr10)
+    }
+
+    @Test("a series poster computes its score from rounded season averages")
+    func seriesPosterRatingIsCalculated() async throws {
+        let library = LibraryFake()
+        library.respond = { _ in
+            try JSONDecoder().decode(
+                JellyfinItemsResponse.self,
+                from: Data(#"""
+                {"Items":[
+                    {"Id":"e1","Name":"E1","Type":"Episode","ParentIndexNumber":1,"UserData":{"Rating":1}},
+                    {"Id":"e2","Name":"E2","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":9}},
+                    {"Id":"e3","Name":"E3","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":9}},
+                    {"Id":"e4","Name":"E4","Type":"Episode","ParentIndexNumber":2,"UserData":{"Rating":9}}
+                ],"TotalRecordCount":4}
+                """#.utf8)
+            )
+        }
+        let store = store(library, enabled: false, ratingEnabled: true)
+        let series = try Self.item(id: "s1", type: "Series")
+
+        await store.enrich(userID: "u1", [series])
+
+        #expect(store.rating(for: series, userID: "u1") == 5)
+        #expect(library.queries.count == 1)
+        #expect(library.queries.first?.fields == "")
     }
 
     @Test("a series with no episodes is not sampled again on the next pass")

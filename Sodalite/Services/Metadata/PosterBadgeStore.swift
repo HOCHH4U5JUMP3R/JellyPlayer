@@ -13,20 +13,24 @@ import Observation
 @MainActor
 final class PosterBadgeStore {
 
-    /// Movies and episodes answer for themselves; a series has no streams of its own, so it is
-    /// sampled from its newest episode. Everything else (collections, folders, playlists, music)
-    /// is never asked about.
+    /// Movie and episode stream badges answer for themselves; series stream badges are sampled
+    /// from a recent episode. Series personal ratings are calculated from all rated episodes,
+    /// grouped by season, because Jellyfin provides no aggregate series rating.
     private static let batchSize = 40
 
     /// The library service and user an item's server answers through. A nil user means the
     /// caller's, which is how the active server keeps reading `AppState.activeUser` (Sodalite#85).
     private let route: @MainActor (_ serverID: String?) -> (library: JellyfinLibraryServiceProtocol, userID: String?)
-    private let isEnabled: @MainActor () -> Bool
+    private let isBadgeEnabled: @MainActor () -> Bool
+    private let isRatingEnabled: @MainActor () -> Bool
 
     /// `JellyfinItem.originKey` -> what its streams said. An entry with empty badges is a negative result and stops
     /// the id from being asked about again.
     private var enriched: [String: MediaBadges] = [:]
     private var inFlight: Set<String> = []
+    private var seriesRatings: [String: Double] = [:]
+    private var resolvedSeriesRatings: Set<String> = []
+    private var ratingInFlight: Set<String> = []
     /// Tail of the series-sampling chain. Home shows several rows at once, each with its own task,
     /// so per-row serialisation would still let ten rows fan out; the chain makes it one sample at
     /// a time for the whole app.
@@ -36,9 +40,11 @@ final class PosterBadgeStore {
     /// reads the keychain, and the callers hold `AppState.activeUser?.id` already (same reason
     /// `spoilerPolicy(userID:)` takes it as a parameter, Sodalite#50).
     init(route: @escaping @MainActor (String?) -> (library: JellyfinLibraryServiceProtocol, userID: String?),
-         isEnabled: @escaping @MainActor () -> Bool) {
+         isBadgeEnabled: @escaping @MainActor () -> Bool,
+         isRatingEnabled: @escaping @MainActor () -> Bool) {
         self.route = route
-        self.isEnabled = isEnabled
+        self.isBadgeEnabled = isBadgeEnabled
+        self.isRatingEnabled = isRatingEnabled
     }
 
     /// What the card should paint right now: the free resolution immediately, anything the
@@ -53,31 +59,59 @@ final class PosterBadgeStore {
                            channelLayout: found.channelLayout ?? base.channelLayout)
     }
 
+
+    func rating(for item: JellyfinItem, userID: String?) -> Double? {
+        guard item.type == .series else { return item.userData?.rating }
+        let resolvedUserID = route(item.serverID).userID ?? userID ?? ""
+        guard !resolvedUserID.isEmpty else { return nil }
+        return seriesRatings["\(item.originKey)|\(resolvedUserID)"]
+    }
+
     func enrich(userID: String, _ items: [JellyfinItem]) async {
-        guard isEnabled() else { return }
+        let badgesEnabled = isBadgeEnabled()
+        let ratingsEnabled = isRatingEnabled()
+        guard badgesEnabled || ratingsEnabled else { return }
 
         var direct: [JellyfinItem] = []
-        var series: [JellyfinItem] = []
-        // An item that already carries its streams (anything fetched with detailFields) answers
-        // itself; asking the server again would buy nothing.
-        // A sparse grid can hold one title in two slots when the server's order shifts between
-        // pages (Sodalite#86); asking twice would trap the batch's keyed seed below.
+        var series: [(item: JellyfinItem, needsBadges: Bool, needsRating: Bool)] = []
         var seen: Set<String> = []
-        for item in items where enriched[item.originKey] == nil && !inFlight.contains(item.originKey)
-                                && item.mediaStreams == nil && seen.insert(item.originKey).inserted {
+        for item in items where seen.insert(item.originKey).inserted {
             switch item.type {
-            case .movie, .episode: direct.append(item)
-            case .series:          series.append(item)
-            default:               continue
+            case .movie, .episode:
+                if badgesEnabled && item.mediaStreams == nil
+                    && enriched[item.originKey] == nil && !inFlight.contains(item.originKey) {
+                    direct.append(item)
+                }
+            case .series:
+                let targetUserID = route(item.serverID).userID ?? userID
+                let ratingKey = "\(item.originKey)|\(targetUserID)"
+                let needsBadges = badgesEnabled && item.mediaStreams == nil
+                    && enriched[item.originKey] == nil && !inFlight.contains(item.originKey)
+                let needsRating = ratingsEnabled && !resolvedSeriesRatings.contains(ratingKey)
+                    && !ratingInFlight.contains(ratingKey)
+                if needsBadges || needsRating {
+                    series.append((item: item, needsBadges: needsBadges, needsRating: needsRating))
+                }
+            default:
+                continue
             }
         }
         guard !direct.isEmpty || !series.isEmpty else { return }
 
-        let keys = Set((direct + series).map(\.originKey))
-        inFlight.formUnion(keys)
-        defer { inFlight.subtract(keys) }
+        let directKeys = Set(direct.map(\.originKey))
+        let seriesBadgeKeys = Set(series.filter { $0.needsBadges }.map { $0.item.originKey })
+        let seriesRatingKeys = Set(series.filter { $0.needsRating }.map {
+            "\($0.item.originKey)|\(route($0.item.serverID).userID ?? userID)"
+        })
+        inFlight.formUnion(directKeys)
+        inFlight.formUnion(seriesBadgeKeys)
+        ratingInFlight.formUnion(seriesRatingKeys)
+        defer {
+            inFlight.subtract(directKeys)
+            inFlight.subtract(seriesBadgeKeys)
+            ratingInFlight.subtract(seriesRatingKeys)
+        }
 
-        // One batch run per server: an id means nothing to a server that did not mint it.
         for (serverID, group) in Dictionary(grouping: direct, by: \.serverID) {
             let target = route(serverID)
             let ids = group.map(\.id)
@@ -86,16 +120,16 @@ final class PosterBadgeStore {
                                  serverID: serverID, library: target.library, userID: target.userID ?? userID)
             }
         }
-        // Series go one at a time on purpose: a sample cannot be batched with another series', and
-        // this chain is what keeps a screenful of rows from firing off ten badge samples at once
-        // (the limiter's background lane, Sodalite#72/AsyncSemaphore.swift:9-19, only orders what's
-        // already queued). Re-checked every iteration: `.task(id:)` cancelling mid-chain (scroll
-        // away, profile switch, the setting turned off) must stop enqueueing new samples, not just
-        // skip writing the ones already in flight (Audit 2026-09-25 NETWORK-5).
-        for item in series {
-            guard !Task.isCancelled, isEnabled() else { return }
+
+        for work in series {
+            guard !Task.isCancelled, isBadgeEnabled() || isRatingEnabled() else { return }
+            let item = work.item
             let target = route(item.serverID)
-            await enqueueSample(item.id, serverID: item.serverID, library: target.library, userID: target.userID ?? userID)
+            let targetUserID = target.userID ?? userID
+            let ratingKey = "\(item.originKey)|\(targetUserID)"
+            await enqueueSample(item.id, originKey: item.originKey, ratingKey: ratingKey,
+                                serverID: item.serverID, library: target.library, userID: targetUserID,
+                                enrichBadges: work.needsBadges, enrichRating: work.needsRating)
         }
     }
 
@@ -118,17 +152,17 @@ final class PosterBadgeStore {
         enriched.merge(found) { _, new in new }
     }
 
-    private func enqueueSample(_ seriesID: String, serverID: String?, library: JellyfinLibraryServiceProtocol, userID: String) async {
+    private func enqueueSample(_ seriesID: String, originKey: String, ratingKey: String,
+                               serverID: String?, library: JellyfinLibraryServiceProtocol, userID: String,
+                               enrichBadges: Bool, enrichRating: Bool) async {
         let previous = seriesTail
         let sample = Task { @MainActor [weak self] in
             await previous?.value
-            await self?.sampleSeries(seriesID, serverID: serverID, library: library, userID: userID)
+            await self?.sampleSeries(seriesID, originKey: originKey, ratingKey: ratingKey,
+                                     serverID: serverID, library: library, userID: userID,
+                                     enrichBadges: enrichBadges, enrichRating: enrichRating)
         }
         seriesTail = sample
-        // `sample` is unstructured and does not inherit this call's cancellation on its own
-        // (Audit 2026-09-25 NETWORK-5): without the handler, a `.task(id:)` cancelling here left
-        // this one sample (and, transitively via `previous`, the whole remaining chain) running to
-        // completion against the shared limiter.
         await withTaskCancellationHandler {
             await sample.value
         } onCancel: {
@@ -136,16 +170,55 @@ final class PosterBadgeStore {
         }
     }
 
-    private func sampleSeries(_ seriesID: String, serverID: String?, library: JellyfinLibraryServiceProtocol, userID: String) async {
-        let query = ItemQuery(parentID: seriesID,
-                              includeItemTypes: [.episode],
-                              sortBy: "DateCreated",
-                              sortOrder: "Descending",
-                              limit: 1,
-                              fields: "MediaStreams")
-        guard let response = try? await library.getItems(userID: userID, query: query) else { return }
-        enriched["\(serverID ?? "")|\(seriesID)"] = response.items.first.map {
-            MediaBadgeResolver.badges(width: $0.width, height: $0.height, streams: $0.mediaStreams)
-        } ?? MediaBadges()
+    private func sampleSeries(_ seriesID: String, originKey: String, ratingKey: String,
+                              serverID: String?, library: JellyfinLibraryServiceProtocol, userID: String,
+                              enrichBadges: Bool, enrichRating: Bool) async {
+        if enrichRating {
+            let pageSize = 200
+            var episodes: [JellyfinItem] = []
+            var startIndex = 0
+            var didLoadRatings = true
+            while true {
+                guard !Task.isCancelled else { return }
+                do {
+                    let response = try await library.getItems(
+                        userID: userID,
+                        query: ItemQuery(parentID: seriesID, includeItemTypes: [.episode],
+                                         limit: pageSize, startIndex: startIndex, fields: "")
+                    )
+                    episodes += response.items
+                    startIndex += response.items.count
+                    if response.items.isEmpty || episodes.count >= response.totalRecordCount
+                        || response.items.count < pageSize { break }
+                } catch {
+                    didLoadRatings = false
+                    break
+                }
+            }
+            if didLoadRatings {
+                if let rating = PosterRatingCalculator.seriesRating(episodes: episodes) {
+                    seriesRatings[ratingKey] = rating
+                }
+                resolvedSeriesRatings.insert(ratingKey)
+            } else {
+                ratingInFlight.remove(ratingKey)
+            }
+        }
+
+        if enrichBadges {
+            let query = ItemQuery(parentID: seriesID, includeItemTypes: [.episode],
+                                  sortBy: "DateCreated", sortOrder: "Descending",
+                                  limit: 1, fields: "MediaStreams")
+            guard let response = try? await library.getItems(userID: userID, query: query) else {
+                inFlight.remove(originKey)
+                return
+            }
+            enriched["\(serverID ?? "")|\(seriesID)"] = response.items.first.map {
+                MediaBadgeResolver.badges(width: $0.width, height: $0.height, streams: $0.mediaStreams)
+            } ?? MediaBadges()
+            inFlight.remove(originKey)
+        }
+        ratingInFlight.remove(ratingKey)
     }
+
 }

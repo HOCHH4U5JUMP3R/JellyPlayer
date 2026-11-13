@@ -98,7 +98,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
     /// upright iPhone. Only for items with a real upright poster to fall back on (films, series,
     /// collections); an episode still or a home video's thumb is wide.
     var portraitHero: Bool = false
-    /// Series pages place the title near the top edge so the episode rail can use the lower half.
+    /// Optional top anchoring for layouts that reserve the lower hero area for content.
     var heroAtTop: Bool = false
     @ViewBuilder let hero: () -> Hero
     @ViewBuilder let primary: () -> Primary

@@ -1,10 +1,7 @@
 import SwiftUI
 
-/// The pills in a card's top-left corner (Sodalite#79).
-///
-/// A leaf on purpose: it, not `MediaCard`, reads the badge store, so a batch of enrichment landing
-/// invalidates the overlays and not the two hundred cards around them. The top right belongs to the
-/// watched checkmark and the bottom edge to the resume bar, so the corner is free.
+/// Poster-corner rating and technical badges. The personal score is a circle matching the watched
+/// mark; technical pills remain stacked below it.
 struct PosterBadgeOverlay: View {
     let item: JellyfinItem
     let fontSize: CGFloat
@@ -12,38 +9,36 @@ struct PosterBadgeOverlay: View {
     let scale: CGFloat
 
     @Environment(\.dependencies) private var dependencies
+    @Environment(\.appState) private var appState
 
     var body: some View {
         let appearance = dependencies.appearancePreferences
         let pills = appearance.showPosterBadges ? dependencies.posterBadgeStore.badges(for: item).pills : []
-        // Jellyfin UserData.Rating is the viewer's own rating (including Scrob's computed
-        // series rating synced back as a user rating), not CommunityRating.
-        let rating = appearance.showPosterRating ? item.userData?.rating : nil
+        let rating = appearance.showPosterRating
+            ? dependencies.posterBadgeStore.rating(for: item, userID: appState.activeUser?.id)
+            : nil
 
-        if item.type == .series, let rating {
+        if let rating {
             VStack(alignment: .leading, spacing: fontSize * 0.2) {
-                SeriesPosterRatingBadge(
-                    rating: rating,
-                    posterWidth: posterWidth,
-                    scale: scale
-                )
+                PosterRatingBadge(rating: rating, posterWidth: posterWidth, scale: scale)
                 if !pills.isEmpty {
                     PosterBadgePills(pills: pills, fontSize: fontSize)
                 }
             }
             .padding(PosterBadgeMetrics.checkInset(posterWidth: posterWidth, scale: scale))
-        } else if !pills.isEmpty || rating != nil {
-            PosterBadgePills(pills: pills, fontSize: fontSize, rating: rating)
+        } else if !pills.isEmpty {
+            PosterBadgePills(pills: pills, fontSize: fontSize)
         }
     }
 }
 
-/// A series rating mirrors the watched mark: same circular footprint and corner inset,
-/// with the score readable inside the disc.
-private struct SeriesPosterRatingBadge: View {
+/// Shared rating mark for movie/series posters, season covers and episode artwork.
+struct PosterRatingBadge: View {
     let rating: Double
     let posterWidth: CGFloat
     let scale: CGFloat
+
+    @Environment(\.appearanceTheme) private var appearanceTheme
 
     private var diameter: CGFloat {
         PosterBadgeMetrics.checkDiameter(posterWidth: posterWidth, scale: scale)
@@ -59,10 +54,9 @@ private struct SeriesPosterRatingBadge: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(appearanceTheme.palette.foreground.color)
         .frame(width: diameter, height: diameter)
-        .background(Color.Theme.scrim, in: Circle())
-        .overlay(Circle().strokeBorder(Color.Theme.hairline, lineWidth: 1))
+        .background(.tint, in: Circle())
         .shadow(color: .black.opacity(0.45), radius: diameter * 0.12, y: diameter * 0.05)
         .accessibilityLabel(Text(RatingPickerSheet.label(rating)))
     }
