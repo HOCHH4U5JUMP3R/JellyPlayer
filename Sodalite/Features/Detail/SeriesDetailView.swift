@@ -56,6 +56,7 @@ struct SeriesDetailView: View {
     /// The secondaries leave the focus engine for that time, so an up-move out of the content can
     /// only land on Play (Sodalite#53, and #146 once the overview box that used to answer this went
     /// away). See `DetailAction`.
+    @FocusState private var focusedAction: DetailAction?
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
     /// Sodalite#146 round 3: Watched on a SERIES is the one control on the page that cannot be
@@ -1170,6 +1171,8 @@ struct SeriesDetailView: View {
                         isConfirmingPlayedChange = true
                     }
                 }
+                .focused($focusedAction, equals: .watched)
+
                 InfuseDetailActionButton(
                     title: "Bewerten",
                     symbol: vm.rating(of: selectedEpisode ?? vm.item) == nil ? "star" : "star.fill"
@@ -1177,6 +1180,8 @@ struct SeriesDetailView: View {
                     let ratedItem = selectedEpisode ?? vm.item
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
+                .focused($focusedAction, equals: .rating)
+
                 InfuseDetailActionButton(
                     title: isShowingEpisode
                         ? ((selectedEpisode.map { vm.isFavorite($0) } == true) ? "Favorit entfernen" : "Favorit")
@@ -1191,6 +1196,8 @@ struct SeriesDetailView: View {
                         Task { await vm.toggleFavorite() }
                     }
                 }
+                .focused($focusedAction, equals: .favorite)
+
                 InfuseDetailActionButton(
                     title: "Synchronisieren",
                     symbol: "arrow.clockwise",
@@ -1208,6 +1215,7 @@ struct SeriesDetailView: View {
                         isRefreshingMetadata = false
                     }
                 }
+                .focused($focusedAction, equals: .sync)
             }
 
             HStack(spacing: 12) {
@@ -1218,6 +1226,7 @@ struct SeriesDetailView: View {
                         pendingPlayRequest = true
                     }
                 }
+                .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
 
                 InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
@@ -1230,6 +1239,7 @@ struct SeriesDetailView: View {
                         }
                     }
                 }
+                .focused($focusedAction, equals: .trailer)
             }
         }
         .frame(maxWidth: 880, alignment: .leading)
@@ -1279,6 +1289,7 @@ struct SeriesDetailView: View {
                 }
             }
         )
+        .focused($focusedAction, equals: .play)
         .focused($playButtonFocused)
     }
 
@@ -1345,6 +1356,7 @@ struct SeriesDetailView: View {
                         )
                     }
                 )
+                .focused($focusedAction, equals: .version)
             }
 
             // Shuffle whole series (server SortBy=Random scoped by series id). Hidden in the episode panel.
@@ -1375,6 +1387,7 @@ struct SeriesDetailView: View {
                         }
                     }
                 )
+                .focused($focusedAction, equals: .shuffle)
             }
 
             // Restart-from-beginning when the play target carries progress (button reads "Resume"), mirroring MovieDetailView. playTarget covers both series root and episode panel.
@@ -1388,6 +1401,7 @@ struct SeriesDetailView: View {
                         requestPlay(target, fromBeginning: true, fromPlayButton: true)
                     }
                 )
+                .focused($focusedAction, equals: .replay)
             }
 
             // One button in one slot for both directions (Sodalite#217), so it keeps its identity
@@ -1407,6 +1421,7 @@ struct SeriesDetailView: View {
                         }
                     }
                 )
+                .focused($focusedAction, equals: .goToShow)
             }
 
             if !isShowingEpisode && vm.hasTrailer {
@@ -1430,6 +1445,7 @@ struct SeriesDetailView: View {
                         }
                     }
                 )
+                .focused($focusedAction, equals: .trailer)
             }
 
             if !isShowingEpisode {
@@ -1438,6 +1454,7 @@ struct SeriesDetailView: View {
                     systemImage: vm.isFavorite ? "heart.fill" : "heart",
                     action: { Task { await vm.toggleFavorite() } }
                 )
+                .focused($focusedAction, equals: .favorite)
             }
 
             if !isShowingEpisode {
@@ -1446,6 +1463,7 @@ struct SeriesDetailView: View {
                     systemImage: vm.isPlayed ? "checkmark.circle.fill" : "checkmark.circle",
                     action: { isConfirmingPlayedChange = true }
                 )
+                .focused($focusedAction, equals: .watched)
             }
 
             // Sodalite#48: Jellyfin keeps a rating per item, the series' own as well as each episode's.
@@ -1456,10 +1474,12 @@ struct SeriesDetailView: View {
                     subtitle: vm.rating.map(RatingPickerSheet.label),
                     action: { ratingPrompt = RatingPrompt(itemID: vm.item.id) }
                 )
+                .focused($focusedAction, equals: .rating)
             }
 
             if !isShowingEpisode, vm.item.type == .series, dependencies.trakt.isConnected {
                 TraktWatchlistButton(item: vm.item)
+                    .focused($focusedAction, equals: .traktWatchlist)
             }
 
             // Shows the EFFECTIVE state for this series, so a tap always reads as "do the other
@@ -1474,6 +1494,7 @@ struct SeriesDetailView: View {
                     systemImage: hidesNow ? "eye" : "eye.slash",
                     action: { setSpoilerRule(hidesNow ? .shown : .hidden, seriesID: seriesID) }
                 )
+                .focused($focusedAction, equals: .spoiler)
                 .contextMenu { spoilerRuleMenu(seriesID: seriesID) }
             }
 
@@ -1488,6 +1509,7 @@ struct SeriesDetailView: View {
                         Task { await vm.setEpisodeFavorite(ep, isFavorite: target) }
                     }
                 )
+                .focused($focusedAction, equals: .favorite)
             }
 
             if isShowingEpisode, let ep = selectedEpisode {
@@ -1499,12 +1521,16 @@ struct SeriesDetailView: View {
                         Task { await vm.setEpisodePlayed(ep, isPlayed: target) }
                     }
                 )
+                .focused($focusedAction, equals: .watched)
+
                 GlassActionButton(
                     title: vm.rating(of: ep) == nil ? "detail.rate" : "detail.rating",
                     systemImage: vm.rating(of: ep) == nil ? "star" : "star.fill",
                     subtitle: vm.rating(of: ep).map(RatingPickerSheet.label),
                     action: { ratingPrompt = RatingPrompt(itemID: ep.id) }
                 )
+                .focused($focusedAction, equals: .rating)
+
                 #if os(iOS)
                 DownloadActionButton(item: ep, sourceID: versionSelection.preferredSourceID(for: ep), target: $downloadTarget)
                 #endif
@@ -1521,6 +1547,7 @@ struct SeriesDetailView: View {
                         navigateToSeerrRequest = .stub(tmdbID: tmdbID, mediaType: .tv)
                     }
                 )
+                .focused($focusedAction, equals: .request)
             }
 
             // Last of the informational controls, and the page's only route to the full synopsis
@@ -1540,6 +1567,8 @@ struct SeriesDetailView: View {
                     openMoreDetails()
                 }
             )
+            .focused($focusedAction, equals: .moreDetails)
+
             // Delete last, matching MovieDetailView, so the destructive action sits furthest from Play.
             if canDelete(displayItem) && !isShowingEpisode {
                 GlassActionButton(
@@ -1548,6 +1577,7 @@ struct SeriesDetailView: View {
                     isDestructive: true,
                     action: { isPresentingDeleteSheet = true }
                 )
+                .focused($focusedAction, equals: .delete)
             }
     }
 
