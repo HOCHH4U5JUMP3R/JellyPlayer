@@ -1896,6 +1896,23 @@ struct SeriesDetailView: View {
         focusedSeasonID = target
     }
 
+    /// Warm the artwork that is visible on first entry. AsyncCachedImage already has a decoded
+    /// memory cache; this fills it before the user moves focus through the season/episode rails.
+    private func prefetchSeriesArtwork(vm: DetailViewModel) async {
+        let seasonURLs = vm.seasons.compactMap { vm.posterURL(for: $0) }
+        let currentIndex = vm.episodes.firstIndex(where: { $0.id == selectedEpisode?.id })
+            ?? vm.episodes.firstIndex(where: { $0.id == vm.currentEpisodeID })
+            ?? 0
+        let lower = max(0, currentIndex - 2)
+        let upper = min(vm.episodes.count, currentIndex + 4)
+        let episodeURLs = vm.episodes[lower..<upper].map {
+            dependencies.jellyfinImageService.episodeThumbnailURL(for: $0)
+        }
+        let urls = Array(Set(seasonURLs + episodeURLs))
+        guard !urls.isEmpty else { return }
+        await ImageCache.prefetch(urls, auth: ImageAuth.snapshot(dependencies.sessionRegistry))
+    }
+
     private func seasonSection(vm: DetailViewModel) -> some View {
         // .focusSection keeps the season and episode rails grouped; row-level move handlers choose vertical destinations.
         let sectionSpacing: CGFloat
@@ -2077,6 +2094,9 @@ struct SeriesDetailView: View {
             }
         }
         .focusSectionCompat()
+        .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.seasons.count)|\(vm.episodes.count)|\(selectedEpisode?.id ?? "")") {
+            await prefetchSeriesArtwork(vm: vm)
+        }
     }
 
     /// An upright iPhone's season bar showed three tabs that filled the width exactly, so nothing said
