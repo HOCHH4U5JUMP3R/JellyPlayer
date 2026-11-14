@@ -672,6 +672,7 @@ struct SeriesDetailView: View {
             heroPosterURL: vm.seriesHeroPosterURL(for: vm.item, episode: initialEpisode),
             heroTallImageURL: tallBackdropURL,
             portraitHero: true,
+            heroAtTop: true,
             hero: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(vm.item.name)
@@ -905,8 +906,7 @@ struct SeriesDetailView: View {
                         .foregroundStyle(.white)
                         .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
                     }
-                    if dependencies.appearancePreferences.showCommunityRating,
-                       let imdb = vm.externalRatings?.imdb, imdb > 0 {
+                    if let imdb = vm.externalRatings?.imdb, imdb > 0 {
                         NamedScoreLabel(source: "IMDb", score: imdb)
                     }
                     if dependencies.appearancePreferences.showCriticRating,
@@ -1001,6 +1001,7 @@ struct SeriesDetailView: View {
             isPending: overviewMayStillLand || isShowingEpisode,
             spoilerItem: displayItem,
             onTap: openMoreDetails,
+            focusedAction: $focusedAction,
             expandsInPlace: isPhonePortrait
         )
     }
@@ -1862,7 +1863,7 @@ struct SeriesDetailView: View {
     private func focusSeasonRow(vm: DetailViewModel) {
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
-        } ?? vm.seasons.first?.id
+        } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
         guard let target else { return }
         var transaction = Transaction()
         transaction.disablesAnimations = true
@@ -1875,6 +1876,14 @@ struct SeriesDetailView: View {
         if let lastFocusedEpisodeID,
            vm.episodes.contains(where: { $0.id == lastFocusedEpisodeID }) {
             return lastFocusedEpisodeID
+        }
+        if let selectedID = selectedEpisode?.id,
+           vm.episodes.contains(where: { $0.id == selectedID }) {
+            return selectedID
+        }
+        if let currentID = vm.currentEpisodeID,
+           vm.episodes.contains(where: { $0.id == currentID }) {
+            return currentID
         }
         return vm.episodes.first?.id
     }
@@ -1928,6 +1937,12 @@ struct SeriesDetailView: View {
                         .padding(.bottom, 32)
                     }
                     .scrollClipDisabled()
+                    #if os(tvOS)
+                    .onMoveCommand { direction in
+                        guard direction == .down, let target = episodeEntryTarget(vm: vm) else { return }
+                        pendingEpisodeFocus = target
+                    }
+                    #endif
                     .onChange(of: focusedSeasonID) { oldID, newID in
                         if let newID {
                             // The selected season is the authoritative vertical entry target.
@@ -2006,6 +2021,11 @@ struct SeriesDetailView: View {
                         }
                         .scrollPosition($episodeRowPosition)
                         .scrollClipDisabled()
+                        #if os(tvOS)
+                        .onMoveCommand { direction in
+                            if direction == .up { focusUpFromEpisodeRow(vm: vm) }
+                        }
+                        #endif
                     .onChange(of: vm.selectedSeasonID) { _, _ in
                         // A newly loaded season starts at the left edge; row entry restores its own remembered card.
                         episodeRowPosition.scrollTo(edge: .leading)
