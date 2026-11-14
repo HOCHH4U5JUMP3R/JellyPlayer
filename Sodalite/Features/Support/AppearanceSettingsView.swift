@@ -195,7 +195,7 @@ struct AppearanceSettingsView: View {
             )
 
             boolRow(
-                icon: "imdb",
+                icon: "star.circle",
                 title: "IMDb-Bewertung",
                 subtitle: "IMDb-Wertung auf Detailseiten anzeigen oder ausblenden.",
                 value: Binding(get: { appearance.showIMDbRating },
@@ -203,7 +203,7 @@ struct AppearanceSettingsView: View {
             )
 
             boolRow(
-                icon: "tmdb",
+                icon: "globe",
                 title: "TMDB-Bewertung",
                 subtitle: "TMDB-Wertung auf Detailseiten anzeigen oder ausblenden.",
                 value: Binding(get: { appearance.showTMDBRating },
