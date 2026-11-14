@@ -21,25 +21,24 @@ struct SeasonTab: View {
     var body: some View {
         VStack(alignment: .center, spacing: 5) {
             Button { action() } label: {
-                ZStack(alignment: .topLeading) {
-                    AsyncCachedImage(url: imageURL) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.Theme.surface)
-                            .overlay(Image(systemName: "tv").font(.title2).foregroundStyle(.tertiary))
-                    }
-                    .frame(width: 150, height: 225)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder((isFocused || isSelected) ? Color.accentColor : Color.clear,
-                                          lineWidth: (isFocused || isSelected) ? FocusStroke.width : 0)
-                    }
-
+                AsyncCachedImage(url: imageURL) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.Theme.surface)
+                        .overlay(Image(systemName: "tv").font(.title2).foregroundStyle(.tertiary))
+                }
+                .frame(width: 150, height: 225)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder((isFocused || isSelected) ? Color.accentColor : Color.clear,
+                                      lineWidth: (isFocused || isSelected) ? FocusStroke.width : 0)
+                }
+                .overlay(alignment: .topTrailing) {
                     ArtworkStateBadges(isPlayed: isPlayed, posterWidth: 150)
-                        .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity, alignment: Alignment.topTrailing)
-
+                }
+                .overlay(alignment: .topLeading) {
                     if dependencies.appearancePreferences.showPosterRating, let personalRating {
                         PosterRatingBadge(rating: personalRating, posterWidth: 150, scale: 1)
                     }
