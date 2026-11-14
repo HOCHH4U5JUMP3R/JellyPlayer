@@ -137,7 +137,6 @@ struct SeriesDetailView: View {
     @State private var lastFocusedSeasonID: String?
     @State private var lastFocusedEpisodeID: String?
     @State private var lastFocusedCastID: String?
-    /// The first episode list load is centered once on the selected/current episode.
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
