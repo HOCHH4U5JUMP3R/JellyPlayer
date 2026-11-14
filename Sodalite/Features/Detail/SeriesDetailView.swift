@@ -2065,12 +2065,13 @@ struct SeriesDetailView: View {
                             }
                         }
 
-                        if let newEpisode {
-                            if let seasonID = vm.selectedSeasonID {
-                                lastFocusedEpisodeBySeason[seasonID] = newEpisode
-                            }
+                        if let newEpisode,
+                           let episode = vm.episodes.first(where: { $0.id == newEpisode }),
+                           let seasonID = episode.seasonId ?? vm.selectedSeasonID {
+                            lastFocusedEpisodeBySeason[seasonID] = newEpisode
                         } else if let oldEpisode {
-                            if let seasonID = vm.selectedSeasonID {
+                            if let seasonID = vm.episodes.first(where: { $0.id == oldEpisode })?.seasonId
+                                ?? vm.selectedSeasonID {
                                 lastFocusedEpisodeBySeason[seasonID] = oldEpisode
                             }
                             episodeAim.focusLeft(oldEpisode)
