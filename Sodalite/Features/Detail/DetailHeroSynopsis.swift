@@ -81,23 +81,29 @@ struct DetailHeroSynopsis: View {
             onTap?()
         } label: {
             synopsisText
-                .padding(.horizontal, 5)
-                .padding(.vertical, 3)
+                .padding(.horizontal, 1)
+                .padding(.vertical, 1)
                 .contentShape(Rectangle())
+                .background {
+                    if isFocused {
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(Color.white.opacity(0.055))
+                    }
+                }
                 .overlay(alignment: .bottomLeading) {
                     if isFocused {
                         Capsule()
-                            .fill(Color.white.opacity(0.9))
-                            .frame(width: 34, height: 2)
-                            .padding(.leading, 2)
-                            .padding(.bottom, 1)
+                            .fill(Color.white.opacity(0.55))
+                            .frame(width: 18, height: 1)
+                            .padding(.leading, 1)
+                            .padding(.bottom, 0)
                             .transition(.opacity)
                     }
                 }
                 .animation(.easeOut(duration: 0.12), value: isFocused)
         }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
+        .buttonStyle(PlainButtonStyle())
+        .focusEffectDisabled(true)
     }
     #endif
 

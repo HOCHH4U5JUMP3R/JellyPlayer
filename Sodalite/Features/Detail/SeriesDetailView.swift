@@ -137,7 +137,7 @@ struct SeriesDetailView: View {
     /// Focus is remembered per rail; the focus engine's nearest-neighbour choice must not
     /// overwrite the last card the viewer used in another horizontal row.
     @State private var lastFocusedSeasonID: String?
-    @State private var lastFocusedEpisodeID: String?
+    @State private var lastFocusedEpisodeBySeason: [String: String] = [:]
     @State private var lastFocusedCastID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
@@ -694,7 +694,7 @@ struct SeriesDetailView: View {
                         .foregroundStyle(.white.opacity(0.96))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                } else if vm.isLoadingSeasons || !vm.hasFullDetail {
+                } else {
                     // Keep the episode-heading slot from the first paint; Next Up fills it in place.
                     Color.clear.frame(height: 36)
                 }
@@ -784,6 +784,7 @@ struct SeriesDetailView: View {
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
+                        .padding(.top, 20)
                         .onChange(of: focusedCastID) { _, newID in
                             if let newID { lastFocusedCastID = newID }
                         }
@@ -945,18 +946,34 @@ struct SeriesDetailView: View {
                 Color.clear.frame(height: 36)
                 Color.clear.frame(height: 26)
                 Color.clear.frame(height: 30)
-                Color.clear.frame(height: 52)
+                Color.clear.frame(height: 60)
             } else {
-                // Series-level ratings use the same source row as movie details; the season rail
-                // remains below this panel and no season-specific fields are added here.
-                ItemMetadataRow(
-                    item: vm.item,
-                    showRuntime: false,
-                    extras: seasonCount(vm: vm),
-                    externalRatings: vm.externalRatings,
-                    awaitingExternalRatings: vm.isAwaitingExternalRatings,
-                    personalRating: vm.rating
-                )
+                // Keep the series state on the same fixed metadata grid as episode state.
+                HStack(spacing: 9) {
+                    if let count = vm.item.childCount, count > 0 {
+                        Text("detail.seasonCount \(count)")
+                            .font(.system(size: 22, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.58))
+                    }
+                }
+                .frame(height: 36, alignment: .leading)
+
+                Group {
+                    if let genres = vm.item.genres, !genres.isEmpty {
+                        Text(genres.joined(separator: "  ·  "))
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.62))
+                            .lineLimit(1)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(height: 26, alignment: .leading)
+
+                seriesRatingLine(vm: vm)
+                    .frame(height: 30, alignment: .leading)
+
+                heroSynopsis
             }
             #else
             if isShowingEpisode {
@@ -1003,6 +1020,44 @@ struct SeriesDetailView: View {
                alignment: isPhonePortrait ? .center : .leading)
     }
 
+
+    @ViewBuilder
+    private func seriesRatingLine(vm: DetailViewModel) -> some View {
+        HStack(spacing: 16) {
+            if dependencies.appearancePreferences.showCommunityRating,
+               let score = vm.item.communityRating {
+                HStack(spacing: 7) {
+                    Image("JellyfinMark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                    Text(score.formatted(.number.precision(.fractionLength(1))))
+                }
+                .foregroundStyle(.white)
+            }
+            if dependencies.appearancePreferences.showIMDbRating,
+               let score = vm.externalRatings?.imdb, score > 0 {
+                NamedScoreLabel(source: "IMDb", score: score)
+            }
+            if dependencies.appearancePreferences.showTMDBRating,
+               let score = vm.externalRatings?.tmdb, score > 0 {
+                NamedScoreLabel(source: "TMDB", score: score)
+            }
+            if dependencies.appearancePreferences.showCriticRating,
+               let score = vm.externalRatings?.rottenTomatoes {
+                RottenTomatoesLabel(score: score)
+            }
+            if let score = vm.rating {
+                HStack(spacing: 6) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                    Text(Int(score.rounded()).formatted())
+                }
+                .foregroundStyle(.white)
+            }
+        }
+        .font(.system(size: 21, weight: .semibold, design: .rounded))
+    }
 
     private var heroSynopsis: some View {
         DetailHeroSynopsis(
@@ -1888,12 +1943,13 @@ struct SeriesDetailView: View {
         withTransaction(transaction) { focusedSeasonID = target }
     }
 
-    /// Each horizontal rail owns its vertical entry target: restore its last focused card,
-    /// otherwise begin at the first card. Playback/current-episode state must not move focus.
+    /// Restore the last card used IN THIS SEASON. On first entry, prefer the selected/current
+    /// episode, then the first card. A remembered card from another season must never win.
     private func episodeEntryTarget(vm: DetailViewModel) -> String? {
-        if let lastFocusedEpisodeID,
-           vm.episodes.contains(where: { $0.id == lastFocusedEpisodeID }) {
-            return lastFocusedEpisodeID
+        if let seasonID = vm.selectedSeasonID,
+           let rememberedID = lastFocusedEpisodeBySeason[seasonID],
+           vm.episodes.contains(where: { $0.id == rememberedID }) {
+            return rememberedID
         }
         if let selectedID = selectedEpisode?.id,
            vm.episodes.contains(where: { $0.id == selectedID }) {
@@ -2009,10 +2065,15 @@ struct SeriesDetailView: View {
                             }
                         }
 
-                        if let newEpisode {
-                            lastFocusedEpisodeID = newEpisode
+                        if let newEpisode,
+                           let episode = vm.episodes.first(where: { $0.id == newEpisode }),
+                           let seasonID = episode.seasonId ?? vm.selectedSeasonID {
+                            lastFocusedEpisodeBySeason[seasonID] = newEpisode
                         } else if let oldEpisode {
-                            lastFocusedEpisodeID = oldEpisode
+                            if let seasonID = vm.episodes.first(where: { $0.id == oldEpisode })?.seasonId
+                                ?? vm.selectedSeasonID {
+                                lastFocusedEpisodeBySeason[seasonID] = oldEpisode
+                            }
                             episodeAim.focusLeft(oldEpisode)
                         }
                     }
@@ -2068,10 +2129,6 @@ struct SeriesDetailView: View {
                             if direction == .up { focusUpFromEpisodeRow(vm: vm) }
                         }
                         #endif
-                    .onChange(of: vm.selectedSeasonID) { _, _ in
-                        // A newly loaded season starts at the left edge; row entry restores its own remembered card.
-                        episodeRowPosition.scrollTo(edge: .leading)
-                    }
                     .onChange(of: focusedEpisodeID) { _, newID in
                         // "Show Details" was picked and focus restored to the row: bounce up to Play. Two-step write forces a real transition (same-value write is a no-op).
                         if pendingPlayFocusAfterMenu, newID != nil {
