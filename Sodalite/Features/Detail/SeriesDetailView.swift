@@ -1910,7 +1910,7 @@ struct SeriesDetailView: View {
         return vm.episodes.first?.id
     }
 
-    /// Up out of the episode row. It used to go straight to the season bar, which skipped the season synopsis sitting between the two (reachable downwards, unreachable upwards). Now the synopsis takes the first stop when there is one, and its own up-move carries on to the season bar.
+    /// Up out of the episode row returns to its own remembered season, or the first tab.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
@@ -1919,7 +1919,7 @@ struct SeriesDetailView: View {
     }
 
     private func seasonSection(vm: DetailViewModel) -> some View {
-        // .focusSection (at the bottom) keeps up/down inside the season+episode block, else a far-right episode's up-swipe bypasses the season bar and lands on the overview textbox; the onMoveCommand redirect then snaps to the selected tab.
+        // .focusSection keeps the season and episode rails grouped; row-level move handlers choose vertical destinations.
         let sectionSpacing: CGFloat
         #if os(tvOS)
         sectionSpacing = 32
@@ -1960,7 +1960,6 @@ struct SeriesDetailView: View {
                                     default:
                                         break
                                     }
-                                }
                                 }
                                 .contextMenu { seasonActions(season, vm: vm) }
                             }
@@ -2074,10 +2073,8 @@ struct SeriesDetailView: View {
                         .scrollPosition($episodeRowPosition)
                         .scrollClipDisabled()
                     .onChange(of: vm.selectedSeasonID) { _, _ in
+                        // A newly loaded season starts at the left edge; row entry restores its own remembered card.
                         episodeRowPosition.scrollTo(edge: .leading)
-                        deferOnMain(by: 0.15) {
-                            scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
-                        }
                     }
                     .onChange(of: focusedEpisodeID) { _, newID in
                         // "Show Details" was picked and focus restored to the row: bounce up to Play. Two-step write forces a real transition (same-value write is a no-op).
@@ -2086,7 +2083,6 @@ struct SeriesDetailView: View {
                             playButtonFocused = false
                             DispatchQueue.main.async { playButtonFocused = true }
                             return
-                        }
                         }
                     }
                     // Sodalite#230: the ring was seen on the finished card while Play named the successor.
@@ -2270,17 +2266,6 @@ struct SeriesDetailView: View {
         }
     }
 
-    /// While a player session is up, the episode it is on wins over next-up: a session that rolled into
-    /// the next season rebuilds or re-seats this row, and next-up still names the episode it was loaded with.
-    private func scrollToCurrentEpisode(proxy: ScrollViewProxy, vm: DetailViewModel) {
-        guard let currentID = episodeRowFollowID ?? selectedEpisode?.id ?? vm.nextUpEpisode?.id ?? vm.currentEpisodeID,
-              vm.episodes.contains(where: { $0.id == currentID }) else { return }
-        deferOnMain(by: 0.1) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                proxy.scrollTo(currentID, anchor: .center)
-            }
-        }
-    }
 }
 
 #if os(tvOS)
