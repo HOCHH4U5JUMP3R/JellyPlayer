@@ -56,7 +56,6 @@ struct SeriesDetailView: View {
     /// The secondaries leave the focus engine for that time, so an up-move out of the content can
     /// only land on Play (Sodalite#53, and #146 once the overview box that used to answer this went
     /// away). See `DetailAction`.
-    @FocusState private var focusedAction: DetailAction?
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
     /// Sodalite#146 round 3: Watched on a SERIES is the one control on the page that cannot be
@@ -698,7 +697,7 @@ struct SeriesDetailView: View {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
                 #if os(tvOS)
-                if vm.hasFullDetail && !vm.isLoadingSeasons {
+                if vm.hasFullDetail {
                     actionButtonRow(vm: vm)
                 } else {
                     actionButtonSkeletonRow()
@@ -712,11 +711,9 @@ struct SeriesDetailView: View {
                 ScrollViewReader { outerProxy in
                     VStack(alignment: .leading, spacing: 8) {
                         #if os(tvOS)
-                        if vm.hasFullDetail && !vm.isLoadingSeasons {
-                            if !vm.seasons.isEmpty {
-                                seasonSection(vm: vm)
-                                    .id("episodeRow")
-                            }
+                        if !vm.seasons.isEmpty {
+                            seasonSection(vm: vm)
+                                .id("episodeRow")
                         } else {
                             seasonSectionSkeleton(vm: vm)
                                 .id("episodeRow")
@@ -778,11 +775,6 @@ struct SeriesDetailView: View {
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
-                        .onMoveCommand { direction in
-                            if direction == .up, let target = episodeEntryTarget(vm: vm) {
-                                pendingEpisodeFocus = target
-                            }
-                        }
                         .onChange(of: focusedCastID) { _, newID in
                             if let newID { lastFocusedCastID = newID }
                         }
@@ -810,7 +802,6 @@ struct SeriesDetailView: View {
                                 #endif
                             }
                         )
-                        .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast) { playButtonFocused = true }
                     }
 
                     if !vm.similarItems.isEmpty {
@@ -822,7 +813,6 @@ struct SeriesDetailView: View {
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster
                         )
-                        .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast && !showsExtras) { playButtonFocused = true }
                     }
 
                     // Same split the search screen teaches: what the server has on top, what it
@@ -834,9 +824,6 @@ struct SeriesDetailView: View {
                             items: vm.catalogSimilar,
                             onItemSelected: { navigateToSeerrRequest = $0 }
                         )
-                        .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast && !showsExtras && vm.similarItems.isEmpty) {
-                            playButtonFocused = true
-                        }
                     }
 
                     // Sodalite#146: one non-focusable line closing the page with what the
@@ -905,7 +892,8 @@ struct SeriesDetailView: View {
                 .frame(height: 26, alignment: .leading)
 
                 HStack(spacing: 16) {
-                    if let communityRating = displayItem.communityRating ?? vm.item.communityRating {
+                    if dependencies.appearancePreferences.showCommunityRating,
+                       let communityRating = displayItem.communityRating ?? vm.item.communityRating {
                         HStack(spacing: 7) {
                             Image("JellyfinMark")
                                 .resizable()
@@ -915,6 +903,14 @@ struct SeriesDetailView: View {
                         }
                         .foregroundStyle(.white)
                         .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
+                    }
+                    if dependencies.appearancePreferences.showCommunityRating,
+                       let imdb = vm.externalRatings?.imdb, imdb > 0 {
+                        NamedScoreLabel(source: "IMDb", score: imdb)
+                    }
+                    if dependencies.appearancePreferences.showCriticRating,
+                       let rottenTomatoes = vm.externalRatings?.rottenTomatoes {
+                        RottenTomatoesLabel(score: rottenTomatoes)
                     }
                     if let personalRating = vm.rating(of: displayItem) {
                         HStack(spacing: 6) {
@@ -1004,7 +1000,6 @@ struct SeriesDetailView: View {
             isPending: overviewMayStillLand || isShowingEpisode,
             spoilerItem: displayItem,
             onTap: openMoreDetails,
-            focusedAction: $focusedAction,
             expandsInPlace: isPhonePortrait
         )
     }
@@ -1175,11 +1170,6 @@ struct SeriesDetailView: View {
                         isConfirmingPlayedChange = true
                     }
                 }
-                .focused($focusedAction, equals: .watched)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedAction = .play }
-                }
-
                 InfuseDetailActionButton(
                     title: "Bewerten",
                     symbol: vm.rating(of: selectedEpisode ?? vm.item) == nil ? "star" : "star.fill"
@@ -1187,11 +1177,6 @@ struct SeriesDetailView: View {
                     let ratedItem = selectedEpisode ?? vm.item
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
-                .focused($focusedAction, equals: .rating)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedAction = .play }
-                }
-
                 InfuseDetailActionButton(
                     title: isShowingEpisode
                         ? ((selectedEpisode.map { vm.isFavorite($0) } == true) ? "Favorit entfernen" : "Favorit")
@@ -1206,11 +1191,6 @@ struct SeriesDetailView: View {
                         Task { await vm.toggleFavorite() }
                     }
                 }
-                .focused($focusedAction, equals: .favorite)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedAction = .trailer }
-                }
-
                 InfuseDetailActionButton(
                     title: "Synchronisieren",
                     symbol: "arrow.clockwise",
@@ -1228,10 +1208,6 @@ struct SeriesDetailView: View {
                         isRefreshingMetadata = false
                     }
                 }
-                .focused($focusedAction, equals: .sync)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedAction = .trailer }
-                }
             }
 
             HStack(spacing: 12) {
@@ -1242,15 +1218,7 @@ struct SeriesDetailView: View {
                         pendingPlayRequest = true
                     }
                 }
-                .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
-                .onMoveCommand { direction in
-                    switch direction {
-                    case .up: focusedAction = .watched
-                    case .down: focusSeasonRow(vm: vm)
-                    default: break
-                    }
-                }
 
                 InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
                     Task {
@@ -1260,14 +1228,6 @@ struct SeriesDetailView: View {
                             playOriginatedFromPlayButton = false
                             showPlayer = true
                         }
-                    }
-                }
-                .focused($focusedAction, equals: .trailer)
-                .onMoveCommand { direction in
-                    switch direction {
-                    case .up: focusedAction = .favorite
-                    case .down: focusSeasonRow(vm: vm)
-                    default: break
                     }
                 }
             }
@@ -1319,7 +1279,6 @@ struct SeriesDetailView: View {
                 }
             }
         )
-        .focused($focusedAction, equals: .play)
         .focused($playButtonFocused)
     }
 
@@ -1386,7 +1345,6 @@ struct SeriesDetailView: View {
                         )
                     }
                 )
-                .focused($focusedAction, equals: .version)
             }
 
             // Shuffle whole series (server SortBy=Random scoped by series id). Hidden in the episode panel.
@@ -1417,7 +1375,6 @@ struct SeriesDetailView: View {
                         }
                     }
                 )
-                .focused($focusedAction, equals: .shuffle)
             }
 
             // Restart-from-beginning when the play target carries progress (button reads "Resume"), mirroring MovieDetailView. playTarget covers both series root and episode panel.
@@ -1431,7 +1388,6 @@ struct SeriesDetailView: View {
                         requestPlay(target, fromBeginning: true, fromPlayButton: true)
                     }
                 )
-                .focused($focusedAction, equals: .replay)
             }
 
             // One button in one slot for both directions (Sodalite#217), so it keeps its identity
@@ -1451,7 +1407,6 @@ struct SeriesDetailView: View {
                         }
                     }
                 )
-                .focused($focusedAction, equals: .goToShow)
             }
 
             if !isShowingEpisode && vm.hasTrailer {
@@ -1475,7 +1430,6 @@ struct SeriesDetailView: View {
                         }
                     }
                 )
-                .focused($focusedAction, equals: .trailer)
             }
 
             if !isShowingEpisode {
@@ -1484,7 +1438,6 @@ struct SeriesDetailView: View {
                     systemImage: vm.isFavorite ? "heart.fill" : "heart",
                     action: { Task { await vm.toggleFavorite() } }
                 )
-                .focused($focusedAction, equals: .favorite)
             }
 
             if !isShowingEpisode {
@@ -1493,7 +1446,6 @@ struct SeriesDetailView: View {
                     systemImage: vm.isPlayed ? "checkmark.circle.fill" : "checkmark.circle",
                     action: { isConfirmingPlayedChange = true }
                 )
-                .focused($focusedAction, equals: .watched)
             }
 
             // Sodalite#48: Jellyfin keeps a rating per item, the series' own as well as each episode's.
@@ -1504,12 +1456,10 @@ struct SeriesDetailView: View {
                     subtitle: vm.rating.map(RatingPickerSheet.label),
                     action: { ratingPrompt = RatingPrompt(itemID: vm.item.id) }
                 )
-                .focused($focusedAction, equals: .rating)
             }
 
             if !isShowingEpisode, vm.item.type == .series, dependencies.trakt.isConnected {
                 TraktWatchlistButton(item: vm.item)
-                    .focused($focusedAction, equals: .traktWatchlist)
             }
 
             // Shows the EFFECTIVE state for this series, so a tap always reads as "do the other
@@ -1524,7 +1474,6 @@ struct SeriesDetailView: View {
                     systemImage: hidesNow ? "eye" : "eye.slash",
                     action: { setSpoilerRule(hidesNow ? .shown : .hidden, seriesID: seriesID) }
                 )
-                .focused($focusedAction, equals: .spoiler)
                 .contextMenu { spoilerRuleMenu(seriesID: seriesID) }
             }
 
@@ -1539,7 +1488,6 @@ struct SeriesDetailView: View {
                         Task { await vm.setEpisodeFavorite(ep, isFavorite: target) }
                     }
                 )
-                .focused($focusedAction, equals: .favorite)
             }
 
             if isShowingEpisode, let ep = selectedEpisode {
@@ -1551,16 +1499,12 @@ struct SeriesDetailView: View {
                         Task { await vm.setEpisodePlayed(ep, isPlayed: target) }
                     }
                 )
-                .focused($focusedAction, equals: .watched)
-
                 GlassActionButton(
                     title: vm.rating(of: ep) == nil ? "detail.rate" : "detail.rating",
                     systemImage: vm.rating(of: ep) == nil ? "star" : "star.fill",
                     subtitle: vm.rating(of: ep).map(RatingPickerSheet.label),
                     action: { ratingPrompt = RatingPrompt(itemID: ep.id) }
                 )
-                .focused($focusedAction, equals: .rating)
-
                 #if os(iOS)
                 DownloadActionButton(item: ep, sourceID: versionSelection.preferredSourceID(for: ep), target: $downloadTarget)
                 #endif
@@ -1577,7 +1521,6 @@ struct SeriesDetailView: View {
                         navigateToSeerrRequest = .stub(tmdbID: tmdbID, mediaType: .tv)
                     }
                 )
-                .focused($focusedAction, equals: .request)
             }
 
             // Last of the informational controls, and the page's only route to the full synopsis
@@ -1597,8 +1540,6 @@ struct SeriesDetailView: View {
                     openMoreDetails()
                 }
             )
-            .focused($focusedAction, equals: .moreDetails)
-
             // Delete last, matching MovieDetailView, so the destructive action sits furthest from Play.
             if canDelete(displayItem) && !isShowingEpisode {
                 GlassActionButton(
@@ -1607,7 +1548,6 @@ struct SeriesDetailView: View {
                     isDestructive: true,
                     action: { isPresentingDeleteSheet = true }
                 )
-                .focused($focusedAction, equals: .delete)
             }
     }
 
@@ -1948,18 +1888,6 @@ struct SeriesDetailView: View {
                                 )
                                 .id(season.id)
                                 // Resolve vertical navigation at the row, not by screen-space proximity.
-                                .onMoveCommand { direction in
-                                    switch direction {
-                                    case .up:
-                                        playButtonFocused = true
-                                    case .down:
-                                        if let target = episodeEntryTarget(vm: vm) {
-                                            pendingEpisodeFocus = target
-                                        }
-                                    default:
-                                        break
-                                    }
-                                }
                                 .contextMenu { seasonActions(season, vm: vm) }
                             }
                         }
@@ -2007,7 +1935,7 @@ struct SeriesDetailView: View {
                 }
             }
 
-            if vm.episodes.isEmpty && vm.isLoadingEpisodes {
+            if vm.episodes.isEmpty && (vm.isLoadingEpisodes || vm.isLoadingSeasons) {
                 episodeSkeletonRow(vm: vm)
             } else if !vm.episodes.isEmpty {
                 // Resolved once for the row: the ring reads the same target the Play button acts on, so the two cannot name different episodes.
@@ -2029,29 +1957,6 @@ struct SeriesDetailView: View {
                                     .buttonStyle(EpisodeCardButtonStyle())
                                     .focused($focusedEpisodeID, equals: episode.id)
                                     // Prime the season-bar target before the up-move resolves, else tvOS's geographic picker skips the bar (far-right episode outside the tabs' span) and lands on the overview above.
-                                    #if os(tvOS)
-                                    .onMoveCommand { direction in
-                                        switch direction {
-                                        case .up:
-                                            focusUpFromEpisodeRow(vm: vm)
-                                        case .down:
-                                            if let people = vm.item.people, !people.isEmpty {
-                                                let cast = jellyfinCastMembers(
-                                                    from: people,
-                                                    imageService: dependencies.jellyfinImageService,
-                                                    imageWidth: metrics.castImageWidth,
-                                                    serverID: vm.item.serverID
-                                                )
-                                                let target = lastFocusedCastID.flatMap { remembered in
-                                                    cast.contains(where: { $0.id == remembered }) ? remembered : nil
-                                                } ?? cast.first?.id
-                                                focusedCastID = target
-                                            }
-                                        default:
-                                            break
-                                        }
-                                    }
-                                    #endif
                                     // The system preview, deliberately: it snapshots the real view
                                     // in the real environment, so it carries the accent, the theme
                                     // and the page's own ground. A hand-built one is a second view
