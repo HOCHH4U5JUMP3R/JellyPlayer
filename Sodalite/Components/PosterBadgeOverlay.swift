@@ -19,8 +19,10 @@ struct PosterBadgeOverlay: View {
             : nil
 
         if !pills.isEmpty || rating != nil {
+            // PosterBadgePills supplies its own optical inset. Adding the watched-check inset here
+            // stacked two transparent margins and pushed the rating noticeably farther inward.
+            // Keep the visible capsule on the same corner line as the state badge.
             PosterBadgePills(pills: pills, fontSize: fontSize, rating: rating)
-                .padding(PosterBadgeMetrics.checkInset(posterWidth: posterWidth, scale: scale))
         }
     }
 }
