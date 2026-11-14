@@ -113,7 +113,6 @@ struct SeriesDetailView: View {
 
     /// Whether Menu has a series state to go back to, or has to leave the page. See the type.
     @State private var episodeOrigin = EpisodeStateOrigin()
-    @State private var episodeRedirectDone = false
     /// Bridge season→episode writes the target episode id here; the episode-row ScrollViewReader scrolls it into the LazyHStack then writes focusedEpisodeID, since a focusedEpisodeID write for an unrendered card is a silent no-op (right-side-takes-two-clicks case).
     @State private var pendingEpisodeFocus: String?
     /// The player return sets this alongside pendingEpisodeFocus: the row jumps instead of animating, because the focus write lands mid-animation and the focus engine's own scroll then stops it short of the card.
@@ -133,14 +132,11 @@ struct SeriesDetailView: View {
     /// Which cast card holds focus, for the row's entry aim (Sodalite#146 round 2). Same rule as the
     /// movie page: the first entry lands on the first card, after that the row remembers.
     @FocusState private var focusedCastID: String?
-    @State private var castEntryAimed = false
     /// Focus is remembered per rail; the focus engine's nearest-neighbour choice must not
     /// overwrite the last card the viewer used in another horizontal row.
     @State private var lastFocusedSeasonID: String?
     @State private var lastFocusedEpisodeID: String?
     @State private var lastFocusedCastID: String?
-    /// The first episode list load is centered once on the selected/current episode.
-    @State private var didInitialEpisodeCenter = false
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
     /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
@@ -782,18 +778,13 @@ struct SeriesDetailView: View {
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
-                        .onFocusMoveUp(active: !seasonBlockIsFirst) { playButtonFocused = true }
-                        .onChange(of: focusedCastID) { oldID, newID in
-                            guard let newID else { return }
-                            if oldID == nil,
-                               let rememberedID = lastFocusedCastID,
-                               cast.contains(where: { $0.id == rememberedID }),
-                               rememberedID != newID {
-                                DispatchQueue.main.async { focusedCastID = rememberedID }
-                                return
+                        .onMoveCommand { direction in
+                            if direction == .up, let target = episodeEntryTarget(vm: vm) {
+                                pendingEpisodeFocus = target
                             }
-                            lastFocusedCastID = newID
-                            aimFirstCastEntry(at: newID, in: cast)
+                        }
+                        .onChange(of: focusedCastID) { _, newID in
+                            if let newID { lastFocusedCastID = newID }
                         }
                     }
 
@@ -1754,15 +1745,6 @@ struct SeriesDetailView: View {
         return status == "Continuing"
     }
 
-    /// Where a move down into the cast row lands; see `MovieDetailView.aimFirstCastEntry` for why the
-    /// geometric landing is arbitrary here and why only the first entry is corrected.
-    private func aimFirstCastEntry(at newID: String?, in cast: [CastMember]) {
-        guard let newID, !castEntryAimed else { return }
-        castEntryAimed = true
-        guard let first = cast.first?.id, newID != first else { return }
-        DispatchQueue.main.async { focusedCastID = first }
-    }
-
     /// Resolve a cast member to a TMDB person id and open the person page; inert when the server has no TMDB id.
     /// The series id, not the selected episode's: TMDB credits a person on the show (Sodalite#143).
     private func handlePersonTap(_ member: CastMember) {
@@ -1908,58 +1890,35 @@ struct SeriesDetailView: View {
     }
 
     private func focusSeasonRow(vm: DetailViewModel) {
-        let target = vm.selectedSeasonID ?? lastFocusedSeasonID.flatMap { remembered in
+        let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
-        }
+        } ?? vm.seasons.first?.id
         guard let target else { return }
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) { focusedSeasonID = target }
     }
 
-    private func centerInitialEpisodeIfNeeded(proxy: ScrollViewProxy, vm: DetailViewModel) {
-        guard !didInitialEpisodeCenter,
-              let target = selectedEpisode?.id ?? vm.currentEpisodeID ?? vm.nextUpEpisode?.id,
-              vm.episodes.contains(where: { $0.id == target }) else { return }
-        didInitialEpisodeCenter = true
-        DispatchQueue.main.async {
-            proxy.scrollTo(target, anchor: .center)
-        }
-    }
-
-    /// Where a move down into the episode row lands. The season button, the one-shot redirect,
-    /// and the player return all read this one resolver so they cannot aim at different cards.
+    /// Each horizontal rail owns its vertical entry target: restore its last focused card,
+    /// otherwise begin at the first card. Playback/current-episode state must not move focus.
     private func episodeEntryTarget(vm: DetailViewModel) -> String? {
-        if let selectedEpisodeID = selectedEpisode?.id,
-           vm.episodes.contains(where: { $0.id == selectedEpisodeID }) {
-            return selectedEpisodeID
-        }
-        if let currentID = vm.currentEpisodeID,
-           vm.episodes.contains(where: { $0.id == currentID }) {
-            return currentID
-        }
-        if let nextUpID = vm.nextUpEpisode?.id,
-           vm.episodes.contains(where: { $0.id == nextUpID }) {
-            return nextUpID
-        }
         if let lastFocusedEpisodeID,
            vm.episodes.contains(where: { $0.id == lastFocusedEpisodeID }) {
             return lastFocusedEpisodeID
         }
-        return episodeAim.target(in: vm.episodes.map(\.id), currentEpisodeID: vm.currentEpisodeID)
+        return vm.episodes.first?.id
     }
 
-    /// Up out of the episode row. It used to go straight to the season bar, which skipped the season synopsis sitting between the two (reachable downwards, unreachable upwards). Now the synopsis takes the first stop when there is one, and its own up-move carries on to the season bar.
+    /// Up out of the episode row returns to its own remembered season, or the first tab.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
-        // The season synopsis panel is intentionally absent; move straight back to the selected season tab.
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
-        } ?? vm.selectedSeasonID
-        deferOnMain(by: 0.03) { focusedSeasonID = target }
+        } ?? vm.seasons.first?.id
+        focusedSeasonID = target
     }
 
     private func seasonSection(vm: DetailViewModel) -> some View {
-        // .focusSection (at the bottom) keeps up/down inside the season+episode block, else a far-right episode's up-swipe bypasses the season bar and lands on the overview textbox; the onMoveCommand redirect then snaps to the selected tab.
+        // .focusSection keeps the season and episode rails grouped; row-level move handlers choose vertical destinations.
         let sectionSpacing: CGFloat
         #if os(tvOS)
         sectionSpacing = 32
@@ -1988,20 +1947,17 @@ struct SeriesDetailView: View {
                                     }
                                 )
                                 .id(season.id)
-                                // Up out of the first section below the fold has to be REDIRECTED, not
-                                // merely resolved, exactly as on the movie page. The secondaries are out
-                                // of the focus engine while focus is not in the action row, so Play is
-                                // the only candidate left, and from a tab past the row's width it is too
-                                // far sideways for the engine to reach at all: the move simply does not
-                                // happen, and the page is a dead end until the viewer walks back to the
-                                // leftmost tab (Sodalite#146 round 2, reported on a device). On the tab
-                                // and not on the block around it: an `onMoveCommand` out there would
-                                // also catch the up-moves out of the episode row and the season
-                                // synopsis, which have their own, nearer destinations.
-                                .onFocusMoveUp(active: true) { playButtonFocused = true }
+                                // Resolve vertical navigation at the row, not by screen-space proximity.
                                 .onMoveCommand { direction in
-                                    if direction == .down, let target = episodeEntryTarget(vm: vm) {
-                                        pendingEpisodeFocus = target
+                                    switch direction {
+                                    case .up:
+                                        playButtonFocused = true
+                                    case .down:
+                                        if let target = episodeEntryTarget(vm: vm) {
+                                            pendingEpisodeFocus = target
+                                        }
+                                    default:
+                                        break
                                     }
                                 }
                                 .contextMenu { seasonActions(season, vm: vm) }
@@ -2020,7 +1976,6 @@ struct SeriesDetailView: View {
                             // Do not restore an older tab here: that overrode an explicit focus
                             // request from Play/Trailer and sent the remote to the wrong season.
                             lastFocusedSeasonID = newID
-                            episodeRedirectDone = false
                         } else if let oldID {
                             lastFocusedSeasonID = oldID
                         }
@@ -2040,19 +1995,13 @@ struct SeriesDetailView: View {
                         }
 
                         if let newEpisode {
-                            // A non-nil old value means horizontal movement inside this rail.
-                            // A nil old value is entry from another rail; keep the previous target.
-                            if oldEpisode != nil {
-                                lastFocusedEpisodeID = newEpisode
-                            }
+                            lastFocusedEpisodeID = newEpisode
                         } else if let oldEpisode {
                             lastFocusedEpisodeID = oldEpisode
                             episodeAim.focusLeft(oldEpisode)
-                            episodeRedirectDone = false
                         }
                     }
                     .onChange(of: vm.selectedSeasonID) { _, newID in
-                        episodeRedirectDone = false
                         withAnimation { proxy.scrollTo(newID, anchor: .center) }
                     }
                 }
@@ -2082,8 +2031,24 @@ struct SeriesDetailView: View {
                                     // Prime the season-bar target before the up-move resolves, else tvOS's geographic picker skips the bar (far-right episode outside the tabs' span) and lands on the overview above.
                                     #if os(tvOS)
                                     .onMoveCommand { direction in
-                                        if direction == .up {
+                                        switch direction {
+                                        case .up:
                                             focusUpFromEpisodeRow(vm: vm)
+                                        case .down:
+                                            if let people = vm.item.people, !people.isEmpty {
+                                                let cast = jellyfinCastMembers(
+                                                    from: people,
+                                                    imageService: dependencies.jellyfinImageService,
+                                                    imageWidth: metrics.castImageWidth,
+                                                    serverID: vm.item.serverID
+                                                )
+                                                let target = lastFocusedCastID.flatMap { remembered in
+                                                    cast.contains(where: { $0.id == remembered }) ? remembered : nil
+                                                } ?? cast.first?.id
+                                                focusedCastID = target
+                                            }
+                                        default:
+                                            break
                                         }
                                     }
                                     #endif
@@ -2107,20 +2072,8 @@ struct SeriesDetailView: View {
                         .scrollPosition($episodeRowPosition)
                         .scrollClipDisabled()
                     .onChange(of: vm.selectedSeasonID) { _, _ in
-                        didInitialEpisodeCenter = false
+                        // A newly loaded season starts at the left edge; row entry restores its own remembered card.
                         episodeRowPosition.scrollTo(edge: .leading)
-                        deferOnMain(by: 0.15) {
-                            scrollToCurrentEpisode(proxy: episodeProxy, vm: vm)
-                        }
-                    }
-                    .onAppear {
-                        centerInitialEpisodeIfNeeded(proxy: episodeProxy, vm: vm)
-                    }
-                    .onChange(of: vm.episodes.map(\.id)) { _, _ in
-                        centerInitialEpisodeIfNeeded(proxy: episodeProxy, vm: vm)
-                    }
-                    .onChange(of: selectedEpisode?.id) { _, _ in
-                        centerInitialEpisodeIfNeeded(proxy: episodeProxy, vm: vm)
                     }
                     .onChange(of: focusedEpisodeID) { _, newID in
                         // "Show Details" was picked and focus restored to the row: bounce up to Play. Two-step write forces a real transition (same-value write is a no-op).
@@ -2129,12 +2082,6 @@ struct SeriesDetailView: View {
                             playButtonFocused = false
                             DispatchQueue.main.async { playButtonFocused = true }
                             return
-                        }
-                        if newID != nil && !episodeRedirectDone {
-                            episodeRedirectDone = true
-                            if let target = episodeEntryTarget(vm: vm), newID != target {
-                                focusedEpisodeID = target
-                            }
                         }
                     }
                     // Sodalite#230: the ring was seen on the finished card while Play named the successor.
@@ -2318,17 +2265,6 @@ struct SeriesDetailView: View {
         }
     }
 
-    /// While a player session is up, the episode it is on wins over next-up: a session that rolled into
-    /// the next season rebuilds or re-seats this row, and next-up still names the episode it was loaded with.
-    private func scrollToCurrentEpisode(proxy: ScrollViewProxy, vm: DetailViewModel) {
-        guard let currentID = episodeRowFollowID ?? selectedEpisode?.id ?? vm.nextUpEpisode?.id ?? vm.currentEpisodeID,
-              vm.episodes.contains(where: { $0.id == currentID }) else { return }
-        deferOnMain(by: 0.1) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                proxy.scrollTo(currentID, anchor: .center)
-            }
-        }
-    }
 }
 
 #if os(tvOS)
