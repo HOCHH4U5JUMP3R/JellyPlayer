@@ -1892,7 +1892,7 @@ struct SeriesDetailView: View {
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
-        } ?? vm.seasons.first?.id
+        } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
         focusedSeasonID = target
     }
 
@@ -1905,7 +1905,7 @@ struct SeriesDetailView: View {
             ?? 0
         let lower = max(0, currentIndex - 2)
         let upper = min(vm.episodes.count, currentIndex + 4)
-        let episodeURLs = vm.episodes[lower..<upper].map {
+        let episodeURLs = vm.episodes[lower..<upper].compactMap {
             dependencies.jellyfinImageService.episodeThumbnailURL(for: $0)
         }
         let urls = Array(Set(seasonURLs + episodeURLs))
