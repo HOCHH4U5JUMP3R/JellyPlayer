@@ -347,6 +347,9 @@ struct FilteredGridView: View {
                 .hidesSystemScrollIndex(showsRail)
             }
             .scrollPosition($scrollPosition)
+            // Start each library overview at its real top on first presentation, rather than
+            // inheriting a stale scroll anchor that leaves the header lower until the first scroll.
+            .defaultScrollAnchor(.top)
             .overlay(alignment: .trailing) {
                 if showsRail { rail }
             }
