@@ -20,8 +20,7 @@ struct DetailHeroSynopsis: View {
     /// Sodalite#50. The teaser is veiled by exactly the same rule as the box below the fold, or a
     /// hidden episode synopsis would simply be printed one screen higher.
     var spoilerItem: JellyfinItem?
-    /// What a tap on the teaser does on touch: the page's More Details action, so the truncated
-    /// text is not a dead end. tvOS leaves the panel outside the focus engine and ignores it.
+    /// Opens the full synopsis when activated on tvOS or tapped on touch.
     var onTap: (() -> Void)?
     /// Shared page focus state: the synopsis has its own identity, so moving down can
     /// assign the exact destination without letting tvOS choose a geometric neighbour.
@@ -78,24 +77,27 @@ struct DetailHeroSynopsis: View {
 
     #if os(tvOS)
     private var tvSynopsisSurface: some View {
-        synopsisText
-            .padding(.horizontal, 5)
-            .padding(.vertical, 3)
-            .contentShape(RoundedRectangle(cornerRadius: 13))
-            // Match the secondary action buttons' quiet focus fill without turning the
-            // synopsis into a Button (which reintroduced the bright system hover plate).
-            .overlay(alignment: .bottomLeading) {
-                if isFocused {
-                    Capsule()
-                        .fill(Color.white.opacity(0.9))
-                        .frame(width: 34, height: 2)
-                        .padding(.leading, 2)
-                        .padding(.bottom, 1)
-                        .transition(.opacity)
+        Button {
+            onTap?()
+        } label: {
+            synopsisText
+                .padding(.horizontal, 5)
+                .padding(.vertical, 3)
+                .contentShape(Rectangle())
+                .overlay(alignment: .bottomLeading) {
+                    if isFocused {
+                        Capsule()
+                            .fill(Color.white.opacity(0.9))
+                            .frame(width: 34, height: 2)
+                            .padding(.leading, 2)
+                            .padding(.bottom, 1)
+                            .transition(.opacity)
+                    }
                 }
-            }
-            .animation(.easeOut(duration: 0.12), value: isFocused)
-            .onTapGesture { onTap?() }
+                .animation(.easeOut(duration: 0.12), value: isFocused)
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
     }
     #endif
 
@@ -104,23 +106,11 @@ struct DetailHeroSynopsis: View {
         Group {
             if let focusedAction {
                 tvSynopsisSurface
-                    .focusable()
-                    .focusEffectDisabled(true)
                     .focused(focusedAction, equals: .synopsis)
-                    .onMoveCommand { direction in
-                        if direction == .down { focusedAction.wrappedValue = .watched }
-                    }
             } else if let onMoveDown {
                 tvSynopsisSurface
-                    .focusable()
-                    .focusEffectDisabled(true)
-                    .onMoveCommand { direction in
-                        if direction == .down { onMoveDown() }
-                    }
             } else {
                 tvSynopsisSurface
-                    .focusable()
-                    .focusEffectDisabled(true)
             }
         }
         #else
