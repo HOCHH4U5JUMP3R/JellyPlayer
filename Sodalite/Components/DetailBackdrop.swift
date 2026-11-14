@@ -158,13 +158,7 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
 
     /// The reserved band and the hint itself are tvOS only: a scrollable page is self-evident on a
     /// touch device (Sodalite#53).
-    private var reservesScrollHint: Bool {
-        #if os(tvOS)
-        true
-        #else
-        false
-        #endif
-    }
+    private var reservesScrollHint: Bool { false }
 
     private var showsScrollHint: Bool {
         reservesScrollHint && ScrollHintPolicy.isVisible(
@@ -260,12 +254,6 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
                         // 24 pt matching the panel-to-buttons gap, widened on tvOS to a constant
                         // band that holds the fold marker (Sodalite#53).
                         .padding(.bottom, ScrollHintPolicy.primaryBottomInset(reservesHint: reservesScrollHint))
-                        .overlay(alignment: .bottom) {
-                            if reservesScrollHint {
-                                ScrollHintChevron(isVisible: showsScrollHint)
-                                    .padding(.bottom, 10)
-                            }
-                        }
                         .background(Color.Theme.scrim)
                     }
                     // iPhone landscape: do NOT force the first page to viewport height. In the short
@@ -352,10 +340,6 @@ struct DetailContentOverlay<Hero: View, Primary: View, Content: View>: View {
         .onAppear { refreshWindowInsets() }
         // Hold the hint back through the cover's present transition, so a viewer who immediately
         // presses down never sees it appear.
-        .task {
-            try? await Task.sleep(for: .milliseconds(800))
-            hintSettled = true
-        }
         // Where the page came to rest after opening (Sodalite#146 round 2). It is supposed to rest
         // at zero: the first page is exactly one viewport tall, so the fold sits on the screen's
         // bottom edge and nothing below it is in sight.
