@@ -179,6 +179,9 @@ struct ProfileAppearancePayload: Codable, Equatable {
     var showPosterProgress: Bool
     var showCommunityRating: Bool
     var showCriticRating: Bool
+    /// Optional for compatibility with profile records created before the source switches existed.
+    var showIMDbRating: Bool? = nil
+    var showTMDBRating: Bool? = nil
     /// nil from a build without the tagline switch (Sodalite#146 round 4). Optional and unapplied
     /// when absent, the rule this file states at the top: a sender that has no opinion must not
     /// hand one over.
@@ -219,6 +222,8 @@ extension ProfileAppearancePayload {
             showPosterProgress: a.showPosterProgress,
             showCommunityRating: a.showCommunityRating,
             showCriticRating: a.showCriticRating,
+            showIMDbRating: a.showIMDbRating,
+            showTMDBRating: a.showTMDBRating,
             showTagline: a.showTagline,
             spoilerHideEpisodeTitles: a.spoilerHideEpisodeTitles,
             pinnedLibraryTabs: a.pinnedLibraryTabs,
@@ -247,6 +252,8 @@ extension ProfileAppearancePayload {
         a.showPosterProgress = showPosterProgress
         a.showCommunityRating = showCommunityRating
         a.showCriticRating = showCriticRating
+        if let showIMDbRating { a.showIMDbRating = showIMDbRating }
+        if let showTMDBRating { a.showTMDBRating = showTMDBRating }
         if let showTagline { a.showTagline = showTagline }
         if let spoilerHideEpisodeTitles { a.spoilerHideEpisodeTitles = spoilerHideEpisodeTitles }
         if let pinnedLibraryTabs { a.setPinnedLibraryTabs(pinnedLibraryTabs) }
