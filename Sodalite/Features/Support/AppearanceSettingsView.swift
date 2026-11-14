@@ -194,6 +194,22 @@ struct AppearanceSettingsView: View {
                                set: { appearance.showCriticRating = $0 })
             )
 
+            boolRow(
+                icon: "imdb",
+                title: "IMDb-Bewertung",
+                subtitle: "IMDb-Wertung auf Detailseiten anzeigen oder ausblenden.",
+                value: Binding(get: { appearance.showIMDbRating },
+                               set: { appearance.showIMDbRating = $0 })
+            )
+
+            boolRow(
+                icon: "tmdb",
+                title: "TMDB-Bewertung",
+                subtitle: "TMDB-Wertung auf Detailseiten anzeigen oder ausblenden.",
+                value: Binding(get: { appearance.showTMDBRating },
+                               set: { appearance.showTMDBRating = $0 })
+            )
+
             // Sodalite#146 round 4. Next to the scores because it is the same kind of choice: a
             // line of scraped copy on a detail page that a viewer may not want there.
             boolRow(
