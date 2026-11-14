@@ -82,7 +82,9 @@ struct MovieDetailView: View {
     /// Seerr service for the TMDB / IMDb / RT scores, nil without a Seerr connection or with both rating switches off.
     private var ratingsService: SeerrMediaServiceProtocol? {
         let prefs = dependencies.appearancePreferences
-        guard appState.isSeerrConnected, prefs.showCommunityRating || prefs.showCriticRating else { return nil }
+        guard appState.isSeerrConnected,
+              prefs.showCommunityRating || prefs.showCriticRating || prefs.showIMDbRating || prefs.showTMDBRating
+        else { return nil }
         return dependencies.seerrMediaService
     }
 
