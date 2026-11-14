@@ -136,7 +136,7 @@ struct MediaCard: View {
     private var itemInfo: some View {
         // Always render the subtitle slot (even empty) so cards keep equal height; poster titles and
         // their year share a centred baseline under the artwork.
-        VStack(alignment: style == .poster ? .center : .leading, spacing: style == .poster ? 4 : 2) {
+        VStack(alignment: style == .poster ? .center : .leading, spacing: style == .poster ? 6 : 2) {
             if style == .poster {
                 MediaCardMarqueeLabel(
                     text: displayTitle,
@@ -149,7 +149,7 @@ struct MediaCard: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .frame(width: cardWidth, height: 16, alignment: .center)
+                    .frame(width: cardWidth, height: 18, alignment: .center)
             } else {
                 Text(displayTitle)
                     .font(.caption)
@@ -313,7 +313,7 @@ private struct MediaCardMarqueeLabel: View {
             }
         }
         .onPreferenceChange(MediaCardTextWidthKey.self) { textWidth = $0 }
-        .frame(height: 16)
+        .frame(height: 22)
         .accessibilityLabel(Text(text))
     }
 }
