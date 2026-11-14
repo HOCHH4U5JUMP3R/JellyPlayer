@@ -672,7 +672,9 @@ struct SeriesDetailView: View {
             heroPosterURL: vm.seriesHeroPosterURL(for: vm.item, episode: initialEpisode),
             heroTallImageURL: tallBackdropURL,
             portraitHero: true,
+            #if os(tvOS)
             heroAtTop: true,
+            #endif
             hero: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(vm.item.name)
@@ -1229,6 +1231,9 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
+                .onMoveCommand { direction in
+                    if direction == .down { focusSeasonRow(vm: vm) }
+                }
 
                 InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
                     Task {
@@ -1241,6 +1246,9 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .trailer)
+                .onMoveCommand { direction in
+                    if direction == .down { focusSeasonRow(vm: vm) }
+                }
             }
         }
         .frame(maxWidth: 880, alignment: .leading)
@@ -1956,8 +1964,15 @@ struct SeriesDetailView: View {
                     .scrollClipDisabled()
                     #if os(tvOS)
                     .onMoveCommand { direction in
-                        guard direction == .down, let target = episodeEntryTarget(vm: vm) else { return }
-                        pendingEpisodeFocus = target
+                        switch direction {
+                        case .up:
+                            playButtonFocused = true
+                        case .down:
+                            guard let target = episodeEntryTarget(vm: vm) else { return }
+                            pendingEpisodeFocus = target
+                        default:
+                            break
+                        }
                     }
                     #endif
                     .onChange(of: focusedSeasonID) { oldID, newID in
