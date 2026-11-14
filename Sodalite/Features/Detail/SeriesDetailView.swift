@@ -669,12 +669,17 @@ struct SeriesDetailView: View {
     /// body has grown past what it should hold. Same shape MovieDetailView already has.
     @ViewBuilder
     private func contentOverlay(vm: DetailViewModel) -> some View {
+        #if os(tvOS)
+        let heroAtTop = true
+        #else
+        let heroAtTop = false
+        #endif
         DetailContentOverlay(
             heroImageURL: backdropURL,
             heroPosterURL: vm.seriesHeroPosterURL(for: vm.item, episode: initialEpisode),
             heroTallImageURL: tallBackdropURL,
             portraitHero: true,
-            heroAtTop: true,
+            heroAtTop: heroAtTop,
             hero: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(vm.item.name)
