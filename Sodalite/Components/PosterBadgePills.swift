@@ -16,7 +16,8 @@ struct PosterBadgePills: View {
             }
             ForEach(pills, id: \.self) { pill(Text($0)) }
         }
-        .padding(fontSize * 0.35)
+        // Fixed optical inset: poster, season and episode artwork share one corner line.
+        .padding(8)
     }
 
     private func ratingPill(_ rating: Double) -> some View {
