@@ -21,25 +21,24 @@ struct SeasonTab: View {
     var body: some View {
         VStack(alignment: .center, spacing: 5) {
             Button { action() } label: {
-                ZStack(alignment: .topLeading) {
-                    AsyncCachedImage(url: imageURL) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.Theme.surface)
-                            .overlay(Image(systemName: "tv").font(.title2).foregroundStyle(.tertiary))
-                    }
-                    .frame(width: 150, height: 225)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder((isFocused || isSelected) ? Color.accentColor : Color.clear,
-                                          lineWidth: (isFocused || isSelected) ? FocusStroke.width : 0)
-                    }
-
+                AsyncCachedImage(url: imageURL) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.Theme.surface)
+                        .overlay(Image(systemName: "tv").font(.title2).foregroundStyle(.tertiary))
+                }
+                .frame(width: 150, height: 225)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder((isFocused || isSelected) ? Color.accentColor : Color.clear,
+                                      lineWidth: (isFocused || isSelected) ? FocusStroke.width : 0)
+                }
+                .overlay(alignment: .topTrailing) {
                     ArtworkStateBadges(isPlayed: isPlayed, posterWidth: 150)
-                        .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity, alignment: Alignment.topTrailing)
-
+                }
+                .overlay(alignment: .topLeading) {
                     if dependencies.appearancePreferences.showPosterRating, let personalRating {
                         PosterRatingBadge(rating: personalRating, posterWidth: 150, scale: 1)
                     }
@@ -47,6 +46,8 @@ struct SeasonTab: View {
             }
             .buttonStyle(SeasonTabButtonStyle())
             .focused(focusedID, equals: id)
+            .scaleEffect(isFocused ? 1.05 : 1)
+            .zIndex(isFocused ? 1 : 0)
 
             Text(name)
                 .font(.system(size: 15, weight: .medium))
@@ -55,8 +56,6 @@ struct SeasonTab: View {
                 .frame(width: 150, alignment: .center)
                 .multilineTextAlignment(.center)
         }
-        .scaleEffect(isFocused ? 1.05 : 1)
-        .zIndex(isFocused ? 1 : 0)
         .animation(.easeOut(duration: 0.16), value: isFocused)
     }
 }

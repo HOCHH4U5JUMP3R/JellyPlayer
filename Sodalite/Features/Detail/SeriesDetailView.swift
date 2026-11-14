@@ -672,6 +672,9 @@ struct SeriesDetailView: View {
             heroPosterURL: vm.seriesHeroPosterURL(for: vm.item, episode: initialEpisode),
             heroTallImageURL: tallBackdropURL,
             portraitHero: true,
+            #if os(tvOS)
+            heroAtTop: true,
+            #endif
             hero: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(vm.item.name)
@@ -905,8 +908,7 @@ struct SeriesDetailView: View {
                         .foregroundStyle(.white)
                         .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
                     }
-                    if dependencies.appearancePreferences.showCommunityRating,
-                       let imdb = vm.externalRatings?.imdb, imdb > 0 {
+                    if let imdb = vm.externalRatings?.imdb, imdb > 0 {
                         NamedScoreLabel(source: "IMDb", score: imdb)
                     }
                     if dependencies.appearancePreferences.showCriticRating,
@@ -1001,6 +1003,7 @@ struct SeriesDetailView: View {
             isPending: overviewMayStillLand || isShowingEpisode,
             spoilerItem: displayItem,
             onTap: openMoreDetails,
+            focusedAction: $focusedAction,
             expandsInPlace: isPhonePortrait
         )
     }
@@ -1228,6 +1231,9 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
+                .onMoveCommand { direction in
+                    if direction == .down { focusSeasonRow(vm: vm) }
+                }
 
                 InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
                     Task {
@@ -1240,6 +1246,9 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .trailer)
+                .onMoveCommand { direction in
+                    if direction == .down { focusSeasonRow(vm: vm) }
+                }
             }
         }
         .frame(maxWidth: 880, alignment: .leading)
@@ -1862,7 +1871,7 @@ struct SeriesDetailView: View {
     private func focusSeasonRow(vm: DetailViewModel) {
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
-        } ?? vm.seasons.first?.id
+        } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
         guard let target else { return }
         var transaction = Transaction()
         transaction.disablesAnimations = true
@@ -1876,6 +1885,14 @@ struct SeriesDetailView: View {
            vm.episodes.contains(where: { $0.id == lastFocusedEpisodeID }) {
             return lastFocusedEpisodeID
         }
+        if let selectedID = selectedEpisode?.id,
+           vm.episodes.contains(where: { $0.id == selectedID }) {
+            return selectedID
+        }
+        if let currentID = vm.currentEpisodeID,
+           vm.episodes.contains(where: { $0.id == currentID }) {
+            return currentID
+        }
         return vm.episodes.first?.id
     }
 
@@ -1883,8 +1900,25 @@ struct SeriesDetailView: View {
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
-        } ?? vm.seasons.first?.id
+        } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
         focusedSeasonID = target
+    }
+
+    /// Warm the artwork that is visible on first entry. AsyncCachedImage already has a decoded
+    /// memory cache; this fills it before the user moves focus through the season/episode rails.
+    private func prefetchSeriesArtwork(vm: DetailViewModel) async {
+        let seasonURLs = vm.seasons.compactMap { vm.posterURL(for: $0) }
+        let currentIndex = vm.episodes.firstIndex(where: { $0.id == selectedEpisode?.id })
+            ?? vm.episodes.firstIndex(where: { $0.id == vm.currentEpisodeID })
+            ?? 0
+        let lower = max(0, currentIndex - 2)
+        let upper = min(vm.episodes.count, currentIndex + 4)
+        let episodeURLs = vm.episodes[lower..<upper].compactMap {
+            dependencies.jellyfinImageService.episodeThumbnailURL(for: $0)
+        }
+        let urls = Array(Set(seasonURLs + episodeURLs))
+        guard !urls.isEmpty else { return }
+        await ImageCache.prefetch(urls, auth: ImageAuth.snapshot(dependencies.sessionRegistry))
     }
 
     private func seasonSection(vm: DetailViewModel) -> some View {
@@ -1928,6 +1962,19 @@ struct SeriesDetailView: View {
                         .padding(.bottom, 32)
                     }
                     .scrollClipDisabled()
+                    #if os(tvOS)
+                    .onMoveCommand { direction in
+                        switch direction {
+                        case .up:
+                            playButtonFocused = true
+                        case .down:
+                            guard let target = episodeEntryTarget(vm: vm) else { return }
+                            pendingEpisodeFocus = target
+                        default:
+                            break
+                        }
+                    }
+                    #endif
                     .onChange(of: focusedSeasonID) { oldID, newID in
                         if let newID {
                             // The selected season is the authoritative vertical entry target.
@@ -2006,6 +2053,11 @@ struct SeriesDetailView: View {
                         }
                         .scrollPosition($episodeRowPosition)
                         .scrollClipDisabled()
+                        #if os(tvOS)
+                        .onMoveCommand { direction in
+                            if direction == .up { focusUpFromEpisodeRow(vm: vm) }
+                        }
+                        #endif
                     .onChange(of: vm.selectedSeasonID) { _, _ in
                         // A newly loaded season starts at the left edge; row entry restores its own remembered card.
                         episodeRowPosition.scrollTo(edge: .leading)
@@ -2057,6 +2109,9 @@ struct SeriesDetailView: View {
             }
         }
         .focusSectionCompat()
+        .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.seasons.count)|\(vm.episodes.count)|\(selectedEpisode?.id ?? "")") {
+            await prefetchSeriesArtwork(vm: vm)
+        }
     }
 
     /// An upright iPhone's season bar showed three tabs that filled the width exactly, so nothing said
