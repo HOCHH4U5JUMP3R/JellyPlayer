@@ -698,7 +698,7 @@ struct SeriesDetailView: View {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
                 #if os(tvOS)
-                if vm.hasFullDetail && !vm.isLoadingSeasons {
+                if vm.hasFullDetail {
                     actionButtonRow(vm: vm)
                 } else {
                     actionButtonSkeletonRow()
@@ -712,11 +712,9 @@ struct SeriesDetailView: View {
                 ScrollViewReader { outerProxy in
                     VStack(alignment: .leading, spacing: 8) {
                         #if os(tvOS)
-                        if vm.hasFullDetail && !vm.isLoadingSeasons {
-                            if !vm.seasons.isEmpty {
-                                seasonSection(vm: vm)
-                                    .id("episodeRow")
-                            }
+                        if !vm.seasons.isEmpty {
+                            seasonSection(vm: vm)
+                                .id("episodeRow")
                         } else {
                             seasonSectionSkeleton(vm: vm)
                                 .id("episodeRow")
@@ -778,11 +776,6 @@ struct SeriesDetailView: View {
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
-                        .onMoveCommand { direction in
-                            if direction == .up, let target = episodeEntryTarget(vm: vm) {
-                                pendingEpisodeFocus = target
-                            }
-                        }
                         .onChange(of: focusedCastID) { _, newID in
                             if let newID { lastFocusedCastID = newID }
                         }
@@ -810,7 +803,6 @@ struct SeriesDetailView: View {
                                 #endif
                             }
                         )
-                        .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast) { playButtonFocused = true }
                     }
 
                     if !vm.similarItems.isEmpty {
@@ -822,7 +814,6 @@ struct SeriesDetailView: View {
                             onItemSelected: { navigateToItem = $0 },
                             cardStyle: .poster
                         )
-                        .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast && !showsExtras) { playButtonFocused = true }
                     }
 
                     // Same split the search screen teaches: what the server has on top, what it
@@ -834,9 +825,6 @@ struct SeriesDetailView: View {
                             items: vm.catalogSimilar,
                             onItemSelected: { navigateToSeerrRequest = $0 }
                         )
-                        .onFocusMoveUp(active: !seasonBlockIsFirst && !hasCast && !showsExtras && vm.similarItems.isEmpty) {
-                            playButtonFocused = true
-                        }
                     }
 
                     // Sodalite#146: one non-focusable line closing the page with what the
@@ -905,7 +893,8 @@ struct SeriesDetailView: View {
                 .frame(height: 26, alignment: .leading)
 
                 HStack(spacing: 16) {
-                    if let communityRating = displayItem.communityRating ?? vm.item.communityRating {
+                    if dependencies.appearancePreferences.showCommunityRating,
+                       let communityRating = displayItem.communityRating ?? vm.item.communityRating {
                         HStack(spacing: 7) {
                             Image("JellyfinMark")
                                 .resizable()
@@ -915,6 +904,14 @@ struct SeriesDetailView: View {
                         }
                         .foregroundStyle(.white)
                         .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
+                    }
+                    if dependencies.appearancePreferences.showCommunityRating,
+                       let imdb = vm.externalRatings?.imdb, imdb > 0 {
+                        NamedScoreLabel(source: "IMDb", score: imdb)
+                    }
+                    if dependencies.appearancePreferences.showCriticRating,
+                       let rottenTomatoes = vm.externalRatings?.rottenTomatoes {
+                        RottenTomatoesLabel(score: rottenTomatoes)
                     }
                     if let personalRating = vm.rating(of: displayItem) {
                         HStack(spacing: 6) {
@@ -1004,7 +1001,6 @@ struct SeriesDetailView: View {
             isPending: overviewMayStillLand || isShowingEpisode,
             spoilerItem: displayItem,
             onTap: openMoreDetails,
-            focusedAction: $focusedAction,
             expandsInPlace: isPhonePortrait
         )
     }
@@ -1176,9 +1172,6 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .watched)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedAction = .play }
-                }
 
                 InfuseDetailActionButton(
                     title: "Bewerten",
@@ -1188,9 +1181,6 @@ struct SeriesDetailView: View {
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
                 .focused($focusedAction, equals: .rating)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedAction = .play }
-                }
 
                 InfuseDetailActionButton(
                     title: isShowingEpisode
@@ -1207,9 +1197,6 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .favorite)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedAction = .trailer }
-                }
 
                 InfuseDetailActionButton(
                     title: "Synchronisieren",
@@ -1229,9 +1216,6 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .sync)
-                .onMoveCommand { direction in
-                    if direction == .down { focusedAction = .trailer }
-                }
             }
 
             HStack(spacing: 12) {
@@ -1244,13 +1228,6 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
-                .onMoveCommand { direction in
-                    switch direction {
-                    case .up: focusedAction = .watched
-                    case .down: focusSeasonRow(vm: vm)
-                    default: break
-                    }
-                }
 
                 InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
                     Task {
@@ -1263,13 +1240,6 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .trailer)
-                .onMoveCommand { direction in
-                    switch direction {
-                    case .up: focusedAction = .favorite
-                    case .down: focusSeasonRow(vm: vm)
-                    default: break
-                    }
-                }
             }
         }
         .frame(maxWidth: 880, alignment: .leading)
@@ -1948,18 +1918,6 @@ struct SeriesDetailView: View {
                                 )
                                 .id(season.id)
                                 // Resolve vertical navigation at the row, not by screen-space proximity.
-                                .onMoveCommand { direction in
-                                    switch direction {
-                                    case .up:
-                                        playButtonFocused = true
-                                    case .down:
-                                        if let target = episodeEntryTarget(vm: vm) {
-                                            pendingEpisodeFocus = target
-                                        }
-                                    default:
-                                        break
-                                    }
-                                }
                                 .contextMenu { seasonActions(season, vm: vm) }
                             }
                         }
@@ -2007,7 +1965,7 @@ struct SeriesDetailView: View {
                 }
             }
 
-            if vm.episodes.isEmpty && vm.isLoadingEpisodes {
+            if vm.episodes.isEmpty && (vm.isLoadingEpisodes || vm.isLoadingSeasons) {
                 episodeSkeletonRow(vm: vm)
             } else if !vm.episodes.isEmpty {
                 // Resolved once for the row: the ring reads the same target the Play button acts on, so the two cannot name different episodes.
@@ -2029,29 +1987,6 @@ struct SeriesDetailView: View {
                                     .buttonStyle(EpisodeCardButtonStyle())
                                     .focused($focusedEpisodeID, equals: episode.id)
                                     // Prime the season-bar target before the up-move resolves, else tvOS's geographic picker skips the bar (far-right episode outside the tabs' span) and lands on the overview above.
-                                    #if os(tvOS)
-                                    .onMoveCommand { direction in
-                                        switch direction {
-                                        case .up:
-                                            focusUpFromEpisodeRow(vm: vm)
-                                        case .down:
-                                            if let people = vm.item.people, !people.isEmpty {
-                                                let cast = jellyfinCastMembers(
-                                                    from: people,
-                                                    imageService: dependencies.jellyfinImageService,
-                                                    imageWidth: metrics.castImageWidth,
-                                                    serverID: vm.item.serverID
-                                                )
-                                                let target = lastFocusedCastID.flatMap { remembered in
-                                                    cast.contains(where: { $0.id == remembered }) ? remembered : nil
-                                                } ?? cast.first?.id
-                                                focusedCastID = target
-                                            }
-                                        default:
-                                            break
-                                        }
-                                    }
-                                    #endif
                                     // The system preview, deliberately: it snapshots the real view
                                     // in the real environment, so it carries the accent, the theme
                                     // and the page's own ground. A hand-built one is a second view

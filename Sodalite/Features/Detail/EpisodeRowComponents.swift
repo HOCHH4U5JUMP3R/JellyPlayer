@@ -42,7 +42,6 @@ struct SeasonTab: View {
 
                     if dependencies.appearancePreferences.showPosterRating, let personalRating {
                         PosterRatingBadge(rating: personalRating, posterWidth: 150, scale: 1)
-                            .padding(PosterBadgeMetrics.checkInset(posterWidth: 150, scale: 1))
                     }
                 }
             }
@@ -212,10 +211,6 @@ struct EpisodeLandscapeCard: View {
                     posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width,
                     scale: dependencies.appearancePreferences.cardScale
                 )
-                .padding(PosterBadgeMetrics.checkInset(
-                    posterWidth: LayoutMetrics.current(hSizeClass).posterSize.width,
-                    scale: dependencies.appearancePreferences.cardScale
-                ))
                 .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity, alignment: Alignment.topLeading)
             }
             VStack(spacing: 3) {
