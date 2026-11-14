@@ -58,7 +58,7 @@ struct DetailHeroSynopsis: View {
         if let text, !text.isEmpty {
             Text(text)
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isFocused ? .white : .secondary)
                 .lineLimit(isExpanded ? .max : lineCount, reservesSpace: !isExpanded)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,11 +84,17 @@ struct DetailHeroSynopsis: View {
             .contentShape(RoundedRectangle(cornerRadius: 13))
             // Match the secondary action buttons' quiet focus fill without turning the
             // synopsis into a Button (which reintroduced the bright system hover plate).
-            .background {
-                RoundedRectangle(cornerRadius: 13)
-                    .fill(Color.white.opacity(isFocused ? 0.28 : 0.10))
-                    .animation(.easeOut(duration: 0.12), value: isFocused)
+            .overlay(alignment: .bottomLeading) {
+                if isFocused {
+                    Capsule()
+                        .fill(Color.white.opacity(0.9))
+                        .frame(width: 34, height: 2)
+                        .padding(.leading, 2)
+                        .padding(.bottom, 1)
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeOut(duration: 0.12), value: isFocused)
             .onTapGesture { onTap?() }
     }
     #endif
