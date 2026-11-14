@@ -91,11 +91,10 @@ struct ItemMetadataRow: View {
             out.append(Segment(view: AnyView(StarScoreLabel(score: community))))
         }
         // External IMDb is independent of the Jellyfin Community switch.
-        if let imdb = ratings.imdb {
+        if dependencies.appearancePreferences.showIMDbRating, let imdb = ratings.imdb {
             out.append(Segment(view: AnyView(NamedScoreLabel(source: "IMDb", score: imdb))))
         }
-        if item.type == .movie, dependencies.appearancePreferences.showCommunityRating,
-           let tmdb = ratings.tmdb {
+        if dependencies.appearancePreferences.showTMDBRating, let tmdb = ratings.tmdb {
             out.append(Segment(view: AnyView(NamedScoreLabel(source: "TMDB", score: tmdb))))
         }
         if let critic = ratings.rottenTomatoes,
