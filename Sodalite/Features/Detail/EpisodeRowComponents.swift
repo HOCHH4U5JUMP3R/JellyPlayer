@@ -46,6 +46,8 @@ struct SeasonTab: View {
             }
             .buttonStyle(SeasonTabButtonStyle())
             .focused(focusedID, equals: id)
+            .scaleEffect(isFocused ? 1.05 : 1)
+            .zIndex(isFocused ? 1 : 0)
 
             Text(name)
                 .font(.system(size: 15, weight: .medium))
@@ -54,8 +56,6 @@ struct SeasonTab: View {
                 .frame(width: 150, alignment: .center)
                 .multilineTextAlignment(.center)
         }
-        .scaleEffect(isFocused ? 1.05 : 1)
-        .zIndex(isFocused ? 1 : 0)
         .animation(.easeOut(duration: 0.16), value: isFocused)
     }
 }
