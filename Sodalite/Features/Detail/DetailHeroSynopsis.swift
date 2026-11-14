@@ -58,7 +58,7 @@ struct DetailHeroSynopsis: View {
         if let text, !text.isEmpty {
             Text(text)
                 .font(.body)
-                .foregroundStyle(isFocused ? .white : .secondary)
+                .foregroundStyle(isFocused ? Color.white : Color.secondary)
                 .lineLimit(isExpanded ? .max : lineCount, reservesSpace: !isExpanded)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -110,13 +110,17 @@ struct DetailHeroSynopsis: View {
                     .onMoveCommand { direction in
                         if direction == .down { focusedAction.wrappedValue = .watched }
                     }
-            } else {
+            } else if let onMoveDown {
                 tvSynopsisSurface
                     .focusable()
                     .focusEffectDisabled(true)
                     .onMoveCommand { direction in
-                        if direction == .down { onMoveDown?() }
+                        if direction == .down { onMoveDown() }
                     }
+            } else {
+                tvSynopsisSurface
+                    .focusable()
+                    .focusEffectDisabled(true)
             }
         }
         #else
