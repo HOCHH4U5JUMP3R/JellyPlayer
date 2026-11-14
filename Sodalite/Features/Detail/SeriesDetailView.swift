@@ -86,7 +86,9 @@ struct SeriesDetailView: View {
     /// Seerr service for the TMDB / IMDb / RT scores, nil without a Seerr connection or with both rating switches off.
     private var ratingsService: SeerrMediaServiceProtocol? {
         let prefs = dependencies.appearancePreferences
-        guard appState.isSeerrConnected, prefs.showCommunityRating || prefs.showCriticRating else { return nil }
+        guard appState.isSeerrConnected,
+              prefs.showCommunityRating || prefs.showCriticRating || prefs.showIMDbRating || prefs.showTMDBRating
+        else { return nil }
         return dependencies.seerrMediaService
     }
 
@@ -672,9 +674,7 @@ struct SeriesDetailView: View {
             heroPosterURL: vm.seriesHeroPosterURL(for: vm.item, episode: initialEpisode),
             heroTallImageURL: tallBackdropURL,
             portraitHero: true,
-            #if os(tvOS)
             heroAtTop: true,
-            #endif
             hero: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(vm.item.name)
@@ -908,8 +908,13 @@ struct SeriesDetailView: View {
                         .foregroundStyle(.white)
                         .accessibilityLabel("Jellyfin-Bewertung \(communityRating.formatted(.number.precision(.fractionLength(1))))")
                     }
-                    if let imdb = vm.externalRatings?.imdb, imdb > 0 {
+                    if dependencies.appearancePreferences.showIMDbRating,
+                       let imdb = vm.externalRatings?.imdb, imdb > 0 {
                         NamedScoreLabel(source: "IMDb", score: imdb)
+                    }
+                    if dependencies.appearancePreferences.showTMDBRating,
+                       let tmdb = vm.externalRatings?.tmdb, tmdb > 0 {
+                        NamedScoreLabel(source: "TMDB", score: tmdb)
                     }
                     if dependencies.appearancePreferences.showCriticRating,
                        let rottenTomatoes = vm.externalRatings?.rottenTomatoes {
