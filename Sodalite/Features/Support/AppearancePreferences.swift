@@ -102,6 +102,8 @@ final class AppearancePreferences {
         static let showPosterRating = "appearance.showPosterRating"
         static let showCommunityRating = "appearance.showCommunityRating"
         static let showCriticRating = "appearance.showCriticRating"
+        static let showIMDbRating = "appearance.showIMDbRating"
+        static let showTMDBRating = "appearance.showTMDBRating"
         static let showTagline = "appearance.showTagline"
     }
 
@@ -219,6 +221,16 @@ final class AppearancePreferences {
     /// Sodalite#127. The Rotten Tomatoes tomatometer, wherever it is drawn.
     var showCriticRating: Bool {
         didSet { store.set(showCriticRating, forKey: Keys.showCriticRating) }
+    }
+
+    /// Controls the IMDb score independently from Jellyfin Community and Rotten Tomatoes.
+    var showIMDbRating: Bool {
+        didSet { store.set(showIMDbRating, forKey: Keys.showIMDbRating) }
+    }
+
+    /// Controls the TMDB score independently from Jellyfin Community and Rotten Tomatoes.
+    var showTMDBRating: Bool {
+        didSet { store.set(showTMDBRating, forKey: Keys.showTMDBRating) }
     }
 
     /// Sodalite#146 round 4. The marketing line a detail page sets against its metadata row. On by
@@ -352,6 +364,8 @@ final class AppearancePreferences {
         self.showPosterRating = store.object(forKey: Keys.showPosterRating) as? Bool ?? false
         self.showCommunityRating = store.object(forKey: Keys.showCommunityRating) as? Bool ?? true
         self.showCriticRating = store.object(forKey: Keys.showCriticRating) as? Bool ?? true
+        self.showIMDbRating = store.object(forKey: Keys.showIMDbRating) as? Bool ?? true
+        self.showTMDBRating = store.object(forKey: Keys.showTMDBRating) as? Bool ?? true
         self.showTagline = store.object(forKey: Keys.showTagline) as? Bool ?? true
         self.navigationStyle = store.string(forKey: Keys.navigationStyle)
             .flatMap(NavigationStyle.init(rawValue:)) ?? .topBar
