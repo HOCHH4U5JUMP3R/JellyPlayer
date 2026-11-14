@@ -107,6 +107,9 @@ struct DetailHeroSynopsis: View {
             if let focusedAction {
                 tvSynopsisSurface
                     .focused(focusedAction, equals: .synopsis)
+                    .onMoveCommand { direction in
+                        if direction == .down { focusedAction.wrappedValue = .watched }
+                    }
             } else if let onMoveDown {
                 tvSynopsisSurface
             } else {
