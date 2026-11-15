@@ -2312,8 +2312,6 @@ struct SeriesDetailView: View {
                         .padding(.vertical, 6)
                     }
                     .scrollPosition($episodeRowPosition)
-                    #if os(tvOS)
-                    #endif
                     .scrollClipDisabled()
                     #if os(tvOS)
                     .onMoveCommand { direction in
