@@ -2106,6 +2106,8 @@ struct SeriesDetailView: View {
                     focusSeasonRow(vm: vm)
                 case .synopsis:
                     break
+                default:
+                    break
                 }
             } else if focusedSeasonID != nil {
                 focusEpisodeRow(vm: vm, targetSeasonID: focusedSeasonID ?? vm.selectedSeasonID)
@@ -2127,6 +2129,8 @@ struct SeriesDetailView: View {
                     focusAction(actionAbovePlay)
                 case .trailer:
                     focusAction(actionAboveTrailer)
+                default:
+                    break
                 }
             } else if focusedCatalogID != nil {
                 focusFirstSimilar(vm: vm)
