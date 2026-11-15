@@ -75,10 +75,14 @@ struct DetailHeroSynopsis: View {
     }
 
     #if os(tvOS)
-    private var tvSynopsisSurface: some View {
+    private func tvSynopsisSurface(isFocused: Bool) -> some View {
         synopsisText
-            .padding(.horizontal, 1)
-            .padding(.vertical, 1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.white.opacity(isFocused ? 0.055 : 0))
+            }
             .contentShape(Rectangle())
             .focusable()
             .focusEffectDisabled(true)
@@ -90,18 +94,18 @@ struct DetailHeroSynopsis: View {
         #if os(tvOS)
         Group {
             if let focusedAction {
-                tvSynopsisSurface
+                tvSynopsisSurface(isFocused: focusedAction.wrappedValue == .synopsis)
                     .focused(focusedAction, equals: .synopsis)
                     .onMoveCommand { direction in
                         if direction == .down { onMoveDown?() }
                     }
             } else if onMoveDown != nil {
-                tvSynopsisSurface
+                tvSynopsisSurface(isFocused: false)
                     .onMoveCommand { direction in
                         if direction == .down { onMoveDown?() }
                     }
             } else {
-                tvSynopsisSurface
+                tvSynopsisSurface(isFocused: false)
             }
         }
         #else
