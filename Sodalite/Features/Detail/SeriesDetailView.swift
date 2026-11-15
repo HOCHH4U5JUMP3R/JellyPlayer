@@ -59,6 +59,7 @@ struct SeriesDetailView: View {
     @FocusState private var focusedAction: DetailAction?
     @State private var actionAbovePlay: DetailAction = .watched
     @State private var actionAboveTrailer: DetailAction = .favorite
+    @State private var actionBelowSynopsis: DetailAction = .watched
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
     /// Sodalite#146 round 3: Watched on a SERIES is the one control on the page that cannot be
@@ -879,6 +880,9 @@ struct SeriesDetailView: View {
                 }
         }
         .modifier(PageScrollProxyCapture(proxy: $pageScrollProxy))
+        #if os(tvOS)
+        .defaultFocus($focusedAction, .play, priority: .userInitiated)
+        #endif
         .transition(.opacity)
     }
 
@@ -1101,6 +1105,7 @@ struct SeriesDetailView: View {
             spoilerItem: displayItem,
             onTap: openMoreDetails,
             focusedAction: $focusedAction,
+            onMoveDown: { focusAction(actionBelowSynopsis) },
             expandsInPlace: isPhonePortrait
         )
     }
@@ -1274,7 +1279,7 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .watched)
                 .onMoveCommand { direction in
                     switch direction {
-                    case .up: focusSynopsis()
+                    case .up: focusSynopsis(from: .watched)
                     case .down:
                         actionAbovePlay = .watched
                         focusAction(.play)
@@ -1292,7 +1297,7 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .rating)
                 .onMoveCommand { direction in
                     switch direction {
-                    case .up: focusSynopsis()
+                    case .up: focusSynopsis(from: .rating)
                     case .down:
                         actionAbovePlay = .rating
                         focusAction(.play)
@@ -1317,7 +1322,7 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .favorite)
                 .onMoveCommand { direction in
                     switch direction {
-                    case .up: focusSynopsis()
+                    case .up: focusSynopsis(from: .favorite)
                     case .down:
                         actionAboveTrailer = .favorite
                         focusAction(.trailer)
@@ -1345,7 +1350,7 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .sync)
                 .onMoveCommand { direction in
                     switch direction {
-                    case .up: focusSynopsis()
+                    case .up: focusSynopsis(from: .sync)
                     case .down:
                         actionAboveTrailer = .sync
                         focusAction(.trailer)
@@ -1393,7 +1398,6 @@ struct SeriesDetailView: View {
             }
         }
         .frame(maxWidth: 880, alignment: .leading)
-        .defaultFocus($focusedAction, .play)
         #else
         Group {
             if isPhonePortrait {
@@ -2023,7 +2027,8 @@ struct SeriesDetailView: View {
         }
     }
 
-    private func focusSynopsis() {
+    private func focusSynopsis(from action: DetailAction) {
+        actionBelowSynopsis = action
         focusAction(.synopsis)
     }
 
@@ -2057,14 +2062,12 @@ struct SeriesDetailView: View {
             let target: String?
             if let targetEpisodeID, vm.episodes.contains(where: { $0.id == targetEpisodeID }) {
                 target = targetEpisodeID
-            } else if let season = vm.seasons.first(where: { $0.id == seasonID }),
-                      vm.isSeasonPlayed(season) {
-                target = vm.episodes.last?.id
-            } else if let currentID = vm.currentEpisodeID,
-                      vm.episodes.contains(where: { $0.id == currentID }) {
-                target = currentID
+            } else if let remembered = lastFocusedEpisodeBySeason[seasonID],
+                      vm.episodes.contains(where: { $0.id == remembered }) {
+                target = remembered
             } else {
-                target = vm.episodes.first(where: { !vm.isPlayed($0) })?.id ?? vm.episodes.first?.id
+                // A row that has never held focus starts at its leftmost episode.
+                target = vm.episodes.first?.id
             }
             guard let target else { return }
             lastFocusedSeasonID = seasonID
@@ -2164,7 +2167,6 @@ struct SeriesDetailView: View {
             seasonTabsSection(vm: vm)
             episodeCardsSection(vm: vm)
         }
-        .focusSectionCompat()
         .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.isLoadingSeasons)|\(vm.isLoadingEpisodes)") {
             await prefetchSeriesArtwork(vm: vm)
         }
@@ -2204,6 +2206,7 @@ struct SeriesDetailView: View {
                     .padding(.bottom, 32)
                 }
                 .scrollClipDisabled()
+                .focusSectionCompat()
                 #if os(tvOS)
                 .onMoveCommand { direction in
                     switch direction {
@@ -2313,6 +2316,7 @@ struct SeriesDetailView: View {
                     }
                     .scrollPosition($episodeRowPosition)
                     .scrollClipDisabled()
+                    .focusSectionCompat()
                     #if os(tvOS)
                     .onMoveCommand { direction in
                         switch direction {
@@ -2358,6 +2362,19 @@ struct SeriesDetailView: View {
                 // Keep the horizontal scroll position owned by episodeRowPosition.
                 // Re-centering on every appearance caused the row to jump when returning
                 // from Cast / Similar / Catalog.
+                }
+                // Show the current episode inside the five-card viewport without taking focus
+                // away from the Play action on initial entry.
+                .task(id: "\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.nextUpEpisode?.id ?? "")") {
+                    guard !vm.episodes.isEmpty else { return }
+                    let targetID = selectedEpisode?.id.flatMap { id in
+                        vm.episodes.contains(where: { $0.id == id }) ? id : nil
+                    } ?? vm.nextUpEpisode?.id.flatMap { id in
+                        vm.episodes.contains(where: { $0.id == id }) ? id : nil
+                    } ?? initialEpisodeFocusTarget(vm: vm)
+                    guard let targetID else { return }
+                    await Task.yield()
+                    episodeProxy.scrollTo(targetID, anchor: .center)
                 }
                 .frame(height: 110)
             }
