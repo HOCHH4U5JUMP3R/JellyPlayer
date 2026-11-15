@@ -84,17 +84,7 @@ struct DetailHeroSynopsis: View {
                 .padding(.horizontal, 1)
                 .padding(.vertical, 1)
                 .contentShape(Rectangle())
-                .overlay(alignment: .bottomLeading) {
-                    if isFocused {
-                        Capsule()
-                            .fill(Color.white.opacity(0.55))
-                            .frame(width: 18, height: 1)
-                            .padding(.leading, 1)
-                            .padding(.bottom, 0)
-                            .transition(.opacity)
-                    }
-                }
-                .animation(.easeOut(duration: 0.12), value: isFocused)
+                .animation(nil, value: isFocused)
         }
         .buttonStyle(PlainButtonStyle())
         .focusEffectDisabled(true)
@@ -108,10 +98,13 @@ struct DetailHeroSynopsis: View {
                 tvSynopsisSurface
                     .focused(focusedAction, equals: .synopsis)
                     .onMoveCommand { direction in
-                        if direction == .down { focusedAction.wrappedValue = .watched }
+                        if direction == .down { onMoveDown?() }
                     }
-            } else if let onMoveDown {
+            } else if onMoveDown != nil {
                 tvSynopsisSurface
+                    .onMoveCommand { direction in
+                        if direction == .down { onMoveDown?() }
+                    }
             } else {
                 tvSynopsisSurface
             }
