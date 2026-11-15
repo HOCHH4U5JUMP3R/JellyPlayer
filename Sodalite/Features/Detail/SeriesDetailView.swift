@@ -2369,6 +2369,8 @@ struct SeriesDetailView: View {
                     guard !vm.episodes.isEmpty else { return }
                     let targetID = selectedEpisode?.id.flatMap { id in
                         vm.episodes.contains(where: { $0.id == id }) ? id : nil
+                    } ?? vm.nextUpEpisode?.id.flatMap { id in
+                        vm.episodes.contains(where: { $0.id == id }) ? id : nil
                     } ?? initialEpisodeFocusTarget(vm: vm)
                     guard let targetID else { return }
                     await Task.yield()
