@@ -259,6 +259,11 @@ struct SeriesDetailView: View {
                 .transition(.opacity)
             }
         }
+        #if os(tvOS)
+        // Keep the default-focus scope outside the loading/content switch so it survives
+        // the transition from the loading anchor to the actual Play button.
+        .defaultFocus($playButtonFocused, true, priority: .userInitiated)
+        #endif
         .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
         // Back/Menu always leaves the detail page. The in-page "Show Series" action remains the
         // explicit way to switch from an episode panel back to the series overview; intercepting
@@ -877,9 +882,6 @@ struct SeriesDetailView: View {
                 }
         }
         .modifier(PageScrollProxyCapture(proxy: $pageScrollProxy))
-        #if os(tvOS)
-        .defaultFocus($playButtonFocused, true, priority: .userInitiated)
-        #endif
         .transition(.opacity)
     }
 
