@@ -2376,7 +2376,7 @@ struct SeriesDetailView: View {
     }
 
     private func episodeCardTile(
-        _ episode: BaseItemDto,
+        _ episode: JellyfinItem,
         vm: DetailViewModel,
         playTargetID: String?,
         cardSize: CGSize
