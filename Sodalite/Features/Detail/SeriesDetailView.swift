@@ -712,7 +712,6 @@ struct SeriesDetailView: View {
                 #if os(tvOS)
                 if vm.hasFullDetail {
                     actionButtonRow(vm: vm)
-                        .defaultFocus($focusedAction, .play, priority: .userInitiated)
                 } else {
                     actionButtonSkeletonRow()
                 }
@@ -861,6 +860,7 @@ struct SeriesDetailView: View {
         }
         .modifier(PageScrollProxyCapture(proxy: $pageScrollProxy))
         #if os(tvOS)
+        .defaultFocus($focusedAction, .play, priority: .userInitiated)
         .onMoveCommand { direction in
             handleDetailMove(direction, vm: vm)
         }
@@ -1223,20 +1223,26 @@ struct SeriesDetailView: View {
                         .fill(Color.white.opacity(0.10))
                         .frame(maxWidth: .infinity)
                         .frame(height: 62)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
             }
             HStack(spacing: 12) {
-                ForEach(0..<2, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 13)
-                        .fill(Color.white.opacity(0.10))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 62)
+                InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
+                    pendingPlayRequest = true
                 }
+                .focused($focusedAction, equals: .play)
+                .focused($playButtonFocused)
+
+                RoundedRectangle(cornerRadius: 13)
+                    .fill(Color.white.opacity(0.10))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 62)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
         }
         .frame(maxWidth: 880, alignment: .leading)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
     #endif
 
