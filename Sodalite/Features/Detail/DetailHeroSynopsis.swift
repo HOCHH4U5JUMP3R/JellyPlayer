@@ -37,7 +37,6 @@ struct DetailHeroSynopsis: View {
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.dependencies) private var dependencies
     @Environment(\.appState) private var appState
-    @Environment(\.isFocused) private var isFocused
 
     /// Two lines in a short viewport (iPhone landscape), where the first page is not viewport-locked
     /// and every added line pushes the action row further past the fold, and in the upright
@@ -77,17 +76,13 @@ struct DetailHeroSynopsis: View {
 
     #if os(tvOS)
     private var tvSynopsisSurface: some View {
-        Button {
-            onTap?()
-        } label: {
-            synopsisText
-                .padding(.horizontal, 1)
-                .padding(.vertical, 1)
-                .contentShape(Rectangle())
-                .animation(nil, value: isFocused)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .focusEffectDisabled(true)
+        synopsisText
+            .padding(.horizontal, 1)
+            .padding(.vertical, 1)
+            .contentShape(Rectangle())
+            .focusable()
+            .focusEffectDisabled(true)
+            .onTapGesture { onTap?() }
     }
     #endif
 
