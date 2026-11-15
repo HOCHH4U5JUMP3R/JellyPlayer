@@ -2036,6 +2036,7 @@ struct SeriesDetailView: View {
             if vm.selectedSeasonID != seasonID || vm.episodes.isEmpty {
                 await vm.loadEpisodes(seasonID: seasonID)
             }
+            guard vm.selectedSeasonID == seasonID else { return }
             let target: String?
             if let targetEpisodeID, vm.episodes.contains(where: { $0.id == targetEpisodeID }) {
                 target = targetEpisodeID
@@ -2096,8 +2097,12 @@ struct SeriesDetailView: View {
 
     #if os(tvOS)
     private func focusSeasonRow(vm: DetailViewModel) {
-        // Play/Trailer return to the active season; loadSeasons selects season one when there is no Next Up.
-        guard let target = vm.selectedSeasonID ?? vm.seasons.first?.id else { return }
+        // Return to Next Up's season. With no current/next episode (all watched or no history),
+        // the series fallback is always season one, never whichever tab happened to be selected last.
+        let currentSeasonID = vm.nextUpEpisode?.seasonId
+            ?? vm.episodes.first(where: { $0.id == vm.currentEpisodeID })?.seasonId
+            ?? (initialEpisode == nil ? nil : vm.selectedSeasonID)
+        guard let target = currentSeasonID ?? vm.seasons.first?.id else { return }
         setFocusWithoutAnimation { focusedSeasonID = target }
     }
 
@@ -2200,9 +2205,15 @@ struct SeriesDetailView: View {
                             if selectedEpisode == nil {
                                 episodeOrigin.openedFromSeries()
                             }
+                            #if os(tvOS)
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) { selectedEpisode = episode }
+                            #else
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedEpisode = episode
                             }
+                            #endif
                         }
 
                         if let newEpisode,
