@@ -791,9 +791,9 @@ struct SeriesDetailView: View {
                             switch direction {
                             case .up:
                                 let remembered = episodeAim.rememberedID
-                ?? focusedEpisodeID
-                ?? vm.selectedSeasonID.flatMap { lastFocusedEpisodeBySeason[$0] }
-            focusEpisodeRow(vm: vm, targetEpisodeID: remembered)
+                                    ?? focusedEpisodeID
+                                    ?? vm.selectedSeasonID.flatMap { lastFocusedEpisodeBySeason[$0] }
+                                focusEpisodeRow(vm: vm, targetEpisodeID: remembered)
                             case .down:
                                 focusFirstSimilar(vm: vm)
                             default:
@@ -2079,7 +2079,10 @@ struct SeriesDetailView: View {
         if let first = castMembers(vm: vm).first {
             setFocusWithoutAnimation { focusedCastID = first.id }
         } else {
-            focusEpisodeRow(vm: vm, targetEpisodeID: episodeAim.rememberedID ?? focusedEpisodeID)
+            let remembered = episodeAim.rememberedID
+                ?? focusedEpisodeID
+                ?? vm.selectedSeasonID.flatMap { lastFocusedEpisodeBySeason[$0] }
+            focusEpisodeRow(vm: vm, targetEpisodeID: remembered)
         }
     }
 
