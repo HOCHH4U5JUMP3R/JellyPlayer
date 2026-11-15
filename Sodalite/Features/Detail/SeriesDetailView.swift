@@ -2363,9 +2363,6 @@ struct SeriesDetailView: View {
                 }
                 .frame(height: 110)
             }
-        }
-        }
-
     }
 
     /// An upright iPhone's season bar showed three tabs that filled the width exactly, so nothing said
