@@ -20,6 +20,8 @@ struct HorizontalMediaRow: View {
     var onShowAll: (() -> Void)? = nil
     /// Overrides the tier's row inset so the row can line up with a host screen that insets differently.
     var inset: CGFloat? = nil
+    /// Optional host-controlled focus target used by detail pages.
+    var focusedID: FocusState<String?>.Binding? = nil
 
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.shellPaysLeadingInset) private var shellPaysLeading
@@ -30,6 +32,15 @@ struct HorizontalMediaRow: View {
     /// has to start where every other row on the same TV starts.
     private var leadingInset: CGFloat {
         shellPaysLeading ? metrics.rowLeading(shellPaysLeading: true) : rowInset
+    }
+
+    @ViewBuilder
+    private func bindingFocus<Content: View>(_ card: Content, to id: String) -> some View {
+        if let focusedID {
+            card.focused(focusedID, equals: id)
+        } else {
+            card
+        }
     }
 
     var body: some View {
@@ -51,20 +62,23 @@ struct HorizontalMediaRow: View {
                 LazyHStack(spacing: metrics.itemSpacing) {
                     // Per server: two servers can carry the same id, and a repeated identity draws a blank card.
                     ForEach(items, id: \.originKey) { item in
-                        FocusableCard(opensMenuOnHold: true) {
-                            onItemSelected?(item)
-                        } content: { isFocused in
-                            MediaCard(
-                                item: item,
-                                imageURL: imageURLProvider(item),
-                                fallbackURL: fallbackURLProvider?(item),
-                                style: cardStyle,
-                                isFocused: isFocused,
-                                showsSeriesArtwork: showsSeriesArtwork,
-                                serverLabel: itemLabel?(item)
-                            )
-                        }
-                        .mediaContextMenu(for: item) { onItemSelected?($0) }
+                        bindingFocus(
+                            FocusableCard(opensMenuOnHold: true) {
+                                onItemSelected?(item)
+                            } content: { isFocused in
+                                MediaCard(
+                                    item: item,
+                                    imageURL: imageURLProvider(item),
+                                    fallbackURL: fallbackURLProvider?(item),
+                                    style: cardStyle,
+                                    isFocused: isFocused,
+                                    showsSeriesArtwork: showsSeriesArtwork,
+                                    serverLabel: itemLabel?(item)
+                                )
+                            }
+                            .mediaContextMenu(for: item) { onItemSelected?($0) },
+                            to: item.originKey
+                        )
                     }
                     if let onShowAll {
                         FocusableCard(action: onShowAll, exposesButtonSemantics: true) { isFocused in
