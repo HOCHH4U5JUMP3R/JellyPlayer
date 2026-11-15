@@ -2094,13 +2094,10 @@ struct SeriesDetailView: View {
     #endif
 
     private func focusSeasonRow(vm: DetailViewModel) {
-        let target = lastFocusedSeasonID.flatMap { remembered in
-            vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
-        } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
-        guard let target else { return }
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) { focusedSeasonID = target }
+        // Play/Trailer always return to the active season. If there is no Next Up target,
+        // loadSeasons() has already selected season one as the all-watched fallback.
+        guard let target = vm.selectedSeasonID ?? vm.seasons.first?.id else { return }
+        setFocusWithoutAnimation { focusedSeasonID = target }
     }
 
     /// Restore the last card used IN THIS SEASON. On first entry, prefer the selected/current
@@ -2127,7 +2124,8 @@ struct SeriesDetailView: View {
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
         } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
-        focusedSeasonID = target
+        guard let target else { return }
+        setFocusWithoutAnimation { focusedSeasonID = target }
     }
 
     /// Warm the artwork that is visible on first entry. AsyncCachedImage already has a decoded
@@ -2311,19 +2309,15 @@ struct SeriesDetailView: View {
                     .onChange(of: pendingEpisodeFocus) { _, target in
                         guard let target else { return }
                         // Scroll the target into the LazyHStack so its .focused modifier exists when we write focusedEpisodeID, else the write silently fails for an unrendered card (right-side 2-press case).
-                        if pendingEpisodeFocusIsReturn {
-                            // Back from the player the row can be many cards away. The focus write below
-                            // lands 50 ms into a 0.2 s animation, the focus engine takes the scroll over and
-                            // the row stopped short of the focused card, so it jumps there instead.
-                            pendingEpisodeFocusIsReturn = false
-                            episodeProxy.scrollTo(target, anchor: .center)
-                        } else {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                episodeProxy.scrollTo(target, anchor: .center)
-                            }
-                        }
+                        // Materialize and center the destination before moving focus. No animated
+                        // scroll is used here: tvOS otherwise interrupts it with its own focus scroll,
+                        // producing the visible double-jump/ghost transition.
+                        pendingEpisodeFocusIsReturn = false
+                        episodeProxy.scrollTo(target, anchor: .center)
                         deferOnMain {
-                            focusedEpisodeID = target
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) { focusedEpisodeID = target }
                             pendingEpisodeFocus = nil
                         }
                     }
