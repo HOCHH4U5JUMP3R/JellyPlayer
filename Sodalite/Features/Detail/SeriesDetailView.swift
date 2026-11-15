@@ -2336,8 +2336,8 @@ struct SeriesDetailView: View {
             }
         }
         .focusSectionCompat()
-        .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")") {
-            if !didSetInitialEpisodeFocus, !vm.episodes.isEmpty {
+        .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.isLoadingSeasons)|\(vm.isLoadingEpisodes)") {
+            if !didSetInitialEpisodeFocus, !vm.isLoadingSeasons, !vm.isLoadingEpisodes, !vm.episodes.isEmpty {
                 if let target = initialEpisodeFocusTarget(vm: vm) {
                     didSetInitialEpisodeFocus = true
                     pendingEpisodeFocus = target
