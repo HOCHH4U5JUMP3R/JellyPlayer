@@ -117,8 +117,6 @@ struct SeriesDetailView: View {
     @State private var episodeOrigin = EpisodeStateOrigin()
     /// Bridge season→episode writes the target episode id here; the episode-row ScrollViewReader scrolls it into the LazyHStack then writes focusedEpisodeID, since a focusedEpisodeID write for an unrendered card is a silent no-op (right-side-takes-two-clicks case).
     @State private var pendingEpisodeFocus: String?
-    /// The player return sets this alongside pendingEpisodeFocus: the row jumps instead of animating, because the focus write lands mid-animation and the focus engine's own scroll then stops it short of the card.
-    @State private var pendingEpisodeFocusIsReturn = false
     /// Sodalite#230: the finished episode and the one the page moved on to. The player return and the
     /// advance arrive in either order, and whichever comes second aims the row at the successor.
     @State private var episodeAdvance: (from: String, to: String)?
@@ -365,7 +363,6 @@ struct SeriesDetailView: View {
                     focusedEpisodeID = nil
                     episodeAim.sessionMoved(to: targetID)
                     returnFocusEpisodeID = targetID
-                    pendingEpisodeFocusIsReturn = true
                     pendingEpisodeFocus = targetID
                     let target = targetID
                     deferOnMain(by: 0.6) {
@@ -2315,7 +2312,6 @@ struct SeriesDetailView: View {
                         // Materialize and center the destination before moving focus. No animated
                         // scroll is used here: tvOS otherwise interrupts it with its own focus scroll,
                         // producing the visible double-jump/ghost transition.
-                        pendingEpisodeFocusIsReturn = false
                         episodeProxy.scrollTo(target, anchor: .center)
                         deferOnMain {
                             var transaction = Transaction()
