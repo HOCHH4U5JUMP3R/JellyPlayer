@@ -1774,7 +1774,6 @@ struct SeriesDetailView: View {
               viewModel?.episodes.contains(where: { $0.id == successor.id }) == true else { return }
         returnFocusEpisodeID = successor.id
         LogTap.shared.note("[EpisodeRow] advance_refocus from=\(finished.id) to=\(successor.id)")
-        pendingEpisodeFocusIsReturn = true
         pendingEpisodeFocus = successor.id
     }
 
