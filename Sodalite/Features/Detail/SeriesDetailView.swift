@@ -2286,7 +2286,7 @@ struct SeriesDetailView: View {
         let playTargetID = playTarget(vm: vm)?.id
         return ScrollViewReader { episodeProxy in
             episodeCardsGeometry(vm: vm, episodeProxy: episodeProxy, playTargetID: playTargetID)
-                .task(id: "\\(vm.selectedSeasonID ?? "")|\\(vm.episodes.count)|\\(vm.currentEpisodeID ?? "")|\\(vm.nextUpEpisode?.id ?? "")") {
+                .task(id: "\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.nextUpEpisode?.id ?? "")") {
                     guard !vm.episodes.isEmpty else { return }
                     let targetID = selectedEpisode?.id.flatMap { id in
                         vm.episodes.contains(where: { $0.id == id }) ? id : nil
@@ -2356,7 +2356,7 @@ struct SeriesDetailView: View {
             }
         }
         .onChange(of: playTargetID) { old, new in
-            LogTap.shared.note("[EpisodeRow] ring \\(old ?? "nil") -> \\(new ?? "nil") rows=\\(vm.episodes.count)")
+            LogTap.shared.note("[EpisodeRow] ring \(old ?? "nil") -> \(new ?? "nil") rows=\(vm.episodes.count)")
         }
         .onChange(of: pendingEpisodeFocus) { _, target in
             guard let target else { return }
