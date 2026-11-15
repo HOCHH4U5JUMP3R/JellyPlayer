@@ -484,12 +484,9 @@ struct SeriesDetailView: View {
                     await viewModel?.loadFullDetail()
                     updateBackdropURL()
                 }
-                // Episode deep-link paints with isLoading already false, so the false-transition that normally seeds the backdrop + pushes focus never fires; do both here.
+                // Episode deep-links also use the same default Play focus as ordinary series opens.
                 if initialEpisode != nil {
                     updateBackdropURL()
-                    deferOnMain(by: 0.1) {
-                        playButtonFocused = true
-                    }
                 }
             }
             // Open the animation gate once the cover's present transition has settled.
@@ -881,7 +878,7 @@ struct SeriesDetailView: View {
         }
         .modifier(PageScrollProxyCapture(proxy: $pageScrollProxy))
         #if os(tvOS)
-        .defaultFocus($focusedAction, .play, priority: .userInitiated)
+        .defaultFocus($playButtonFocused, true, priority: .userInitiated)
         #endif
         .transition(.opacity)
     }
