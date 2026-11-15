@@ -467,6 +467,13 @@ struct SeriesDetailView: View {
                 .detailCoverPush()
         }
         .onAppear {
+            #if os(tvOS)
+            // Navigation can retain this view's state while another destination is shown.
+            // Reclaim Play focus on every appearance, not just the button's first insertion.
+            DispatchQueue.main.async {
+                focusAction(.play)
+            }
+            #endif
             if viewModel == nil, let userID = sessionUserID {
                 selectedEpisode = initialEpisode
                 viewModel = DetailViewModel(
@@ -1368,14 +1375,6 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
-                // The synopsis is focusable before this row is mounted. Explicitly claim focus
-                // when the real Play control enters the hierarchy; defaultFocus alone can lose
-                // that first evaluation to the earlier synopsis.
-                .onAppear {
-                    DispatchQueue.main.async {
-                        focusAction(.play)
-                    }
-                }
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusAction(actionAbovePlay)
