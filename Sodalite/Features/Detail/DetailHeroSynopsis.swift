@@ -57,7 +57,7 @@ struct DetailHeroSynopsis: View {
         if let text, !text.isEmpty {
             Text(text)
                 .font(.body)
-                .foregroundStyle(isFocused ? Color.white : Color.secondary)
+                .foregroundStyle(Color.secondary)
                 .lineLimit(isExpanded ? .max : lineCount, reservesSpace: !isExpanded)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)

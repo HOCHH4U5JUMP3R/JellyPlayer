@@ -57,6 +57,7 @@ struct SeriesDetailView: View {
     /// only land on Play (Sodalite#53, and #146 once the overview box that used to answer this went
     /// away). See `DetailAction`.
     @FocusState private var focusedAction: DetailAction?
+    @State private var actionAbovePlay: DetailAction = .watched
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
     /// Sodalite#146 round 3: Watched on a SERIES is the one control on the page that cannot be
@@ -1273,7 +1274,9 @@ struct SeriesDetailView: View {
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis()
-                    case .down: focusAction(.play)
+                    case .down:
+                        actionAbovePlay = .watched
+                        focusAction(.play)
                     default: break
                     }
                 }
@@ -1289,7 +1292,9 @@ struct SeriesDetailView: View {
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis()
-                    case .down: focusAction(.play)
+                    case .down:
+                        actionAbovePlay = .rating
+                        focusAction(.play)
                     default: break
                     }
                 }
@@ -1356,7 +1361,7 @@ struct SeriesDetailView: View {
                 .focused($playButtonFocused)
                 .onMoveCommand { direction in
                     switch direction {
-                    case .up: focusAction(.watched)
+                    case .up: focusAction(actionAbovePlay)
                     case .down: focusSeasonRow(vm: vm)
                     default: break
                     }
@@ -1383,6 +1388,7 @@ struct SeriesDetailView: View {
             }
         }
         .frame(maxWidth: 880, alignment: .leading)
+        .defaultFocus($focusedAction, .play)
         #else
         Group {
             if isPhonePortrait {
@@ -2031,11 +2037,18 @@ struct SeriesDetailView: View {
     /// a fully watched season enters on its final episode.
     private func focusEpisodeRow(vm: DetailViewModel, targetSeasonID: String? = nil, targetEpisodeID: String? = nil) {
         guard let seasonID = targetSeasonID ?? vm.selectedSeasonID else { return }
+        if vm.selectedSeasonID == seasonID, !vm.episodes.isEmpty {
+            applyEpisodeFocusTarget(vm: vm, seasonID: seasonID, targetEpisodeID: targetEpisodeID)
+            return
+        }
         Task { @MainActor in
-            if vm.selectedSeasonID != seasonID || vm.episodes.isEmpty {
-                await vm.loadEpisodes(seasonID: seasonID)
-            }
+            await vm.loadEpisodes(seasonID: seasonID)
             guard vm.selectedSeasonID == seasonID else { return }
+            applyEpisodeFocusTarget(vm: vm, seasonID: seasonID, targetEpisodeID: targetEpisodeID)
+        }
+    }
+
+    private func applyEpisodeFocusTarget(vm: DetailViewModel, seasonID: String, targetEpisodeID: String?) {
             let target: String?
             if let targetEpisodeID, vm.episodes.contains(where: { $0.id == targetEpisodeID }) {
                 target = targetEpisodeID
@@ -2051,7 +2064,6 @@ struct SeriesDetailView: View {
             guard let target else { return }
             lastFocusedSeasonID = seasonID
             pendingEpisodeFocus = target
-        }
     }
 
     private func castMembers(vm: DetailViewModel) -> [CastMember] {
