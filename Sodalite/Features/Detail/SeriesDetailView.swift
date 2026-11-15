@@ -709,15 +709,7 @@ struct SeriesDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
-                #if os(tvOS)
-                if vm.hasFullDetail {
-                    actionButtonRow(vm: vm)
-                } else {
-                    actionButtonSkeletonRow()
-                }
-                #else
                 actionButtonRow(vm: vm)
-                #endif
                 // Seasons and episodes are fetched in parallel, but on tvOS their real rows wait
                 // until the series detail and Next Up have settled. This prevents the lower rows
                 // appearing first and then being pushed down when the hero metadata arrives.
@@ -1212,28 +1204,12 @@ struct SeriesDetailView: View {
     // MARK: - Action Buttons
 
     #if os(tvOS)
-    /// Holds the two action rows' exact footprint until the detail and Next Up data are ready.
-    /// Non-focusable placeholders prevent the remote from landing on controls whose labels or
-    /// targets are still changing.
-    private func actionButtonSkeletonRow() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                ForEach(0..<4, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 13)
-                        .fill(Color.white.opacity(0.10))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 62)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-            }
-            HStack(spacing: 12) {
-                InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
-                    pendingPlayRequest = true
-                }
-                .focused($focusedAction, equals: .play)
-                .focused($playButtonFocused)
-
+    /// Loading placeholders retain the top row's footprint while Play remains a real,
+    /// focusable control from the first content frame.
+    #if os(tvOS)
+    private func actionButtonSkeletonTopRow() -> some View {
+        HStack(spacing: 12) {
+            ForEach(0..<4, id: \.self) { _ in
                 RoundedRectangle(cornerRadius: 13)
                     .fill(Color.white.opacity(0.10))
                     .frame(maxWidth: .infinity)
@@ -1242,100 +1218,122 @@ struct SeriesDetailView: View {
                     .accessibilityHidden(true)
             }
         }
-        .frame(maxWidth: 880, alignment: .leading)
+    }
+
+    private func playActionButton(vm: DetailViewModel) -> some View {
+        InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
+            if let target = playTarget(vm: vm) {
+                requestPlay(target, fromBeginning: false, fromPlayButton: true)
+            } else {
+                pendingPlayRequest = true
+            }
+        }
+        .focused($focusedAction, equals: .play)
+        .focused($playButtonFocused)
+    }
+
+    private func trailerActionButton(vm: DetailViewModel) -> some View {
+        InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
+            Task {
+                if let trailer = await vm.loadTrailer() {
+                    playItem = trailer
+                    playFromBeginning = true
+                    playOriginatedFromPlayButton = false
+                    showPlayer = true
+                }
+            }
+        }
+        .focused($focusedAction, equals: .trailer)
     }
     #endif
 
-    /// Button row below the glass panel, outside it (Sodalite#15 round 6) so the plate stays a compact metadata card; each GlassActionButton carries its own material so the row needs no plate.
+    /// Button row below the glass panel, outside it (Sodalite#15 round 6).
     private func actionButtonRow(vm: DetailViewModel) -> some View {
         #if os(tvOS)
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                InfuseDetailActionButton(
-                    title: isShowingEpisode
-                        ? ((selectedEpisode.map { vm.isPlayed($0) } == true) ? "Als ungesehen markieren" : "Als gesehen markieren")
-                        : (vm.isPlayed ? "Als ungesehen markieren" : "Als gesehen markieren"),
-                    symbol: (isShowingEpisode ? (selectedEpisode.map { vm.isPlayed($0) } ?? false) : vm.isPlayed) ? "checkmark" : "eye"
-                ) {
-                    if let episode = selectedEpisode {
-                        Task { await vm.setEpisodePlayed(episode, isPlayed: !vm.isPlayed(episode)) }
-                    } else {
-                        isConfirmingPlayedChange = true
-                    }
-                }
-                .focused($focusedAction, equals: .watched)
-
-                InfuseDetailActionButton(
-                    title: "Bewerten",
-                    symbol: vm.rating(of: selectedEpisode ?? vm.item) == nil ? "star" : "star.fill"
-                ) {
-                    let ratedItem = selectedEpisode ?? vm.item
-                    ratingPrompt = RatingPrompt(itemID: ratedItem.id)
-                }
-                .focused($focusedAction, equals: .rating)
-
-                InfuseDetailActionButton(
-                    title: isShowingEpisode
-                        ? ((selectedEpisode.map { vm.isFavorite($0) } == true) ? "Favorit entfernen" : "Favorit")
-                        : (vm.isFavorite ? "Favorit entfernen" : "Favorit"),
-                    symbol: (isShowingEpisode
-                        ? (selectedEpisode.map { vm.isFavorite($0) } ?? false)
-                        : vm.isFavorite) ? "heart.fill" : "heart"
-                ) {
-                    if let episode = selectedEpisode {
-                        Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) }
-                    } else {
-                        Task { await vm.toggleFavorite() }
-                    }
-                }
-                .focused($focusedAction, equals: .favorite)
-
-                InfuseDetailActionButton(
-                    title: "Synchronisieren",
-                    symbol: "arrow.clockwise",
-                    isLoading: isRefreshingMetadata
-                ) {
-                    guard !isRefreshingMetadata else { return }
-                    isRefreshingMetadata = true
-                    Task {
-                        let selectedID = selectedEpisode?.id
-                        await vm.refreshMetadata()
-                        if let selectedID,
-                           let refreshed = vm.episodes.first(where: { $0.id == selectedID }) {
-                            selectedEpisode = refreshed
-                        }
-                        isRefreshingMetadata = false
-                    }
-                }
-                .focused($focusedAction, equals: .sync)
+            if vm.hasFullDetail {
+                actionButtonTopRow(vm: vm)
+            } else {
+                actionButtonSkeletonTopRow()
             }
-
             HStack(spacing: 12) {
-                InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
-                    if let target = playTarget(vm: vm) {
-                        requestPlay(target, fromBeginning: false, fromPlayButton: true)
-                    } else {
-                        pendingPlayRequest = true
-                    }
+                playActionButton(vm: vm)
+                if vm.hasFullDetail {
+                    trailerActionButton(vm: vm)
+                } else {
+                    RoundedRectangle(cornerRadius: 13)
+                        .fill(Color.white.opacity(0.10))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 62)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
-                .focused($focusedAction, equals: .play)
-                .focused($playButtonFocused)
-
-                InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
-                    Task {
-                        if let trailer = await vm.loadTrailer() {
-                            playItem = trailer
-                            playFromBeginning = true
-                            playOriginatedFromPlayButton = false
-                            showPlayer = true
-                        }
-                    }
-                }
-                .focused($focusedAction, equals: .trailer)
             }
         }
         .frame(maxWidth: 880, alignment: .leading)
-        #else
+        private func actionButtonTopRow(vm: DetailViewModel) -> some View {
+        HStack(spacing: 12) {
+            InfuseDetailActionButton(
+                title: isShowingEpisode
+                    ? ((selectedEpisode.map { vm.isPlayed($0) } == true) ? "Als ungesehen markieren" : "Als gesehen markieren")
+                    : (vm.isPlayed ? "Als ungesehen markieren" : "Als gesehen markieren"),
+                symbol: (isShowingEpisode ? (selectedEpisode.map { vm.isPlayed($0) } ?? false) : vm.isPlayed) ? "checkmark" : "eye"
+            ) {
+                if let episode = selectedEpisode {
+                    Task { await vm.setEpisodePlayed(episode, isPlayed: !vm.isPlayed(episode)) }
+                } else {
+                    isConfirmingPlayedChange = true
+                }
+            }
+            .focused($focusedAction, equals: .watched)
+
+            InfuseDetailActionButton(
+                title: "Bewerten",
+                symbol: vm.rating(of: selectedEpisode ?? vm.item) == nil ? "star" : "star.fill"
+            ) {
+                let ratedItem = selectedEpisode ?? vm.item
+                ratingPrompt = RatingPrompt(itemID: ratedItem.id)
+            }
+            .focused($focusedAction, equals: .rating)
+
+            InfuseDetailActionButton(
+                title: isShowingEpisode
+                    ? ((selectedEpisode.map { vm.isFavorite($0) } == true) ? "Favorit entfernen" : "Favorit")
+                    : (vm.isFavorite ? "Favorit entfernen" : "Favorit"),
+                symbol: (isShowingEpisode
+                    ? (selectedEpisode.map { vm.isFavorite($0) } ?? false)
+                    : vm.isFavorite) ? "heart.fill" : "heart"
+            ) {
+                if let episode = selectedEpisode {
+                    Task { await vm.setEpisodeFavorite(episode, isFavorite: !vm.isFavorite(episode)) }
+                } else {
+                    Task { await vm.toggleFavorite() }
+                }
+            }
+            .focused($focusedAction, equals: .favorite)
+
+            InfuseDetailActionButton(
+                title: "Synchronisieren",
+                symbol: "arrow.clockwise",
+                isLoading: isRefreshingMetadata
+            ) {
+                guard !isRefreshingMetadata else { return }
+                isRefreshingMetadata = true
+                Task {
+                    let selectedID = selectedEpisode?.id
+                    await vm.refreshMetadata()
+                    if let selectedID,
+                       let refreshed = vm.episodes.first(where: { $0.id == selectedID }) {
+                        selectedEpisode = refreshed
+                    }
+                    isRefreshingMetadata = false
+                }
+            }
+            .focused($focusedAction, equals: .sync)
+        }
+    }
+
+    #else
         Group {
             if isPhonePortrait {
                 VStack(spacing: 12) {
