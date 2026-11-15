@@ -22,8 +22,11 @@ struct DetailHeroSynopsis: View {
     var spoilerItem: JellyfinItem?
     /// Opens the full synopsis when activated on tvOS or tapped on touch.
     var onTap: (() -> Void)?
-    /// Shared page focus state; the parent detail page routes vertical movement centrally.
+    /// Shared page focus state: the synopsis has its own identity, so moving down can
+    /// assign the exact destination without letting tvOS choose a geometric neighbour.
     var focusedAction: FocusState<DetailAction?>.Binding? = nil
+    /// Explicit fallback for callers that do not share the page's action focus state.
+    var onMoveDown: (() -> Void)?
     /// The upright iPhone's placement under the action row (Blexbi): the page scrolls freely there,
     /// so a tap opens the whole text in place instead of leaving for More Details. The reserved
     /// lines still hold while it is closed, which is what keeps the buttons above it still.
@@ -89,6 +92,14 @@ struct DetailHeroSynopsis: View {
             if let focusedAction {
                 tvSynopsisSurface
                     .focused(focusedAction, equals: .synopsis)
+                    .onMoveCommand { direction in
+                        if direction == .down { onMoveDown?() }
+                    }
+            } else if onMoveDown != nil {
+                tvSynopsisSurface
+                    .onMoveCommand { direction in
+                        if direction == .down { onMoveDown?() }
+                    }
             } else {
                 tvSynopsisSurface
             }
