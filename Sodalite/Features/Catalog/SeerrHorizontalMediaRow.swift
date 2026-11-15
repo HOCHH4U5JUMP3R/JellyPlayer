@@ -35,9 +35,10 @@ struct SeerrHorizontalMediaRow: View {
                 .padding(.leading, leadingInset)
                 .padding(.trailing, metrics.rowInset)
 
-            RowScrollView(leading: leadingInset, trailing: metrics.rowInset,
-                          vertical: metrics.rowVerticalPadding) {
-                LazyHStack(spacing: metrics.itemSpacing) {
+            ScrollViewReader { proxy in
+                RowScrollView(leading: leadingInset, trailing: metrics.rowInset,
+                              vertical: metrics.rowVerticalPadding) {
+                    LazyHStack(spacing: metrics.itemSpacing) {
                     // stableKey not id: TMDB ids collide across movie/tv (trending mixes both); duplicate ForEach ids cause ghost cards and focus jumps.
                     ForEach(Array(items.enumerated()), id: \.element.stableKey) { index, media in
                         bindingFocus(
@@ -48,6 +49,7 @@ struct SeerrHorizontalMediaRow: View {
                             },
                             to: media.stableKey
                         )
+                        .id(media.stableKey)
                         .onAppear {
                             if index >= items.count - prefetchThreshold {
                                 onNeedsMore?()
@@ -59,9 +61,14 @@ struct SeerrHorizontalMediaRow: View {
                         ProgressView()
                             .frame(width: metrics.posterSize.width, height: metrics.posterSize.height)
                     }
+                    }
                 }
+                .onChange(of: focusedID?.wrappedValue) { _, target in
+                    guard let target else { return }
+                    proxy.scrollTo(target, anchor: .center)
+                }
+                .focusSectionCompat()
             }
-            .focusSectionCompat()
         }
     }
 }
