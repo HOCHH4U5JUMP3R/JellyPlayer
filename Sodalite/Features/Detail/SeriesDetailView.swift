@@ -2283,6 +2283,7 @@ struct SeriesDetailView: View {
                             .padding(.vertical, 6)
                         }
                         .scrollPosition($episodeRowPosition)
+                        .defaultFocus($focusedEpisodeID, initialEpisodeFocusTarget(vm: vm) ?? vm.episodes[0].id)
                         .scrollClipDisabled()
                         #if os(tvOS)
                         .onMoveCommand { direction in
