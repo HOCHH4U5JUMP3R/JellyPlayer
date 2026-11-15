@@ -1368,6 +1368,14 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
+                // The synopsis is focusable before this row is mounted. Explicitly claim focus
+                // when the real Play control enters the hierarchy; defaultFocus alone can lose
+                // that first evaluation to the earlier synopsis.
+                .onAppear {
+                    DispatchQueue.main.async {
+                        focusAction(.play)
+                    }
+                }
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusAction(actionAbovePlay)
