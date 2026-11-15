@@ -1206,7 +1206,6 @@ struct SeriesDetailView: View {
     #if os(tvOS)
     /// Loading placeholders retain the top row's footprint while Play remains a real,
     /// focusable control from the first content frame.
-    #if os(tvOS)
     private func actionButtonSkeletonTopRow() -> some View {
         HStack(spacing: 12) {
             ForEach(0..<4, id: \.self) { _ in
@@ -1245,33 +1244,8 @@ struct SeriesDetailView: View {
         }
         .focused($focusedAction, equals: .trailer)
     }
-    #endif
 
-    /// Button row below the glass panel, outside it (Sodalite#15 round 6).
-    private func actionButtonRow(vm: DetailViewModel) -> some View {
-        #if os(tvOS)
-        VStack(alignment: .leading, spacing: 12) {
-            if vm.hasFullDetail {
-                actionButtonTopRow(vm: vm)
-            } else {
-                actionButtonSkeletonTopRow()
-            }
-            HStack(spacing: 12) {
-                playActionButton(vm: vm)
-                if vm.hasFullDetail {
-                    trailerActionButton(vm: vm)
-                } else {
-                    RoundedRectangle(cornerRadius: 13)
-                        .fill(Color.white.opacity(0.10))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 62)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-            }
-        }
-        .frame(maxWidth: 880, alignment: .leading)
-        private func actionButtonTopRow(vm: DetailViewModel) -> some View {
+    private func actionButtonTopRow(vm: DetailViewModel) -> some View {
         HStack(spacing: 12) {
             InfuseDetailActionButton(
                 title: isShowingEpisode
@@ -1332,8 +1306,33 @@ struct SeriesDetailView: View {
             .focused($focusedAction, equals: .sync)
         }
     }
+    #endif
 
-    #else
+    /// The action row stays mounted while detail data loads so Play is present for initial focus.
+    private func actionButtonRow(vm: DetailViewModel) -> some View {
+        #if os(tvOS)
+        VStack(alignment: .leading, spacing: 12) {
+            if vm.hasFullDetail {
+                actionButtonTopRow(vm: vm)
+            } else {
+                actionButtonSkeletonTopRow()
+            }
+            HStack(spacing: 12) {
+                playActionButton(vm: vm)
+                if vm.hasFullDetail {
+                    trailerActionButton(vm: vm)
+                } else {
+                    RoundedRectangle(cornerRadius: 13)
+                        .fill(Color.white.opacity(0.10))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 62)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+        .frame(maxWidth: 880, alignment: .leading)
+        #else
         Group {
             if isPhonePortrait {
                 VStack(spacing: 12) {
