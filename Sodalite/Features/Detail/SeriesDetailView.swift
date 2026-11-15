@@ -2283,7 +2283,9 @@ struct SeriesDetailView: View {
                             .padding(.vertical, 6)
                         }
                         .scrollPosition($episodeRowPosition)
+                        #if os(tvOS)
                         .defaultFocus($focusedEpisodeID, initialEpisodeFocusTarget(vm: vm) ?? vm.episodes[0].id)
+                        #endif
                         .scrollClipDisabled()
                         #if os(tvOS)
                         .onMoveCommand { direction in
@@ -2338,6 +2340,7 @@ struct SeriesDetailView: View {
         }
         .focusSectionCompat()
         .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.isLoadingSeasons)|\(vm.isLoadingEpisodes)") {
+            #if os(tvOS)
             if !didSetInitialEpisodeFocus, !vm.isLoadingSeasons, !vm.isLoadingEpisodes, !vm.episodes.isEmpty {
                 if let target = initialEpisodeFocusTarget(vm: vm) {
                     didSetInitialEpisodeFocus = true
@@ -2345,6 +2348,7 @@ struct SeriesDetailView: View {
                     pendingEpisodeFocus = target
                 }
             }
+            #endif
             await prefetchSeriesArtwork(vm: vm)
         }
     }
