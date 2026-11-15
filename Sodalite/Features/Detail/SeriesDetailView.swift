@@ -2285,20 +2285,51 @@ struct SeriesDetailView: View {
     private func episodeCardsLoadedSection(vm: DetailViewModel) -> some View {
         let playTargetID = playTarget(vm: vm)?.id
         return ScrollViewReader { episodeProxy in
-            episodeCardsGeometry(vm: vm, episodeProxy: episodeProxy, playTargetID: playTargetID)
-                .task(id: "\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.nextUpEpisode?.id ?? "")") {
-                    guard !vm.episodes.isEmpty else { return }
-                    let targetID = selectedEpisode?.id.flatMap { id in
-                        vm.episodes.contains(where: { $0.id == id }) ? id : nil
-                    } ?? vm.nextUpEpisode?.id.flatMap { id in
-                        vm.episodes.contains(where: { $0.id == id }) ? id : nil
-                    } ?? initialEpisodeFocusTarget(vm: vm)
-                    guard let targetID else { return }
-                    await Task.yield()
-                    episodeProxy.scrollTo(targetID, anchor: .center)
-                }
+            episodeCardsGeometry(
+                vm: vm,
+                episodeProxy: episodeProxy,
+                playTargetID: playTargetID
+            )
+            .task(id: episodeCardsTaskID(vm: vm)) {
+                await centerInitialEpisodeCards(vm: vm, proxy: episodeProxy)
+            }
         }
         .frame(height: 110)
+    }
+
+    private func episodeCardsTaskID(vm: DetailViewModel) -> String {
+        [
+            vm.selectedSeasonID ?? "",
+            String(vm.episodes.count),
+            vm.currentEpisodeID ?? "",
+            vm.nextUpEpisode?.id ?? ""
+        ].joined(separator: "|")
+    }
+
+    @MainActor
+    private func centerInitialEpisodeCards(
+        vm: DetailViewModel,
+        proxy: ScrollViewProxy
+    ) async {
+        guard !vm.episodes.isEmpty else { return }
+
+        let selectedID = selectedEpisode?.id
+        let selectedIDIsInSeason = selectedID.map { id in
+            vm.episodes.contains(where: { $0.id == id })
+        } ?? false
+
+        let nextUpID = vm.nextUpEpisode?.id
+        let nextUpIDIsInSeason = nextUpID.map { id in
+            vm.episodes.contains(where: { $0.id == id })
+        } ?? false
+
+        let targetID: String? = selectedIDIsInSeason
+            ? selectedID
+            : (nextUpIDIsInSeason ? nextUpID : initialEpisodeFocusTarget(vm: vm))
+
+        guard let targetID else { return }
+        await Task.yield()
+        proxy.scrollTo(targetID, anchor: .center)
     }
 
     private func episodeCardsGeometry(
