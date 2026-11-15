@@ -2153,209 +2153,216 @@ struct SeriesDetailView: View {
     }
 
     private func seasonSection(vm: DetailViewModel) -> some View {
-        // .focusSection keeps the season and episode rails grouped; row-level move handlers choose vertical destinations.
-        let sectionSpacing: CGFloat
-        #if os(tvOS)
-        sectionSpacing = 32
-        #else
-        sectionSpacing = 20
-        #endif
+        let sectionSpacing: CGFloat = {
+            #if os(tvOS)
+            return 32
+            #else
+            return 20
+            #endif
+        }()
         return VStack(alignment: .leading, spacing: sectionSpacing) {
-            if usesSeasonMenu {
-                seasonMenu(vm: vm)
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(vm.seasons) { season in
-                                SeasonTab(
-                                    id: season.id,
-                                    name: season.name,
-                                    imageURL: vm.posterURL(for: season),
-                                    personalRating: vm.seasonRating(for: season),
-                                    isPlayed: vm.isSeasonPlayed(season),
-                                    isSelected: vm.selectedSeasonID == season.id,
-                                    focusedID: $focusedSeasonID,
-                                    action: {
-                                        // Don't reset the hero to series root here: flipping the short episode panel to the taller series panel while focus is on the season bar makes tvOS follow the tab and scroll the page down. "Serie anzeigen" resets the hero explicitly.
-                                        Task { await vm.loadEpisodes(seasonID: season.id) }
-                                    }
-                                )
-                                .id(season.id)
-                                // Resolve vertical navigation at the row, not by screen-space proximity.
-                                .contextMenu { seasonActions(season, vm: vm) }
-                            }
+            seasonTabsSection(vm: vm)
+            episodeCardsSection(vm: vm)
+        }
+        .focusSectionCompat()
+        .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.isLoadingSeasons)|\(vm.isLoadingEpisodes)") {
+            await prefetchSeriesArtwork(vm: vm)
+        }
+    }
+
+    @ViewBuilder
+    private func seasonTabsSection(vm: DetailViewModel) -> some View {
+        if usesSeasonMenu {
+            seasonMenu(vm: vm)
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(vm.seasons) { season in
+                            SeasonTab(
+                                id: season.id,
+                                name: season.name,
+                                imageURL: vm.posterURL(for: season),
+                                personalRating: vm.seasonRating(for: season),
+                                isPlayed: vm.isSeasonPlayed(season),
+                                isSelected: vm.selectedSeasonID == season.id,
+                                focusedID: $focusedSeasonID,
+                                action: {
+                                    // Don't reset the hero to series root here: flipping the short episode panel to the taller series panel while focus is on the season bar makes tvOS follow the tab and scroll the page down. "Serie anzeigen" resets the hero explicitly.
+                                    Task { await vm.loadEpisodes(seasonID: season.id) }
+                                }
+                            )
+                            .id(season.id)
+                            // Resolve vertical navigation at the row, not by screen-space proximity.
+                            .contextMenu { seasonActions(season, vm: vm) }
                         }
-                        // Focus scale 1.05 needs vertical slack or the halo clips against the scroll-view edges.
-                        .padding(.top, 8)
-                        // The season poster grows visually by 5% while focused; reserve
-                        // enough real layout space so the episode rail cannot paint over it.
-                        .padding(.bottom, 32)
                     }
+                    // Focus scale 1.05 needs vertical slack or the halo clips against the scroll-view edges.
+                    .padding(.top, 8)
+                    // The season poster grows visually by 5% while focused; reserve
+                    // enough real layout space so the episode rail cannot paint over it.
+                    .padding(.bottom, 32)
+                }
+                .scrollClipDisabled()
+                #if os(tvOS)
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .up:
+                        focusAction(.play)
+                    case .down:
+                        focusEpisodeRow(vm: vm, targetSeasonID: focusedSeasonID ?? vm.selectedSeasonID)
+                    default:
+                        break
+                    }
+                }
+                #endif
+                .onChange(of: focusedSeasonID) { oldID, newID in
+                    if let newID {
+                        // The selected season is the authoritative vertical entry target.
+                        // Do not restore an older tab here: that overrode an explicit focus
+                        // request from Play/Trailer and sent the remote to the wrong season.
+                        lastFocusedSeasonID = newID
+                    } else if let oldID {
+                        lastFocusedSeasonID = oldID
+                    }
+                }
+                .onChange(of: focusedEpisodeID) { oldEpisode, newEpisode in
+                    if let newEpisode,
+                       let episode = vm.episodes.first(where: { $0.id == newEpisode }),
+                       selectedEpisode?.id != newEpisode {
+                        // Infuse-style preview: the focused card is the page's active episode.
+                        // No Select/menu action is needed; all hero metadata reads displayItem.
+                        if selectedEpisode == nil {
+                            episodeOrigin.openedFromSeries()
+                        }
+                        #if os(tvOS)
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) { selectedEpisode = episode }
+                        #else
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedEpisode = episode
+                        }
+                        #endif
+                    }
+
+                    if let newEpisode,
+                       let episode = vm.episodes.first(where: { $0.id == newEpisode }),
+                       let seasonID = episode.seasonId ?? vm.selectedSeasonID {
+                        lastFocusedEpisodeBySeason[seasonID] = newEpisode
+                    } else if let oldEpisode {
+                        if let seasonID = vm.episodes.first(where: { $0.id == oldEpisode })?.seasonId
+                            ?? vm.selectedSeasonID {
+                            lastFocusedEpisodeBySeason[seasonID] = oldEpisode
+                        }
+                        episodeAim.focusLeft(oldEpisode)
+                    }
+                }
+                .onChange(of: vm.selectedSeasonID) { _, newID in
+                    if let newID { proxy.scrollTo(newID, anchor: .center) }
+                }
+                .onChange(of: focusedSeasonID) { _, newID in
+                    if let newID { proxy.scrollTo(newID, anchor: .center) }
+                }
+            }
+        }
+
+
+    }
+
+    @ViewBuilder
+    private func episodeCardsSection(vm: DetailViewModel) -> some View {
+        if vm.episodes.isEmpty && (vm.isLoadingEpisodes || vm.isLoadingSeasons) {
+            episodeSkeletonRow(vm: vm)
+        } else if !vm.episodes.isEmpty {
+            // Resolved once for the row: the ring reads the same target the Play button acts on, so the two cannot name different episodes.
+            let playTargetID = playTarget(vm: vm)?.id
+            ScrollViewReader { episodeProxy in
+                GeometryReader { geometry in
+                    let railSpacing: CGFloat = 16
+                    let cardWidth = max(120, (geometry.size.width - railSpacing * 4) / 5)
+                    let railCardSize = CGSize(width: cardWidth, height: cardWidth * 9 / 16)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: railSpacing) {
+                        ForEach(vm.episodes) { episode in
+                            VStack(alignment: .leading, spacing: 10) {
+                                Button {
+                                    requestPlay(episode, fromBeginning: false, fromPlayButton: false)
+                                } label: {
+                                    episodeCard(episode, vm: vm, playTargetID: playTargetID, cardSize: railCardSize)
+                                }
+                                .buttonStyle(EpisodeCardButtonStyle())
+                                .focused($focusedEpisodeID, equals: episode.id)
+                                // Prime the season-bar target before the up-move resolves, else tvOS's geographic picker skips the bar (far-right episode outside the tabs' span) and lands on the overview above.
+                                // The system preview, deliberately: it snapshots the real view
+                                // in the real environment, so it carries the accent, the theme
+                                // and the page's own ground. A hand-built one is a second view
+                                // hierarchy outside all three, and it showed: default blue and a
+                                // grey platter (2026-09-14). What the snapshot cannot do is
+                                // reach outside the card's bounds, which is why the ring now
+                                // lives inside them (see EpisodeCardStroke.ringMargin).
+                                .contextMenu { episodeContextMenu(episode, vm: vm) }
+
+                            }
+                            .id(episode.id)
+                        }
+                    }
+                    // Reserve room for the tvOS focus lift so the top edge and focus ring stay
+                    // inside the horizontal ScrollView's clipping bounds.
+                        .padding(.vertical, 6)
+                    }
+                    .scrollPosition($episodeRowPosition)
+                    #if os(tvOS)
+                    #endif
                     .scrollClipDisabled()
                     #if os(tvOS)
                     .onMoveCommand { direction in
                         switch direction {
-                        case .up:
-                            focusAction(.play)
-                        case .down:
-                            focusEpisodeRow(vm: vm, targetSeasonID: focusedSeasonID ?? vm.selectedSeasonID)
-                        default:
-                            break
+                        case .up: focusUpFromEpisodeRow(vm: vm)
+                        case .down: focusFirstCast(vm: vm)
+                        default: break
                         }
                     }
                     #endif
-                    .onChange(of: focusedSeasonID) { oldID, newID in
-                        if let newID {
-                            // The selected season is the authoritative vertical entry target.
-                            // Do not restore an older tab here: that overrode an explicit focus
-                            // request from Play/Trailer and sent the remote to the wrong season.
-                            lastFocusedSeasonID = newID
-                        } else if let oldID {
-                            lastFocusedSeasonID = oldID
-                        }
-                    }
-                    .onChange(of: focusedEpisodeID) { oldEpisode, newEpisode in
-                        if let newEpisode,
-                           let episode = vm.episodes.first(where: { $0.id == newEpisode }),
-                           selectedEpisode?.id != newEpisode {
-                            // Infuse-style preview: the focused card is the page's active episode.
-                            // No Select/menu action is needed; all hero metadata reads displayItem.
-                            if selectedEpisode == nil {
-                                episodeOrigin.openedFromSeries()
-                            }
-                            #if os(tvOS)
-                            var transaction = Transaction()
-                            transaction.disablesAnimations = true
-                            withTransaction(transaction) { selectedEpisode = episode }
-                            #else
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedEpisode = episode
-                            }
-                            #endif
-                        }
-
-                        if let newEpisode,
-                           let episode = vm.episodes.first(where: { $0.id == newEpisode }),
-                           let seasonID = episode.seasonId ?? vm.selectedSeasonID {
-                            lastFocusedEpisodeBySeason[seasonID] = newEpisode
-                        } else if let oldEpisode {
-                            if let seasonID = vm.episodes.first(where: { $0.id == oldEpisode })?.seasonId
-                                ?? vm.selectedSeasonID {
-                                lastFocusedEpisodeBySeason[seasonID] = oldEpisode
-                            }
-                            episodeAim.focusLeft(oldEpisode)
-                        }
-                    }
-                    .onChange(of: vm.selectedSeasonID) { _, newID in
-                        if let newID { proxy.scrollTo(newID, anchor: .center) }
-                    }
-                    .onChange(of: focusedSeasonID) { _, newID in
-                        if let newID { proxy.scrollTo(newID, anchor: .center) }
+                .onChange(of: focusedEpisodeID) { _, newID in
+                    // "Show Details" was picked and focus restored to the row: bounce up to Play. Two-step write forces a real transition (same-value write is a no-op).
+                    if pendingPlayFocusAfterMenu, newID != nil {
+                        pendingPlayFocusAfterMenu = false
+                        playButtonFocused = false
+                        DispatchQueue.main.async { playButtonFocused = true }
+                        return
                     }
                 }
-            }
-
-            if vm.episodes.isEmpty && (vm.isLoadingEpisodes || vm.isLoadingSeasons) {
-                episodeSkeletonRow(vm: vm)
-            } else if !vm.episodes.isEmpty {
-                // Resolved once for the row: the ring reads the same target the Play button acts on, so the two cannot name different episodes.
-                let playTargetID = playTarget(vm: vm)?.id
-                ScrollViewReader { episodeProxy in
-                    GeometryReader { geometry in
-                        let railSpacing: CGFloat = 16
-                        let cardWidth = max(120, (geometry.size.width - railSpacing * 4) / 5)
-                        let railCardSize = CGSize(width: cardWidth, height: cardWidth * 9 / 16)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: railSpacing) {
-                            ForEach(vm.episodes) { episode in
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Button {
-                                        requestPlay(episode, fromBeginning: false, fromPlayButton: false)
-                                    } label: {
-                                        episodeCard(episode, vm: vm, playTargetID: playTargetID, cardSize: railCardSize)
-                                    }
-                                    .buttonStyle(EpisodeCardButtonStyle())
-                                    .focused($focusedEpisodeID, equals: episode.id)
-                                    // Prime the season-bar target before the up-move resolves, else tvOS's geographic picker skips the bar (far-right episode outside the tabs' span) and lands on the overview above.
-                                    // The system preview, deliberately: it snapshots the real view
-                                    // in the real environment, so it carries the accent, the theme
-                                    // and the page's own ground. A hand-built one is a second view
-                                    // hierarchy outside all three, and it showed: default blue and a
-                                    // grey platter (2026-09-14). What the snapshot cannot do is
-                                    // reach outside the card's bounds, which is why the ring now
-                                    // lives inside them (see EpisodeCardStroke.ringMargin).
-                                    .contextMenu { episodeContextMenu(episode, vm: vm) }
-
-                                }
-                                .id(episode.id)
-                            }
-                        }
-                        // Reserve room for the tvOS focus lift so the top edge and focus ring stay
-                        // inside the horizontal ScrollView's clipping bounds.
-                            .padding(.vertical, 6)
-                        }
-                        .scrollPosition($episodeRowPosition)
-                        #if os(tvOS)
-                        #endif
-                        .scrollClipDisabled()
-                        #if os(tvOS)
-                        .onMoveCommand { direction in
-                            switch direction {
-                            case .up: focusUpFromEpisodeRow(vm: vm)
-                            case .down: focusFirstCast(vm: vm)
-                            default: break
-                            }
-                        }
-                        #endif
-                    .onChange(of: focusedEpisodeID) { _, newID in
-                        // "Show Details" was picked and focus restored to the row: bounce up to Play. Two-step write forces a real transition (same-value write is a no-op).
-                        if pendingPlayFocusAfterMenu, newID != nil {
-                            pendingPlayFocusAfterMenu = false
-                            playButtonFocused = false
-                            DispatchQueue.main.async { playButtonFocused = true }
-                            return
-                        }
-                    }
-                    // Sodalite#230: the ring was seen on the finished card while Play named the successor.
-                    .onChange(of: playTargetID) { old, new in
-                        LogTap.shared.note("[EpisodeRow] ring \(old ?? "nil") -> \(new ?? "nil") rows=\(vm.episodes.count)")
-                    }
-                    .onChange(of: pendingEpisodeFocus) { _, target in
-                        guard let target else { return }
-                        // Scroll the target into the LazyHStack so its .focused modifier exists when we write focusedEpisodeID, else the write silently fails for an unrendered card (right-side 2-press case).
-                        // Materialize and center the destination before moving focus. No animated
-                        // scroll is used here: tvOS otherwise interrupts it with its own focus scroll,
-                        // producing the visible double-jump/ghost transition.
-                        episodeProxy.scrollTo(target, anchor: .center)
-                        deferOnMain {
-                            var transaction = Transaction()
-                            transaction.disablesAnimations = true
-                            withTransaction(transaction) { focusedEpisodeID = target }
-                            pendingEpisodeFocus = nil
-                        }
-                    }
-                    // No animation: the row is behind the player, and an animated scroll is exactly
-                    // what leaves the target unrendered for a moment.
-                    .onChange(of: episodeRowFollowID) { _, target in
-                        guard let target, vm.episodes.contains(where: { $0.id == target }) else { return }
-                        episodeProxy.scrollTo(target, anchor: .center)
-                    }
-                    // Keep the horizontal scroll position owned by episodeRowPosition.
-                    // Re-centering on every appearance caused the row to jump when returning
-                    // from Cast / Similar / Catalog.
-                    }
-                    .frame(height: 110)
+                // Sodalite#230: the ring was seen on the finished card while Play named the successor.
+                .onChange(of: playTargetID) { old, new in
+                    LogTap.shared.note("[EpisodeRow] ring \(old ?? "nil") -> \(new ?? "nil") rows=\(vm.episodes.count)")
                 }
+                .onChange(of: pendingEpisodeFocus) { _, target in
+                    guard let target else { return }
+                    // Scroll the target into the LazyHStack so its .focused modifier exists when we write focusedEpisodeID, else the write silently fails for an unrendered card (right-side 2-press case).
+                    // Materialize and center the destination before moving focus. No animated
+                    // scroll is used here: tvOS otherwise interrupts it with its own focus scroll,
+                    // producing the visible double-jump/ghost transition.
+                    episodeProxy.scrollTo(target, anchor: .center)
+                    deferOnMain {
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) { focusedEpisodeID = target }
+                        pendingEpisodeFocus = nil
+                    }
+                }
+                // No animation: the row is behind the player, and an animated scroll is exactly
+                // what leaves the target unrendered for a moment.
+                .onChange(of: episodeRowFollowID) { _, target in
+                    guard let target, vm.episodes.contains(where: { $0.id == target }) else { return }
+                    episodeProxy.scrollTo(target, anchor: .center)
+                }
+                // Keep the horizontal scroll position owned by episodeRowPosition.
+                // Re-centering on every appearance caused the row to jump when returning
+                // from Cast / Similar / Catalog.
+                }
+                .frame(height: 110)
             }
-        }
-        .focusSectionCompat()
-        .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.isLoadingSeasons)|\(vm.isLoadingEpisodes)") {
-            #if os(tvOS)
-            // Initial page focus belongs to Play (see actionButtonRow.defaultFocus).
-            // Do not seed pendingEpisodeFocus here: that would override Play and land on an episode.
-            #endif
-            await prefetchSeriesArtwork(vm: vm)
         }
     }
 
