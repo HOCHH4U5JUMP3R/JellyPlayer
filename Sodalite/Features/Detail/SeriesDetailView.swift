@@ -790,7 +790,10 @@ struct SeriesDetailView: View {
                         .onMoveCommand { direction in
                             switch direction {
                             case .up:
-                                focusEpisodeRow(vm: vm, targetEpisodeID: episodeAim.rememberedID ?? focusedEpisodeID)
+                                let remembered = episodeAim.rememberedID
+                ?? focusedEpisodeID
+                ?? vm.selectedSeasonID.flatMap { lastFocusedEpisodeBySeason[$0] }
+            focusEpisodeRow(vm: vm, targetEpisodeID: remembered)
                             case .down:
                                 focusFirstSimilar(vm: vm)
                             default:
