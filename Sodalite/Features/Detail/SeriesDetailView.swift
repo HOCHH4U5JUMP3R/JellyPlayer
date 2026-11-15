@@ -117,8 +117,6 @@ struct SeriesDetailView: View {
     @State private var episodeOrigin = EpisodeStateOrigin()
     /// Bridge season→episode writes the target episode id here; the episode-row ScrollViewReader scrolls it into the LazyHStack then writes focusedEpisodeID, since a focusedEpisodeID write for an unrendered card is a silent no-op (right-side-takes-two-clicks case).
     @State private var pendingEpisodeFocus: String?
-    /// The player return sets this alongside pendingEpisodeFocus: the row jumps instead of animating, because the focus write lands mid-animation and the focus engine's own scroll then stops it short of the card.
-    @State private var pendingEpisodeFocusIsReturn = false
     /// Sodalite#230: the finished episode and the one the page moved on to. The player return and the
     /// advance arrive in either order, and whichever comes second aims the row at the successor.
     @State private var episodeAdvance: (from: String, to: String)?
@@ -134,6 +132,9 @@ struct SeriesDetailView: View {
     /// Which cast card holds focus, for the row's entry aim (Sodalite#146 round 2). Same rule as the
     /// movie page: the first entry lands on the first card, after that the row remembers.
     @FocusState private var focusedCastID: String?
+    @FocusState private var focusedSimilarID: String?
+    @FocusState private var focusedCatalogID: String?
+    @State private var didSetInitialEpisodeFocus = false
     /// Focus is remembered per rail; the focus engine's nearest-neighbour choice must not
     /// overwrite the last card the viewer used in another horizontal row.
     @State private var lastFocusedSeasonID: String?
@@ -362,7 +363,6 @@ struct SeriesDetailView: View {
                     focusedEpisodeID = nil
                     episodeAim.sessionMoved(to: targetID)
                     returnFocusEpisodeID = targetID
-                    pendingEpisodeFocusIsReturn = true
                     pendingEpisodeFocus = targetID
                     let target = targetID
                     deferOnMain(by: 0.6) {
@@ -506,7 +506,6 @@ struct SeriesDetailView: View {
         // It also explains why the defect came and went. A push racing the first focus evaluation is
         // either redundant or a move, depending on which lands first, and that is decided by how fast
         // the detail fetch returns.
-        .defaultFocus($playButtonFocused, true)
         .onChange(of: selectedEpisode?.id) { _, newID in
             updateBackdropURL()
             // Episode lists are slim (no MediaStreams/MediaSources, or placeholder sources on a lazy server); on opening into episode mode pull full detail and swap in (same id) so the TechInfoBox and the version button see the real files.
@@ -784,6 +783,21 @@ struct SeriesDetailView: View {
                             focusedID: $focusedCastID,
                             onSelect: { handlePersonTap($0) }
                         )
+                        #if os(tvOS)
+                        .onMoveCommand { direction in
+                            switch direction {
+                            case .up:
+                                let remembered = episodeAim.rememberedID
+                                    ?? focusedEpisodeID
+                                    ?? vm.selectedSeasonID.flatMap { lastFocusedEpisodeBySeason[$0] }
+                                focusEpisodeRow(vm: vm, targetEpisodeID: remembered)
+                            case .down:
+                                focusFirstSimilar(vm: vm)
+                            default:
+                                break
+                            }
+                        }
+                        #endif
                         .padding(.top, 20)
                         .onChange(of: focusedCastID) { _, newID in
                             if let newID { lastFocusedCastID = newID }
@@ -821,8 +835,18 @@ struct SeriesDetailView: View {
                             items: vm.similarItems,
                             imageURLProvider: { vm.posterURL(for: $0) },
                             onItemSelected: { navigateToItem = $0 },
-                            cardStyle: .poster
+                            cardStyle: .poster,
+                            focusedID: $focusedSimilarID
                         )
+                        #if os(tvOS)
+                        .onMoveCommand { direction in
+                            switch direction {
+                            case .up: focusFirstCastOrEpisode(vm: vm)
+                            case .down: focusFirstCatalog(vm: vm)
+                            default: break
+                            }
+                        }
+                        #endif
                     }
 
                     // Same split the search screen teaches: what the server has on top, what it
@@ -832,8 +856,14 @@ struct SeriesDetailView: View {
                             title: "search.section.catalog",
                             titleFont: detailSectionTitleFont,
                             items: vm.catalogSimilar,
-                            onItemSelected: { navigateToSeerrRequest = $0 }
+                            onItemSelected: { navigateToSeerrRequest = $0 },
+                            focusedID: $focusedCatalogID
                         )
+                        #if os(tvOS)
+                        .onMoveCommand { direction in
+                            if direction == .up { focusFirstSimilar(vm: vm) }
+                        }
+                        #endif
                     }
 
                     // Sodalite#146: one non-focusable line closing the page with what the
@@ -1240,6 +1270,13 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .watched)
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .up: focusSynopsis()
+                    case .down: focusAction(.play)
+                    default: break
+                    }
+                }
 
                 InfuseDetailActionButton(
                     title: "Bewerten",
@@ -1249,6 +1286,13 @@ struct SeriesDetailView: View {
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
                 .focused($focusedAction, equals: .rating)
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .up: focusSynopsis()
+                    case .down: focusAction(.play)
+                    default: break
+                    }
+                }
 
                 InfuseDetailActionButton(
                     title: isShowingEpisode
@@ -1265,6 +1309,13 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .favorite)
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .up: focusSynopsis()
+                    case .down: focusAction(.trailer)
+                    default: break
+                    }
+                }
 
                 InfuseDetailActionButton(
                     title: "Synchronisieren",
@@ -1284,6 +1335,13 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .sync)
+                .onMoveCommand { direction in
+                    switch direction {
+                    case .up: focusSynopsis()
+                    case .down: focusAction(.trailer)
+                    default: break
+                    }
+                }
             }
 
             HStack(spacing: 12) {
@@ -1297,7 +1355,11 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
                 .onMoveCommand { direction in
-                    if direction == .down { focusSeasonRow(vm: vm) }
+                    switch direction {
+                    case .up: focusAction(.watched)
+                    case .down: focusSeasonRow(vm: vm)
+                    default: break
+                    }
                 }
 
                 InfuseDetailActionButton(title: "Trailer", symbol: "play.rectangle") {
@@ -1312,7 +1374,11 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .trailer)
                 .onMoveCommand { direction in
-                    if direction == .down { focusSeasonRow(vm: vm) }
+                    switch direction {
+                    case .up: focusAction(.favorite)
+                    case .down: focusSeasonRow(vm: vm)
+                    default: break
+                    }
                 }
             }
         }
@@ -1933,42 +1999,125 @@ struct SeriesDetailView: View {
         )
     }
 
-    private func focusSeasonRow(vm: DetailViewModel) {
-        let target = lastFocusedSeasonID.flatMap { remembered in
-            vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
-        } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
-        guard let target else { return }
+    #if os(tvOS)
+    private func setFocusWithoutAnimation(_ update: () -> Void) {
         var transaction = Transaction()
         transaction.disablesAnimations = true
-        withTransaction(transaction) { focusedSeasonID = target }
+        withTransaction(transaction, update)
     }
 
-    /// Restore the last card used IN THIS SEASON. On first entry, prefer the selected/current
-    /// episode, then the first card. A remembered card from another season must never win.
-    private func episodeEntryTarget(vm: DetailViewModel) -> String? {
-        if let seasonID = vm.selectedSeasonID,
-           let rememberedID = lastFocusedEpisodeBySeason[seasonID],
-           vm.episodes.contains(where: { $0.id == rememberedID }) {
-            return rememberedID
+    private func focusAction(_ action: DetailAction) {
+        setFocusWithoutAnimation {
+            focusedAction = action
+            playButtonFocused = action == .play
         }
-        if let selectedID = selectedEpisode?.id,
-           vm.episodes.contains(where: { $0.id == selectedID }) {
-            return selectedID
-        }
+    }
+
+    private func focusSynopsis() {
+        focusAction(.synopsis)
+    }
+
+    private func initialEpisodeFocusTarget(vm: DetailViewModel) -> String? {
         if let currentID = vm.currentEpisodeID,
            vm.episodes.contains(where: { $0.id == currentID }) {
             return currentID
         }
-        return vm.episodes.first?.id
+        if let firstUnwatched = vm.episodes.first(where: { !vm.isPlayed($0) }) {
+            return firstUnwatched.id
+        }
+        return vm.episodes.last?.id
     }
 
-    /// Up out of the episode row returns to its own remembered season, or the first tab.
+    /// Down from a season loads that season if necessary, then chooses its first unseen episode;
+    /// a fully watched season enters on its final episode.
+    private func focusEpisodeRow(vm: DetailViewModel, targetSeasonID: String? = nil, targetEpisodeID: String? = nil) {
+        guard let seasonID = targetSeasonID ?? vm.selectedSeasonID else { return }
+        Task { @MainActor in
+            if vm.selectedSeasonID != seasonID || vm.episodes.isEmpty {
+                await vm.loadEpisodes(seasonID: seasonID)
+            }
+            guard vm.selectedSeasonID == seasonID else { return }
+            let target: String?
+            if let targetEpisodeID, vm.episodes.contains(where: { $0.id == targetEpisodeID }) {
+                target = targetEpisodeID
+            } else if let season = vm.seasons.first(where: { $0.id == seasonID }),
+                      vm.isSeasonPlayed(season) {
+                target = vm.episodes.last?.id
+            } else if let currentID = vm.currentEpisodeID,
+                      vm.episodes.contains(where: { $0.id == currentID }) {
+                target = currentID
+            } else {
+                target = vm.episodes.first(where: { !vm.isPlayed($0) })?.id ?? vm.episodes.first?.id
+            }
+            guard let target else { return }
+            lastFocusedSeasonID = seasonID
+            pendingEpisodeFocus = target
+        }
+    }
+
+    private func castMembers(vm: DetailViewModel) -> [CastMember] {
+        jellyfinCastMembers(
+            from: vm.item.people ?? [],
+            imageService: dependencies.jellyfinImageService,
+            imageWidth: metrics.castImageWidth,
+            serverID: vm.item.serverID
+        )
+    }
+
+    private func focusFirstCast(vm: DetailViewModel) {
+        if let first = castMembers(vm: vm).first {
+            setFocusWithoutAnimation { focusedCastID = first.id }
+        } else {
+            focusFirstSimilar(vm: vm)
+        }
+    }
+
+    private func focusFirstCastOrEpisode(vm: DetailViewModel) {
+        if let first = castMembers(vm: vm).first {
+            setFocusWithoutAnimation { focusedCastID = first.id }
+        } else {
+            let remembered = episodeAim.rememberedID
+                ?? focusedEpisodeID
+                ?? vm.selectedSeasonID.flatMap { lastFocusedEpisodeBySeason[$0] }
+            focusEpisodeRow(vm: vm, targetEpisodeID: remembered)
+        }
+    }
+
+    private func focusFirstSimilar(vm: DetailViewModel) {
+        if let first = vm.similarItems.first {
+            setFocusWithoutAnimation { focusedSimilarID = first.originKey }
+        } else {
+            focusFirstCatalog(vm: vm)
+        }
+    }
+
+    private func focusFirstCatalog(vm: DetailViewModel) {
+        if let first = vm.catalogSimilar.first {
+            setFocusWithoutAnimation { focusedCatalogID = first.stableKey }
+        }
+    }
+    #endif
+
+    #if os(tvOS)
+    private func focusSeasonRow(vm: DetailViewModel) {
+        // Return to Next Up's season. With no current/next episode (all watched or no history),
+        // the series fallback is always season one, never whichever tab happened to be selected last.
+        let currentSeasonID = vm.nextUpEpisode?.seasonId
+            ?? vm.episodes.first(where: { $0.id == vm.currentEpisodeID })?.seasonId
+            ?? (initialEpisode == nil ? nil : vm.selectedSeasonID)
+        guard let target = currentSeasonID ?? vm.seasons.first?.id else { return }
+        setFocusWithoutAnimation { focusedSeasonID = target }
+    }
+
+    /// Up from episodes restores the exact season that was focused before entering the episode rail.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
         } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
-        focusedSeasonID = target
+        guard let target else { return }
+        setFocusWithoutAnimation { focusedSeasonID = target }
     }
+    #endif
 
     /// Warm the artwork that is visible on first entry. AsyncCachedImage already has a decoded
     /// memory cache; this fills it before the user moves focus through the season/episode rails.
@@ -2032,10 +2181,9 @@ struct SeriesDetailView: View {
                     .onMoveCommand { direction in
                         switch direction {
                         case .up:
-                            playButtonFocused = true
+                            focusAction(.play)
                         case .down:
-                            guard let target = episodeEntryTarget(vm: vm) else { return }
-                            pendingEpisodeFocus = target
+                            focusEpisodeRow(vm: vm, targetSeasonID: focusedSeasonID ?? vm.selectedSeasonID)
                         default:
                             break
                         }
@@ -2060,9 +2208,15 @@ struct SeriesDetailView: View {
                             if selectedEpisode == nil {
                                 episodeOrigin.openedFromSeries()
                             }
+                            #if os(tvOS)
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) { selectedEpisode = episode }
+                            #else
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedEpisode = episode
                             }
+                            #endif
                         }
 
                         if let newEpisode,
@@ -2078,7 +2232,10 @@ struct SeriesDetailView: View {
                         }
                     }
                     .onChange(of: vm.selectedSeasonID) { _, newID in
-                        withAnimation { proxy.scrollTo(newID, anchor: .center) }
+                        if let newID { proxy.scrollTo(newID, anchor: .center) }
+                    }
+                    .onChange(of: focusedSeasonID) { _, newID in
+                        if let newID { proxy.scrollTo(newID, anchor: .center) }
                     }
                 }
             }
@@ -2123,10 +2280,17 @@ struct SeriesDetailView: View {
                             .padding(.vertical, 6)
                         }
                         .scrollPosition($episodeRowPosition)
+                        #if os(tvOS)
+                        .defaultFocus($focusedEpisodeID, initialEpisodeFocusTarget(vm: vm) ?? vm.episodes[0].id)
+                        #endif
                         .scrollClipDisabled()
                         #if os(tvOS)
                         .onMoveCommand { direction in
-                            if direction == .up { focusUpFromEpisodeRow(vm: vm) }
+                            switch direction {
+                            case .up: focusUpFromEpisodeRow(vm: vm)
+                            case .down: focusFirstCast(vm: vm)
+                            default: break
+                            }
                         }
                         #endif
                     .onChange(of: focusedEpisodeID) { _, newID in
@@ -2145,19 +2309,14 @@ struct SeriesDetailView: View {
                     .onChange(of: pendingEpisodeFocus) { _, target in
                         guard let target else { return }
                         // Scroll the target into the LazyHStack so its .focused modifier exists when we write focusedEpisodeID, else the write silently fails for an unrendered card (right-side 2-press case).
-                        if pendingEpisodeFocusIsReturn {
-                            // Back from the player the row can be many cards away. The focus write below
-                            // lands 50 ms into a 0.2 s animation, the focus engine takes the scroll over and
-                            // the row stopped short of the focused card, so it jumps there instead.
-                            pendingEpisodeFocusIsReturn = false
-                            episodeProxy.scrollTo(target, anchor: .center)
-                        } else {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                episodeProxy.scrollTo(target, anchor: .center)
-                            }
-                        }
+                        // Materialize and center the destination before moving focus. No animated
+                        // scroll is used here: tvOS otherwise interrupts it with its own focus scroll,
+                        // producing the visible double-jump/ghost transition.
+                        episodeProxy.scrollTo(target, anchor: .center)
                         deferOnMain {
-                            focusedEpisodeID = target
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) { focusedEpisodeID = target }
                             pendingEpisodeFocus = nil
                         }
                     }
@@ -2176,7 +2335,16 @@ struct SeriesDetailView: View {
             }
         }
         .focusSectionCompat()
-        .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.seasons.count)|\(vm.episodes.count)|\(selectedEpisode?.id ?? "")") {
+        .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.isLoadingSeasons)|\(vm.isLoadingEpisodes)") {
+            #if os(tvOS)
+            if !didSetInitialEpisodeFocus, !vm.isLoadingSeasons, !vm.isLoadingEpisodes, !vm.episodes.isEmpty {
+                if let target = initialEpisodeFocusTarget(vm: vm) {
+                    didSetInitialEpisodeFocus = true
+                    lastFocusedSeasonID = vm.selectedSeasonID
+                    pendingEpisodeFocus = target
+                }
+            }
+            #endif
             await prefetchSeriesArtwork(vm: vm)
         }
     }
