@@ -84,12 +84,6 @@ struct DetailHeroSynopsis: View {
                 .padding(.horizontal, 1)
                 .padding(.vertical, 1)
                 .contentShape(Rectangle())
-                .background {
-                    if isFocused {
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(Color.white.opacity(0.055))
-                    }
-                }
                 .overlay(alignment: .bottomLeading) {
                     if isFocused {
                         Capsule()

@@ -58,6 +58,7 @@ struct SeriesDetailView: View {
     /// away). See `DetailAction`.
     @FocusState private var focusedAction: DetailAction?
     @State private var actionAbovePlay: DetailAction = .watched
+    @State private var actionAboveTrailer: DetailAction = .favorite
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
     /// Sodalite#146 round 3: Watched on a SERIES is the one control on the page that cannot be
@@ -1317,7 +1318,9 @@ struct SeriesDetailView: View {
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis()
-                    case .down: focusAction(.trailer)
+                    case .down:
+                        actionAboveTrailer = .favorite
+                        focusAction(.trailer)
                     default: break
                     }
                 }
@@ -1343,7 +1346,9 @@ struct SeriesDetailView: View {
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis()
-                    case .down: focusAction(.trailer)
+                    case .down:
+                        actionAboveTrailer = .sync
+                        focusAction(.trailer)
                     default: break
                     }
                 }
@@ -1380,7 +1385,7 @@ struct SeriesDetailView: View {
                 .focused($focusedAction, equals: .trailer)
                 .onMoveCommand { direction in
                     switch direction {
-                    case .up: focusAction(.favorite)
+                    case .up: focusAction(actionAboveTrailer)
                     case .down: focusSeasonRow(vm: vm)
                     default: break
                     }
@@ -2292,7 +2297,6 @@ struct SeriesDetailView: View {
                         }
                         .scrollPosition($episodeRowPosition)
                         #if os(tvOS)
-                        .defaultFocus($focusedEpisodeID, initialEpisodeFocusTarget(vm: vm) ?? vm.episodes[0].id)
                         #endif
                         .scrollClipDisabled()
                         #if os(tvOS)
@@ -2348,13 +2352,8 @@ struct SeriesDetailView: View {
         .focusSectionCompat()
         .task(id: "\(vm.item.id)|\(vm.selectedSeasonID ?? "")|\(vm.episodes.count)|\(vm.currentEpisodeID ?? "")|\(vm.isLoadingSeasons)|\(vm.isLoadingEpisodes)") {
             #if os(tvOS)
-            if !didSetInitialEpisodeFocus, !vm.isLoadingSeasons, !vm.isLoadingEpisodes, !vm.episodes.isEmpty {
-                if let target = initialEpisodeFocusTarget(vm: vm) {
-                    didSetInitialEpisodeFocus = true
-                    lastFocusedSeasonID = vm.selectedSeasonID
-                    pendingEpisodeFocus = target
-                }
-            }
+            // Initial page focus belongs to Play (see actionButtonRow.defaultFocus).
+            // Do not seed pendingEpisodeFocus here: that would override Play and land on an episode.
             #endif
             await prefetchSeriesArtwork(vm: vm)
         }
