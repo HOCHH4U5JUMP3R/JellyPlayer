@@ -57,9 +57,10 @@ struct HorizontalMediaRow: View {
             .padding(.leading, leadingInset)
             .padding(.trailing, rowInset)
 
-            RowScrollView(leading: leadingInset, trailing: rowInset,
-                          vertical: metrics.rowVerticalPadding) {
-                LazyHStack(spacing: metrics.itemSpacing) {
+            ScrollViewReader { proxy in
+                RowScrollView(leading: leadingInset, trailing: rowInset,
+                              vertical: metrics.rowVerticalPadding) {
+                    LazyHStack(spacing: metrics.itemSpacing) {
                     // Per server: two servers can carry the same id, and a repeated identity draws a blank card.
                     ForEach(items, id: \.originKey) { item in
                         bindingFocus(
@@ -79,17 +80,23 @@ struct HorizontalMediaRow: View {
                             .mediaContextMenu(for: item) { onItemSelected?($0) },
                             to: item.originKey
                         )
+                        .id(item.originKey)
                     }
                     if let onShowAll {
                         FocusableCard(action: onShowAll, exposesButtonSemantics: true) { isFocused in
                             ShowAllCard(style: cardStyle, isFocused: isFocused)
                         }
                     }
+                    }
                 }
+                .onChange(of: focusedID?.wrappedValue) { _, target in
+                    guard let target else { return }
+                    proxy.scrollTo(target, anchor: .center)
+                }
+                // A row is its own focus section so vertical navigation can reach it from any column (#80).
+                .focusSectionCompat()
+                .enrichesPosterBadges(items)
             }
-            // A row is its own focus section so vertical navigation can reach it from any column (#80).
-            .focusSectionCompat()
-            .enrichesPosterBadges(items)
         }
     }
 }
