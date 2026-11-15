@@ -2009,7 +2009,7 @@ struct SeriesDetailView: View {
     private func focusAction(_ action: DetailAction) {
         setFocusWithoutAnimation {
             focusedAction = action
-            if action == .play { playButtonFocused = true }
+            playButtonFocused = action == .play
         }
     }
 
@@ -2093,33 +2093,14 @@ struct SeriesDetailView: View {
     }
     #endif
 
+    #if os(tvOS)
     private func focusSeasonRow(vm: DetailViewModel) {
-        // Play/Trailer always return to the active season. If there is no Next Up target,
-        // loadSeasons() has already selected season one as the all-watched fallback.
+        // Play/Trailer return to the active season; loadSeasons selects season one when there is no Next Up.
         guard let target = vm.selectedSeasonID ?? vm.seasons.first?.id else { return }
         setFocusWithoutAnimation { focusedSeasonID = target }
     }
 
-    /// Restore the last card used IN THIS SEASON. On first entry, prefer the selected/current
-    /// episode, then the first card. A remembered card from another season must never win.
-    private func episodeEntryTarget(vm: DetailViewModel) -> String? {
-        if let seasonID = vm.selectedSeasonID,
-           let rememberedID = lastFocusedEpisodeBySeason[seasonID],
-           vm.episodes.contains(where: { $0.id == rememberedID }) {
-            return rememberedID
-        }
-        if let selectedID = selectedEpisode?.id,
-           vm.episodes.contains(where: { $0.id == selectedID }) {
-            return selectedID
-        }
-        if let currentID = vm.currentEpisodeID,
-           vm.episodes.contains(where: { $0.id == currentID }) {
-            return currentID
-        }
-        return vm.episodes.first?.id
-    }
-
-    /// Up out of the episode row returns to its own remembered season, or the first tab.
+    /// Up from episodes restores the exact season that was focused before entering the episode rail.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
@@ -2127,6 +2108,7 @@ struct SeriesDetailView: View {
         guard let target else { return }
         setFocusWithoutAnimation { focusedSeasonID = target }
     }
+    #endif
 
     /// Warm the artwork that is visible on first entry. AsyncCachedImage already has a decoded
     /// memory cache; this fills it before the user moves focus through the season/episode rails.
