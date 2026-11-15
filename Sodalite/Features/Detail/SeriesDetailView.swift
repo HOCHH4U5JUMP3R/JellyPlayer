@@ -2049,6 +2049,7 @@ struct SeriesDetailView: View {
                 target = vm.episodes.first(where: { !vm.isPlayed($0) })?.id ?? vm.episodes.first?.id
             }
             guard let target else { return }
+            lastFocusedSeasonID = seasonID
             pendingEpisodeFocus = target
         }
     }
@@ -2322,6 +2323,7 @@ struct SeriesDetailView: View {
             if !didSetInitialEpisodeFocus, !vm.isLoadingSeasons, !vm.isLoadingEpisodes, !vm.episodes.isEmpty {
                 if let target = initialEpisodeFocusTarget(vm: vm) {
                     didSetInitialEpisodeFocus = true
+                    lastFocusedSeasonID = vm.selectedSeasonID
                     pendingEpisodeFocus = target
                 }
             }
