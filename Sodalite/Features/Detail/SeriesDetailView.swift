@@ -1267,13 +1267,13 @@ struct SeriesDetailView: View {
                         isConfirmingPlayedChange = true
                     }
                 }
-                .focused($focusedAction, equals: .watched)
-                .disabled(actionEntryTarget != nil && actionEntryTarget != .watched)
                 .onFocusChanged { hasFocus in
                     guard hasFocus else { return }
                     if actionEntryTarget == .watched { actionEntryTarget = nil }
                     seasonEntryTargetID = nil
                 }
+                .focused($focusedAction, equals: .watched)
+                .disabled(actionEntryTarget != nil && actionEntryTarget != .watched)
                 .prefersDefaultFocus(actionBelowSynopsis == .watched, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
@@ -1292,13 +1292,13 @@ struct SeriesDetailView: View {
                     let ratedItem = selectedEpisode ?? vm.item
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
-                .focused($focusedAction, equals: .rating)
-                .disabled(actionEntryTarget != nil && actionEntryTarget != .rating)
                 .onFocusChanged { hasFocus in
                     guard hasFocus else { return }
                     if actionEntryTarget == .rating { actionEntryTarget = nil }
                     seasonEntryTargetID = nil
                 }
+                .focused($focusedAction, equals: .rating)
+                .disabled(actionEntryTarget != nil && actionEntryTarget != .rating)
                 .prefersDefaultFocus(actionBelowSynopsis == .rating, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
@@ -1324,13 +1324,13 @@ struct SeriesDetailView: View {
                         Task { await vm.toggleFavorite() }
                     }
                 }
-                .focused($focusedAction, equals: .favorite)
-                .disabled(actionEntryTarget != nil && actionEntryTarget != .favorite)
                 .onFocusChanged { hasFocus in
                     guard hasFocus else { return }
                     if actionEntryTarget == .favorite { actionEntryTarget = nil }
                     seasonEntryTargetID = nil
                 }
+                .focused($focusedAction, equals: .favorite)
+                .disabled(actionEntryTarget != nil && actionEntryTarget != .favorite)
                 .prefersDefaultFocus(actionBelowSynopsis == .favorite, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
@@ -1359,13 +1359,13 @@ struct SeriesDetailView: View {
                         isRefreshingMetadata = false
                     }
                 }
-                .focused($focusedAction, equals: .sync)
-                .disabled(actionEntryTarget != nil && actionEntryTarget != .sync)
                 .onFocusChanged { hasFocus in
                     guard hasFocus else { return }
                     if actionEntryTarget == .sync { actionEntryTarget = nil }
                     seasonEntryTargetID = nil
                 }
+                .focused($focusedAction, equals: .sync)
+                .disabled(actionEntryTarget != nil && actionEntryTarget != .sync)
                 .prefersDefaultFocus(actionBelowSynopsis == .sync, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
@@ -1387,13 +1387,13 @@ struct SeriesDetailView: View {
                         pendingPlayRequest = true
                     }
                 }
-                .focused($focusedAction, equals: .play)
-                .focused($playButtonFocused)
                 .onFocusChanged { hasFocus in
                     guard hasFocus else { return }
                     actionEntryTarget = nil
                     seasonEntryTargetID = seasonEntryTarget(vm: vm)
                 }
+                .focused($focusedAction, equals: .play)
+                .focused($playButtonFocused)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusAction(actionAbovePlay)
@@ -1412,12 +1412,12 @@ struct SeriesDetailView: View {
                         }
                     }
                 }
-                .focused($focusedAction, equals: .trailer)
                 .onFocusChanged { hasFocus in
                     guard hasFocus else { return }
                     actionEntryTarget = nil
                     seasonEntryTargetID = seasonEntryTarget(vm: vm)
                 }
+                .focused($focusedAction, equals: .trailer)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusAction(actionAboveTrailer)
