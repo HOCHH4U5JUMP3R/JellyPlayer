@@ -52,6 +52,8 @@ struct SeriesDetailView: View {
     @FocusState private var focusedEpisodeID: String?
     /// Separate focus binding used by the player-return and vertical-navigation paths.
     @FocusState private var playButtonFocused: Bool
+    /// Keeps the temporary Menu-dismiss anchor independent from the real Play action's focus state.
+    @FocusState private var loadingDismissFocused: Bool
     /// Which control in the action row holds focus, nil while focus is anywhere else on the page.
     /// The secondaries leave the focus engine for that time, so an up-move out of the content can
     /// only land on Play (Sodalite#53, and #146 once the overview box that used to answer this went
@@ -247,6 +249,7 @@ struct SeriesDetailView: View {
                 // its fixed-size placeholder; replacing the whole page here caused focus and
                 // layout to be rebuilt when isLoading changed.
                 contentOverlay(vm: vm)
+                    .defaultFocus($focusedAction, .play, priority: .userInitiated)
             } else {
                 // The view model is created in onAppear. Until then, keep a neutral loading
                 // surface and a focus anchor so Menu still dismisses the detail route safely.
@@ -254,19 +257,14 @@ struct SeriesDetailView: View {
                     ProgressView()
                     // Invisible focus anchor, else Menu on the loading screen propagates past the nav stack and quits the app instead of popping back.
                     Button("") { dismiss() }
-                        // Share Play's focus identity until the visible Play control is inserted.
-                        .focused($focusedAction, equals: .play)
+                        // Keep the Menu-safe anchor out of the action row's focus state.
+                        .focused($loadingDismissFocused)
                         .opacity(0)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
             }
         }
-        #if os(tvOS)
-        // The Play action is present as soon as the series content appears, even while
-        // metadata and episode data are still resolving. Target the actual action identity.
-        .defaultFocus($focusedAction, .play, priority: .userInitiated)
-        #endif
         // Back/Menu always leaves the detail page. The in-page "Show Series" action remains the
         // explicit way to switch from an episode panel back to the series overview; intercepting
         // Menu here inserted an unwanted intermediate page and required two presses to leave.
@@ -984,7 +982,7 @@ struct SeriesDetailView: View {
                 Color.clear.frame(height: 36)
                 Color.clear.frame(height: 26)
                 Color.clear.frame(height: 30)
-                Color.clear.frame(height: 70)
+                Color.clear.frame(height: 90)
             } else {
                 // Keep the series state on the same fixed metadata grid as episode state.
                 HStack(spacing: 9) {
