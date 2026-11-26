@@ -2649,6 +2649,7 @@ struct SeriesDetailView: View {
 #if os(tvOS)
 private struct InfuseDetailActionButtonStyle: ButtonStyle {
     var isProminent: Bool
+    var onFocusChanged: ((Bool) -> Void)? = nil
     @Environment(\.isFocused) private var isFocused
 
     func makeBody(configuration: Configuration) -> some View {
@@ -2664,6 +2665,7 @@ private struct InfuseDetailActionButtonStyle: ButtonStyle {
                     )
             )
             .contentShape(RoundedRectangle(cornerRadius: 13))
+            .onChange(of: isFocused) { _, hasFocus in onFocusChanged?(hasFocus) }
             .animation(.easeOut(duration: 0.12), value: isFocused)
             .animation(nil, value: configuration.isPressed)
     }
@@ -2674,7 +2676,14 @@ private struct InfuseDetailActionButton: View {
     let symbol: String
     var prominent = false
     var isLoading = false
+    var focusChangeHandler: ((Bool) -> Void)? = nil
     let action: () -> Void
+
+    func onFocusChanged(_ handler: @escaping (Bool) -> Void) -> Self {
+        var copy = self
+        copy.focusChangeHandler = handler
+        return copy
+    }
 
     var body: some View {
         Button(action: action) {
@@ -2695,7 +2704,7 @@ private struct InfuseDetailActionButton: View {
             .frame(maxWidth: .infinity)
             .frame(height: 62)
         }
-        .buttonStyle(InfuseDetailActionButtonStyle(isProminent: prominent))
+        .buttonStyle(InfuseDetailActionButtonStyle(isProminent: prominent, onFocusChanged: focusChangeHandler))
         .focusEffectDisabled(true)
         .accessibilityLabel(Text(title))
     }
