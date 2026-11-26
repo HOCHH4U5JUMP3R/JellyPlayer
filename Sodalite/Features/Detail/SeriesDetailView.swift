@@ -249,7 +249,8 @@ struct SeriesDetailView: View {
                 // its fixed-size placeholder; replacing the whole page here caused focus and
                 // layout to be rebuilt when isLoading changed.
                 contentOverlay(vm: vm)
-                    .defaultFocus($focusedAction, .play, priority: .userInitiated)
+                    // Bind initial focus directly to the actual Play control.
+                    .defaultFocus($playButtonFocused, true, priority: .userInitiated)
             } else {
                 // The view model is created in onAppear. Until then, keep a neutral loading
                 // surface and a focus anchor so Menu still dismisses the detail route safely.
