@@ -506,6 +506,21 @@ struct SeriesDetailView: View {
         .onChange(of: viewModel?.isLoading) { _, _ in
             updateBackdropURL()
         }
+        // Remember the last real action-row destination, not the geometrically nearest button.
+        // Ignore the transition FROM synopsis: tvOS can briefly report its geometric candidate
+        // before the explicit return target is applied.
+        .onChange(of: focusedAction) { oldAction, newAction in
+            let rowActions: Set<DetailAction> = [.watched, .rating, .favorite, .sync]
+            if newAction == .synopsis {
+                if let oldAction, rowActions.contains(oldAction) {
+                    actionBelowSynopsis = oldAction
+                }
+            } else if oldAction != .synopsis,
+                      let newAction,
+                      rowActions.contains(newAction) {
+                actionBelowSynopsis = newAction
+            }
+        }
         // Match MovieDetailView: the default focus belongs to the page root, not to a nested
         // focus scope inside the scrolling content.
         .defaultFocus($playButtonFocused, true)
