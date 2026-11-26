@@ -253,6 +253,9 @@ struct SeriesDetailView: View {
                     ProgressView()
                     // Invisible focus anchor, else Menu on the loading screen propagates past the nav stack and quits the app instead of popping back.
                     Button("") { dismiss() }
+                        // Keep the Play focus identity alive while the real content is loading.
+                        // The loaded Play button uses this same FocusState binding.
+                        .focused($playButtonFocused)
                         .opacity(0)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -262,7 +265,7 @@ struct SeriesDetailView: View {
         #if os(tvOS)
         // Keep the default-focus scope outside the loading/content switch so it survives
         // the transition from the loading anchor to the actual Play button.
-        .defaultFocus($focusedAction, .play, priority: .userInitiated)
+        .defaultFocus($playButtonFocused, true, priority: .userInitiated)
         #endif
         .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
         // Back/Menu always leaves the detail page. The in-page "Show Series" action remains the
