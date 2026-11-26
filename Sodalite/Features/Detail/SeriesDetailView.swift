@@ -145,7 +145,7 @@ struct SeriesDetailView: View {
     @State private var lastFocusedCastID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
-     let item: JellyfinItem
+    let item: JellyfinItem
     /// Seeds the preselected episode for an episode-route open (DetailRouterView .episode) so the panel paints from snapshot and the VM lands on the right season. nil for a normal series open.
     var initialEpisode: JellyfinItem? = nil
     /// TopShelf playAction: fire the primary play action once, as soon as a play target exists.
@@ -496,7 +496,7 @@ struct SeriesDetailView: View {
                     updateBackdropURL()
                 }
             }
-         }
+        }
         .onDisappear {
             #if os(tvOS)
             // Do not let a retained navigation destination restore synopsis focus on its next visit.
