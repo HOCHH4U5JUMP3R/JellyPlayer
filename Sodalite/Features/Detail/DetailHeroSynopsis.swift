@@ -38,12 +38,14 @@ struct DetailHeroSynopsis: View {
     @Environment(\.dependencies) private var dependencies
     @Environment(\.appState) private var appState
 
-    /// Two lines in a short viewport (iPhone landscape), where the first page is not viewport-locked
-    /// and every added line pushes the action row further past the fold, and in the upright
-    /// iPhone's column, which shares its first screen with the poster. The rest is behind the info
-    /// button.
+    /// Keep three lines on tvOS, matching the series detail's intended first-screen synopsis.
+    /// Compact phone layouts retain their two-line teaser to protect the action row.
     private var lineCount: Int {
+        #if os(tvOS)
+        3
+        #else
         vSizeClass == .compact || hSizeClass == .compact ? 2 : 3
+        #endif
     }
 
     private var isSpoilerHidden: Bool {
@@ -86,9 +88,11 @@ struct DetailHeroSynopsis: View {
             .contentShape(Rectangle())
             // Reserve the same footprint as the loading placeholder. The synopsis must not
             // compete with Play for initial focus while its text is still being resolved.
-            .frame(height: 70, alignment: .topLeading)
+            .frame(height: 90, alignment: .topLeading)
             .clipped()
-            .focusable(!isPending && !(text?.isEmpty ?? true))
+            // Pending metadata must not make an already visible episode synopsis impossible to focus.
+            // Initial focus is assigned explicitly to Play by the containing detail page.
+            .focusable(!(text?.isEmpty ?? true))
             .focusEffectDisabled(true)
             .onTapGesture { onTap?() }
     }
