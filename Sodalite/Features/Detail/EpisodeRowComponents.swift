@@ -13,7 +13,6 @@ struct SeasonTab: View {
     let isSelected: Bool
     var focusedID: FocusState<String?>.Binding
     var isEntryFocusEnabled: Bool = true
-    var onActualFocus: () -> Void = {}
     let action: () -> Void
 
     @Environment(\.dependencies) private var dependencies
@@ -46,9 +45,7 @@ struct SeasonTab: View {
                     }
                 }
             }
-            .buttonStyle(SeasonTabButtonStyle(onFocusChanged: { hasFocus in
-                if hasFocus { onActualFocus() }
-            }))
+            .buttonStyle(SeasonTabButtonStyle())
             .focused(focusedID, equals: id)
             // A move from Play/Trailer is an explicit hand-off, not a geometric row entry.
             // Keep every other tab out of the candidate set until the requested one owns focus.
@@ -82,12 +79,10 @@ struct EpisodeCardButtonStyle: ButtonStyle {
 
 struct SeasonTabButtonStyle: ButtonStyle {
     @Environment(\.isFocused) private var isFocused
-    var onFocusChanged: ((Bool) -> Void)? = nil
 
     func makeBody(configuration: Configuration) -> some View {
         // Asymmetric stroke: 50ms fade-in delay, 0 fade-out. A residual wrong-tab transition slipping past the onMoveCommand prime never shows the stroke, the 50ms window lets the DispatchQueue fallback land focus on the right tab first. 50ms is sub-perceptual.
         configuration.label
-            .onChange(of: isFocused) { _, hasFocus in onFocusChanged?(hasFocus) }
             // Not `.focusStroke`: this stroke carries its own asymmetric timing, which the shared
             // modifier has no place for. The width is the same 3.
             .overlay(
