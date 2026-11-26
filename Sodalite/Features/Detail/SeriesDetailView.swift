@@ -51,6 +51,7 @@ struct SeriesDetailView: View {
     @FocusState private var focusedSeasonID: String?
     @FocusState private var focusedEpisodeID: String?
     /// Separate focus binding used by the player-return and vertical-navigation paths.
+    @Namespace private var detailFocusScope
     @FocusState private var playButtonFocused: Bool
     /// Keeps the temporary Menu-dismiss anchor independent from the real Play action's focus state.
     @FocusState private var loadingDismissFocused: Bool
@@ -249,8 +250,7 @@ struct SeriesDetailView: View {
                 // its fixed-size placeholder; replacing the whole page here caused focus and
                 // layout to be rebuilt when isLoading changed.
                 contentOverlay(vm: vm)
-                    // Bind initial focus directly to the actual Play control.
-                    .defaultFocus($playButtonFocused, true, priority: .userInitiated)
+                    .focusScope(detailFocusScope)
             } else {
                 // The view model is created in onAppear. Until then, keep a neutral loading
                 // surface and a focus anchor so Menu still dismisses the detail route safely.
@@ -1341,6 +1341,7 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
+                .prefersDefaultFocus(true, in: detailFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusAction(actionAbovePlay)
