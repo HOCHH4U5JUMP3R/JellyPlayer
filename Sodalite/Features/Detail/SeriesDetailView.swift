@@ -1262,6 +1262,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .watched)
+                .focusable(focusedAction != .synopsis || actionBelowSynopsis == .watched)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis(from: .watched)
@@ -1280,6 +1281,7 @@ struct SeriesDetailView: View {
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
                 .focused($focusedAction, equals: .rating)
+                .focusable(focusedAction != .synopsis || actionBelowSynopsis == .rating)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis(from: .rating)
@@ -1305,6 +1307,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .favorite)
+                .focusable(focusedAction != .synopsis || actionBelowSynopsis == .favorite)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis(from: .favorite)
@@ -1333,6 +1336,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .sync)
+                .focusable(focusedAction != .synopsis || actionBelowSynopsis == .sync)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis(from: .sync)
