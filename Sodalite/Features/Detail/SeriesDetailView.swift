@@ -60,6 +60,7 @@ struct SeriesDetailView: View {
     /// away). See `DetailAction`.
     @FocusState private var focusedAction: DetailAction?
     @Namespace private var actionRowFocusScope
+    @Namespace private var seasonRowFocusScope
     @State private var actionAbovePlay: DetailAction = .watched
     @State private var actionAboveTrailer: DetailAction = .favorite
     @State private var actionBelowSynopsis: DetailAction = .watched
@@ -2204,6 +2205,7 @@ struct SeriesDetailView: View {
                                     Task { await vm.loadEpisodes(seasonID: season.id) }
                                 }
                             )
+                            .prefersDefaultFocus(focusedSeasonID == season.id, in: seasonRowFocusScope)
                             .id(season.id)
                             // Resolve vertical navigation at the row, not by screen-space proximity.
                             .contextMenu { seasonActions(season, vm: vm) }
@@ -2214,6 +2216,7 @@ struct SeriesDetailView: View {
                     // The season poster grows visually by 5% while focused; reserve
                     // enough real layout space so the episode rail cannot paint over it.
                     .padding(.bottom, 32)
+                    .focusScope(seasonRowFocusScope)
                 }
                 .scrollClipDisabled()
                 .focusSectionCompat()
