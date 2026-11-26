@@ -983,7 +983,7 @@ struct SeriesDetailView: View {
                 Color.clear.frame(height: 36)
                 Color.clear.frame(height: 26)
                 Color.clear.frame(height: 30)
-                Color.clear.frame(height: 90)
+                Color.clear.frame(height: 112)
             } else {
                 // Keep the series state on the same fixed metadata grid as episode state.
                 HStack(spacing: 9) {
