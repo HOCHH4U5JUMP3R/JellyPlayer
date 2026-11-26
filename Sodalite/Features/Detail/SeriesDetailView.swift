@@ -235,7 +235,7 @@ struct SeriesDetailView: View {
             // Solid black behind the spinner; backdrop held back until content is ready to crossfade over it.
             Color.black.ignoresSafeArea()
 
-            if let vm = viewModel, !vm.isLoading {
+            if let vm = viewModel {
                 DetailBackdrop(
                     imageURL: backdropURL,
                     posterFallbackURL: vm.heroPosterURL(for: vm.item)
@@ -245,7 +245,10 @@ struct SeriesDetailView: View {
                     .transition(.opacity)
             }
 
-            if let vm = viewModel, !vm.isLoading {
+            if let vm = viewModel {
+                // Keep the complete page mounted while detail data is loading. Each section owns
+                // its fixed-size placeholder; replacing the whole page here caused focus and
+                // layout to be rebuilt when isLoading changed.
                 contentOverlay(vm: vm)
             } else {
                 // Centred spinner; gating on isLoading avoids the field-fill repaint storm (play title + subtitle + progress all change in a 300ms window) and lands the user on one finished render.
@@ -266,7 +269,6 @@ struct SeriesDetailView: View {
         // metadata and episode data are still resolving. Target the actual action identity.
         .defaultFocus($focusedAction, .play, priority: .userInitiated)
         #endif
-        .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
         // Back/Menu always leaves the detail page. The in-page "Show Series" action remains the
         // explicit way to switch from an episode panel back to the series overview; intercepting
         // Menu here inserted an unwanted intermediate page and required two presses to leave.
@@ -759,7 +761,7 @@ struct SeriesDetailView: View {
             }
             .padding(.horizontal, metrics.rowInset)
             // Keyed on item + load state only, NOT genre count: on an instant-paint episode deep-link the series genres land post-paint, flipping the count rebuilt the panel and broke scroll-to-top back to Play. Genres fill in via in-place diff.
-            .id("\(vm.item.id)-\(vm.isLoading)")
+             .id(vm.item.id)
             /* episode changes update in place; do not animate the entire column */
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
@@ -985,7 +987,7 @@ struct SeriesDetailView: View {
                 Color.clear.frame(height: 36)
                 Color.clear.frame(height: 26)
                 Color.clear.frame(height: 30)
-                Color.clear.frame(height: 60)
+                Color.clear.frame(height: 70)
             } else {
                 // Keep the series state on the same fixed metadata grid as episode state.
                 HStack(spacing: 9) {
