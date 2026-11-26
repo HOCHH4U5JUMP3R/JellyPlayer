@@ -253,6 +253,8 @@ struct SeriesDetailView: View {
                     ProgressView()
                     // Invisible focus anchor, else Menu on the loading screen propagates past the nav stack and quits the app instead of popping back.
                     Button("") { dismiss() }
+                        // Share Play's focus identity until the visible Play control is inserted.
+                        .focused($focusedAction, equals: .play)
                         .opacity(0)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
