@@ -1351,6 +1351,11 @@ struct SeriesDetailView: View {
                     }
                 }
             }
+            #if os(tvOS)
+            .onMoveCommand { direction in
+                moveActionHorizontally(direction, order: [.watched, .rating, .favorite, .sync])
+            }
+            #endif
             .focusScope(actionRowFocusScope)
 
             HStack(spacing: 12) {
@@ -1390,6 +1395,11 @@ struct SeriesDetailView: View {
                     }
                 }
             }
+            #if os(tvOS)
+            .onMoveCommand { direction in
+                moveActionHorizontally(direction, order: [.play, .trailer])
+            }
+            #endif
         }
         .frame(maxWidth: 880, alignment: .leading)
         #else
@@ -2021,6 +2031,17 @@ struct SeriesDetailView: View {
         }
     }
 
+    /// Resolve horizontal movement from the declared order of the currently focused action row.
+    /// This prevents tvOS from choosing a neighbouring button by its changing screen geometry.
+    private func moveActionHorizontally(_ direction: MoveCommandDirection, order: [DetailAction]) {
+        guard direction == .left || direction == .right,
+              let current = focusedAction,
+              let index = order.firstIndex(of: current) else { return }
+        let nextIndex = index + (direction == .right ? 1 : -1)
+        guard order.indices.contains(nextIndex) else { return }
+        focusAction(order[nextIndex])
+    }
+
     /// Explicitly move focus to the real Play control. Clearing both bindings first is required
     /// when the destination is already logically selected but tvOS retained another control.
     private func forcePlayFocus() {
@@ -2233,6 +2254,12 @@ struct SeriesDetailView: View {
                         focusAction(.play)
                     case .down:
                         focusEpisodeRow(vm: vm, targetSeasonID: focusedSeasonID ?? vm.selectedSeasonID)
+                    case .left, .right:
+                        guard let current = focusedSeasonID,
+                              let index = vm.seasons.firstIndex(where: { $0.id == current }) else { break }
+                        let nextIndex = index + (direction == .right ? 1 : -1)
+                        guard vm.seasons.indices.contains(nextIndex) else { break }
+                        setFocusWithoutAnimation { focusedSeasonID = vm.seasons[nextIndex].id }
                     default:
                         break
                     }
@@ -2396,6 +2423,14 @@ struct SeriesDetailView: View {
             switch direction {
             case .up: focusUpFromEpisodeRow(vm: vm)
             case .down: focusFirstCast(vm: vm)
+            case .left, .right:
+                guard let current = focusedEpisodeID,
+                      let index = vm.episodes.firstIndex(where: { $0.id == current }) else { break }
+                let nextIndex = index + (direction == .right ? 1 : -1)
+                guard vm.episodes.indices.contains(nextIndex) else { break }
+                let target = vm.episodes[nextIndex].id
+                episodeProxy.scrollTo(target, anchor: .center)
+                setFocusWithoutAnimation { focusedEpisodeID = target }
             default: break
             }
         }
