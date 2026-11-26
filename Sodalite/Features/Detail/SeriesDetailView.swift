@@ -1997,10 +1997,10 @@ struct SeriesDetailView: View {
         }
     }
 
-    #if os(tvOS)
     /// Explicitly move focus to the real Play control. Clearing both bindings first is required
     /// when the destination is already logically selected but tvOS retained another control.
     private func forcePlayFocus() {
+        #if os(tvOS)
         setFocusWithoutAnimation {
             focusedAction = nil
             playButtonFocused = false
@@ -2011,8 +2011,10 @@ struct SeriesDetailView: View {
                 playButtonFocused = true
             }
         }
+        #else
+        playButtonFocused = true
+        #endif
     }
-    #endif
 
     private func focusSynopsis(from action: DetailAction) {
         actionBelowSynopsis = action
