@@ -12,6 +12,7 @@ struct SeasonTab: View {
     let isPlayed: Bool
     let isSelected: Bool
     var focusedID: FocusState<String?>.Binding
+    var isEntryFocusEnabled: Bool = true
     let action: () -> Void
 
     @Environment(\.dependencies) private var dependencies
@@ -46,6 +47,9 @@ struct SeasonTab: View {
             }
             .buttonStyle(SeasonTabButtonStyle())
             .focused(focusedID, equals: id)
+            // A move from Play/Trailer is an explicit hand-off, not a geometric row entry.
+            // Keep every other tab out of the candidate set until the requested one owns focus.
+            .disabled(!isEntryFocusEnabled)
             .scaleEffect(isFocused ? 1.05 : 1)
             .zIndex(isFocused ? 1 : 0)
 

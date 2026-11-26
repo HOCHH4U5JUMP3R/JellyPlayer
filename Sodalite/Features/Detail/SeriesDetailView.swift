@@ -145,6 +145,8 @@ struct SeriesDetailView: View {
     /// Focus is remembered per rail; the focus engine's nearest-neighbour choice must not
     /// overwrite the last card the viewer used in another horizontal row.
     @State private var lastFocusedSeasonID: String?
+    /// During a vertical hand-off from Play/Trailer, only the intended season remains eligible for focus.
+    @State private var seasonEntryTargetID: String?
     @State private var lastFocusedEpisodeBySeason: [String: String] = [:]
     @State private var lastFocusedCastID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
@@ -2136,7 +2138,10 @@ struct SeriesDetailView: View {
             ?? vm.episodes.first(where: { $0.id == vm.currentEpisodeID })?.seasonId
             ?? (initialEpisode == nil ? nil : vm.selectedSeasonID)
         guard let target = currentSeasonID ?? vm.seasons.first?.id else { return }
-        setFocusWithoutAnimation { focusedSeasonID = target }
+        setFocusWithoutAnimation {
+            seasonEntryTargetID = target
+            focusedSeasonID = target
+        }
     }
 
     /// Up from episodes restores the exact season that was focused before entering the episode rail.
@@ -2200,6 +2205,7 @@ struct SeriesDetailView: View {
                                 isPlayed: vm.isSeasonPlayed(season),
                                 isSelected: vm.selectedSeasonID == season.id,
                                 focusedID: $focusedSeasonID,
+                                isEntryFocusEnabled: seasonEntryTargetID == nil || seasonEntryTargetID == season.id,
                                 action: {
                                     // Don't reset the hero to series root here: flipping the short episode panel to the taller series panel while focus is on the season bar makes tvOS follow the tab and scroll the page down. "Serie anzeigen" resets the hero explicitly.
                                     Task { await vm.loadEpisodes(seasonID: season.id) }
@@ -2238,6 +2244,9 @@ struct SeriesDetailView: View {
                         // Do not restore an older tab here: that overrode an explicit focus
                         // request from Play/Trailer and sent the remote to the wrong season.
                         lastFocusedSeasonID = newID
+                        if seasonEntryTargetID == newID {
+                            seasonEntryTargetID = nil
+                        }
                     } else if let oldID {
                         lastFocusedSeasonID = oldID
                     }
