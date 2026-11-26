@@ -59,6 +59,7 @@ struct SeriesDetailView: View {
     /// only land on Play (Sodalite#53, and #146 once the overview box that used to answer this went
     /// away). See `DetailAction`.
     @FocusState private var focusedAction: DetailAction?
+    @Namespace private var actionRowFocusScope
     @State private var actionAbovePlay: DetailAction = .watched
     @State private var actionAboveTrailer: DetailAction = .favorite
     @State private var actionBelowSynopsis: DetailAction = .watched
@@ -1262,7 +1263,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .watched)
-                .focusable(focusedAction != .synopsis || actionBelowSynopsis == .watched)
+                .prefersDefaultFocus(actionBelowSynopsis == .watched, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis(from: .watched)
@@ -1281,7 +1282,7 @@ struct SeriesDetailView: View {
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
                 .focused($focusedAction, equals: .rating)
-                .focusable(focusedAction != .synopsis || actionBelowSynopsis == .rating)
+                .prefersDefaultFocus(actionBelowSynopsis == .rating, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis(from: .rating)
@@ -1307,7 +1308,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .favorite)
-                .focusable(focusedAction != .synopsis || actionBelowSynopsis == .favorite)
+                .prefersDefaultFocus(actionBelowSynopsis == .favorite, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis(from: .favorite)
@@ -1336,7 +1337,7 @@ struct SeriesDetailView: View {
                     }
                 }
                 .focused($focusedAction, equals: .sync)
-                .focusable(focusedAction != .synopsis || actionBelowSynopsis == .sync)
+                .prefersDefaultFocus(actionBelowSynopsis == .sync, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusSynopsis(from: .sync)
@@ -1347,6 +1348,7 @@ struct SeriesDetailView: View {
                     }
                 }
             }
+            .focusScope(actionRowFocusScope)
 
             HStack(spacing: 12) {
                 InfuseDetailActionButton(title: "Abspielen", symbol: "play.fill", prominent: true) {
