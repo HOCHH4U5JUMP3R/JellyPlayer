@@ -64,6 +64,8 @@ struct SeriesDetailView: View {
     @State private var actionAbovePlay: DetailAction = .watched
     @State private var actionAboveTrailer: DetailAction = .favorite
     @State private var actionBelowSynopsis: DetailAction = .watched
+    /// The sole action allowed to receive focus while returning from the synopsis.
+    @State private var actionEntryTarget: DetailAction?
     @State private var isPresentingDeleteSheet: Bool = false
     @State private var isPresentingMoreDetails = false
     /// Sodalite#146 round 3: Watched on a SERIES is the one control on the page that cannot be
@@ -1265,7 +1267,13 @@ struct SeriesDetailView: View {
                         isConfirmingPlayedChange = true
                     }
                 }
+                .onFocusChanged { hasFocus in
+                    guard hasFocus else { return }
+                    if actionEntryTarget == .watched { actionEntryTarget = nil }
+                    seasonEntryTargetID = nil
+                }
                 .focused($focusedAction, equals: .watched)
+                .disabled(actionEntryTarget != nil && actionEntryTarget != .watched)
                 .prefersDefaultFocus(actionBelowSynopsis == .watched, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
@@ -1284,7 +1292,13 @@ struct SeriesDetailView: View {
                     let ratedItem = selectedEpisode ?? vm.item
                     ratingPrompt = RatingPrompt(itemID: ratedItem.id)
                 }
+                .onFocusChanged { hasFocus in
+                    guard hasFocus else { return }
+                    if actionEntryTarget == .rating { actionEntryTarget = nil }
+                    seasonEntryTargetID = nil
+                }
                 .focused($focusedAction, equals: .rating)
+                .disabled(actionEntryTarget != nil && actionEntryTarget != .rating)
                 .prefersDefaultFocus(actionBelowSynopsis == .rating, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
@@ -1310,7 +1324,13 @@ struct SeriesDetailView: View {
                         Task { await vm.toggleFavorite() }
                     }
                 }
+                .onFocusChanged { hasFocus in
+                    guard hasFocus else { return }
+                    if actionEntryTarget == .favorite { actionEntryTarget = nil }
+                    seasonEntryTargetID = nil
+                }
                 .focused($focusedAction, equals: .favorite)
+                .disabled(actionEntryTarget != nil && actionEntryTarget != .favorite)
                 .prefersDefaultFocus(actionBelowSynopsis == .favorite, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
@@ -1339,7 +1359,13 @@ struct SeriesDetailView: View {
                         isRefreshingMetadata = false
                     }
                 }
+                .onFocusChanged { hasFocus in
+                    guard hasFocus else { return }
+                    if actionEntryTarget == .sync { actionEntryTarget = nil }
+                    seasonEntryTargetID = nil
+                }
                 .focused($focusedAction, equals: .sync)
+                .disabled(actionEntryTarget != nil && actionEntryTarget != .sync)
                 .prefersDefaultFocus(actionBelowSynopsis == .sync, in: actionRowFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
@@ -1361,6 +1387,11 @@ struct SeriesDetailView: View {
                         pendingPlayRequest = true
                     }
                 }
+                .onFocusChanged { hasFocus in
+                    guard hasFocus else { return }
+                    actionEntryTarget = nil
+                    seasonEntryTargetID = seasonEntryTarget(vm: vm)
+                }
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
                 .onMoveCommand { direction in
@@ -1380,6 +1411,11 @@ struct SeriesDetailView: View {
                             showPlayer = true
                         }
                     }
+                }
+                .onFocusChanged { hasFocus in
+                    guard hasFocus else { return }
+                    actionEntryTarget = nil
+                    seasonEntryTargetID = seasonEntryTarget(vm: vm)
                 }
                 .focused($focusedAction, equals: .trailer)
                 .onMoveCommand { direction in
@@ -2015,6 +2051,10 @@ struct SeriesDetailView: View {
     }
 
     private func focusAction(_ action: DetailAction) {
+        let rowActions: Set<DetailAction> = [.watched, .rating, .favorite, .sync]
+        if rowActions.contains(action) {
+            actionEntryTarget = action
+        }
         setFocusWithoutAnimation {
             focusedAction = action
             playButtonFocused = action == .play
@@ -2042,6 +2082,9 @@ struct SeriesDetailView: View {
 
     private func focusSynopsis(from action: DetailAction) {
         actionBelowSynopsis = action
+        // Arm the exact return target BEFORE focus leaves the action row. The other buttons
+        // stay disabled for the entire time the synopsis owns focus.
+        actionEntryTarget = action
         focusAction(.synopsis)
     }
 
@@ -2131,14 +2174,19 @@ struct SeriesDetailView: View {
     #endif
 
     #if os(tvOS)
-    private func focusSeasonRow(vm: DetailViewModel) {
+    private func seasonEntryTarget(vm: DetailViewModel) -> String? {
         // Return to Next Up's season. With no current/next episode (all watched or no history),
         // the series fallback is always season one, never whichever tab happened to be selected last.
-        let currentSeasonID = vm.nextUpEpisode?.seasonId
+        vm.nextUpEpisode?.seasonId
             ?? vm.episodes.first(where: { $0.id == vm.currentEpisodeID })?.seasonId
             ?? (initialEpisode == nil ? nil : vm.selectedSeasonID)
-        guard let target = currentSeasonID ?? vm.seasons.first?.id else { return }
+            ?? vm.seasons.first?.id
+    }
+
+    private func focusSeasonRow(vm: DetailViewModel) {
+        guard let target = seasonEntryTarget(vm: vm) else { return }
         setFocusWithoutAnimation {
+            // This is also armed on actual Play/Trailer focus; setting it again here is a safe fallback.
             seasonEntryTargetID = target
             focusedSeasonID = target
         }
@@ -2206,6 +2254,11 @@ struct SeriesDetailView: View {
                                 isSelected: vm.selectedSeasonID == season.id,
                                 focusedID: $focusedSeasonID,
                                 isEntryFocusEnabled: seasonEntryTargetID == nil || seasonEntryTargetID == season.id,
+                                onActualFocus: {
+                                    // FocusState can be assigned before tvOS completes the hand-off.
+                                    // Re-enable peer seasons only after the button itself reports focus.
+                                    if seasonEntryTargetID == season.id { seasonEntryTargetID = nil }
+                                },
                                 action: {
                                     // Don't reset the hero to series root here: flipping the short episode panel to the taller series panel while focus is on the season bar makes tvOS follow the tab and scroll the page down. "Serie anzeigen" resets the hero explicitly.
                                     Task { await vm.loadEpisodes(seasonID: season.id) }
@@ -2244,9 +2297,6 @@ struct SeriesDetailView: View {
                         // Do not restore an older tab here: that overrode an explicit focus
                         // request from Play/Trailer and sent the remote to the wrong season.
                         lastFocusedSeasonID = newID
-                        if seasonEntryTargetID == newID {
-                            seasonEntryTargetID = nil
-                        }
                     } else if let oldID {
                         lastFocusedSeasonID = oldID
                     }
@@ -2599,6 +2649,7 @@ struct SeriesDetailView: View {
 #if os(tvOS)
 private struct InfuseDetailActionButtonStyle: ButtonStyle {
     var isProminent: Bool
+    var onFocusChanged: ((Bool) -> Void)? = nil
     @Environment(\.isFocused) private var isFocused
 
     func makeBody(configuration: Configuration) -> some View {
@@ -2614,6 +2665,7 @@ private struct InfuseDetailActionButtonStyle: ButtonStyle {
                     )
             )
             .contentShape(RoundedRectangle(cornerRadius: 13))
+            .onChange(of: isFocused) { _, hasFocus in onFocusChanged?(hasFocus) }
             .animation(.easeOut(duration: 0.12), value: isFocused)
             .animation(nil, value: configuration.isPressed)
     }
@@ -2624,7 +2676,14 @@ private struct InfuseDetailActionButton: View {
     let symbol: String
     var prominent = false
     var isLoading = false
+    var focusChangeHandler: ((Bool) -> Void)? = nil
     let action: () -> Void
+
+    func onFocusChanged(_ handler: @escaping (Bool) -> Void) -> Self {
+        var copy = self
+        copy.focusChangeHandler = handler
+        return copy
+    }
 
     var body: some View {
         Button(action: action) {
@@ -2645,7 +2704,7 @@ private struct InfuseDetailActionButton: View {
             .frame(maxWidth: .infinity)
             .frame(height: 62)
         }
-        .buttonStyle(InfuseDetailActionButtonStyle(isProminent: prominent))
+        .buttonStyle(InfuseDetailActionButtonStyle(isProminent: prominent, onFocusChanged: focusChangeHandler))
         .focusEffectDisabled(true)
         .accessibilityLabel(Text(title))
     }
