@@ -84,7 +84,11 @@ struct DetailHeroSynopsis: View {
                     .fill(Color.white.opacity(isFocused ? 0.055 : 0))
             }
             .contentShape(Rectangle())
-            .focusable()
+            // Reserve the same footprint as the loading placeholder. The synopsis must not
+            // compete with Play for initial focus while its text is still being resolved.
+            .frame(height: 70, alignment: .topLeading)
+            .clipped()
+            .focusable(!isPending && !(text?.isEmpty ?? true))
             .focusEffectDisabled(true)
             .onTapGesture { onTap?() }
     }

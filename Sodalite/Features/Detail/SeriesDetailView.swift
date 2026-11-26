@@ -50,7 +50,7 @@ struct SeriesDetailView: View {
     private static let pageTopAnchor = "detailPageTop"
     @FocusState private var focusedSeasonID: String?
     @FocusState private var focusedEpisodeID: String?
-    /// Play button enters the hierarchy only after isLoading flips false, so the focus engine has nothing to auto-land on at first paint; pushed explicitly via .onChange below.
+    /// Separate focus binding used by the player-return and vertical-navigation paths.
     @FocusState private var playButtonFocused: Bool
     /// Which control in the action row holds focus, nil while focus is anywhere else on the page.
     /// The secondaries leave the focus engine for that time, so an up-move out of the content can
@@ -145,9 +145,6 @@ struct SeriesDetailView: View {
     @State private var lastFocusedCastID: String?
     /// Horizontal offset of the episode row, so a season switch can return it to the row's real start (its inset included) instead of to the first card's leading edge.
     @State private var episodeRowPosition = ScrollPosition()
-    /// Gates the isLoading crossfade so it stays inert during the cover's present transition (the viewModel is built lazily in onAppear, so isLoading flips while the fullScreenCover dissolves in and animating those flips reads as an ugly top-left fly-in). Same fix as MovieDetailView.
-    @State private var didSettleIn = false
-
     let item: JellyfinItem
     /// Seeds the preselected episode for an episode-route open (DetailRouterView .episode) so the panel paints from snapshot and the VM lands on the right season. nil for a normal series open.
     var initialEpisode: JellyfinItem? = nil
@@ -232,10 +229,10 @@ struct SeriesDetailView: View {
 
     var body: some View {
         ZStack {
-            // Solid black behind the spinner; backdrop held back until content is ready to crossfade over it.
+            // Solid black under the backdrop and the brief pre-view-model loading state.
             Color.black.ignoresSafeArea()
 
-            if let vm = viewModel, !vm.isLoading {
+            if let vm = viewModel {
                 DetailBackdrop(
                     imageURL: backdropURL,
                     posterFallbackURL: vm.heroPosterURL(for: vm.item)
@@ -245,10 +242,14 @@ struct SeriesDetailView: View {
                     .transition(.opacity)
             }
 
-            if let vm = viewModel, !vm.isLoading {
+            if let vm = viewModel {
+                // Keep the complete page mounted while detail data is loading. Each section owns
+                // its fixed-size placeholder; replacing the whole page here caused focus and
+                // layout to be rebuilt when isLoading changed.
                 contentOverlay(vm: vm)
             } else {
-                // Centred spinner; gating on isLoading avoids the field-fill repaint storm (play title + subtitle + progress all change in a 300ms window) and lands the user on one finished render.
+                // The view model is created in onAppear. Until then, keep a neutral loading
+                // surface and a focus anchor so Menu still dismisses the detail route safely.
                 ZStack {
                     ProgressView()
                     // Invisible focus anchor, else Menu on the loading screen propagates past the nav stack and quits the app instead of popping back.
@@ -266,7 +267,6 @@ struct SeriesDetailView: View {
         // metadata and episode data are still resolving. Target the actual action identity.
         .defaultFocus($focusedAction, .play, priority: .userInitiated)
         #endif
-        .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
         // Back/Menu always leaves the detail page. The in-page "Show Series" action remains the
         // explicit way to switch from an episode panel back to the series overview; intercepting
         // Menu here inserted an unwanted intermediate page and required two presses to leave.
@@ -496,8 +496,6 @@ struct SeriesDetailView: View {
                     updateBackdropURL()
                 }
             }
-            // Open the animation gate once the cover's present transition has settled.
-            deferOnMain(by: 0.35) { didSettleIn = true }
         }
         .onDisappear {
             #if os(tvOS)
@@ -758,8 +756,9 @@ struct SeriesDetailView: View {
                 }
             }
             .padding(.horizontal, metrics.rowInset)
-            // Keyed on item + load state only, NOT genre count: on an instant-paint episode deep-link the series genres land post-paint, flipping the count rebuilt the panel and broke scroll-to-top back to Play. Genres fill in via in-place diff.
-            .id("\(vm.item.id)-\(vm.isLoading)")
+            // Stable identity across loading, metadata and genre updates; do not rebuild the
+            // primary column when the view model changes its loading state.
+            .id(vm.item.id)
             /* episode changes update in place; do not animate the entire column */
         }) {
             // Captured proxy lets player-dismiss scroll the outer ScrollView back to the episode row, else tvOS's scroll-focus-into-view runs against a not-yet-rendered state and jumps to the top.
@@ -985,7 +984,7 @@ struct SeriesDetailView: View {
                 Color.clear.frame(height: 36)
                 Color.clear.frame(height: 26)
                 Color.clear.frame(height: 30)
-                Color.clear.frame(height: 60)
+                Color.clear.frame(height: 70)
             } else {
                 // Keep the series state on the same fixed metadata grid as episode state.
                 HStack(spacing: 9) {
