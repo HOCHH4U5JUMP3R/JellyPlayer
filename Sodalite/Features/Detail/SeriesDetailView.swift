@@ -253,9 +253,6 @@ struct SeriesDetailView: View {
                     ProgressView()
                     // Invisible focus anchor, else Menu on the loading screen propagates past the nav stack and quits the app instead of popping back.
                     Button("") { dismiss() }
-                        // Keep the Play focus identity alive while the real content is loading.
-                        // The loaded Play button uses this same FocusState binding.
-                        .focused($playButtonFocused)
                         .opacity(0)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -263,9 +260,9 @@ struct SeriesDetailView: View {
             }
         }
         #if os(tvOS)
-        // Keep the default-focus scope outside the loading/content switch so it survives
-        // the transition from the loading anchor to the actual Play button.
-        .defaultFocus($playButtonFocused, true, priority: .userInitiated)
+        // The Play action is present as soon as the series content appears, even while
+        // metadata and episode data are still resolving. Target the actual action identity.
+        .defaultFocus($focusedAction, .play, priority: .userInitiated)
         #endif
         .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
         // Back/Menu always leaves the detail page. The in-page "Show Series" action remains the
@@ -719,15 +716,10 @@ struct SeriesDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 glassPanel(vm: vm)
                     .id(Self.pageTopAnchor)
-                #if os(tvOS)
-                if vm.hasFullDetail {
-                    actionButtonRow(vm: vm)
-                } else {
-                    actionButtonSkeletonRow()
-                }
-                #else
+                // Keep the real controls in the hierarchy from the first content frame.
+                // Play can then receive default focus immediately; its action already queues
+                // a press until Next Up resolves.
                 actionButtonRow(vm: vm)
-                #endif
                 // Seasons and episodes are fetched in parallel, but on tvOS their real rows wait
                 // until the series detail and Next Up have settled. This prevents the lower rows
                 // appearing first and then being pushed down when the hero metadata arrives.
@@ -1238,35 +1230,6 @@ struct SeriesDetailView: View {
     }
 
     // MARK: - Action Buttons
-
-    #if os(tvOS)
-    /// Holds the two action rows' exact footprint until the detail and Next Up data are ready.
-    /// Non-focusable placeholders prevent the remote from landing on controls whose labels or
-    /// targets are still changing.
-    private func actionButtonSkeletonRow() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                ForEach(0..<4, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 13)
-                        .fill(Color.white.opacity(0.10))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 62)
-                }
-            }
-            HStack(spacing: 12) {
-                ForEach(0..<2, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 13)
-                        .fill(Color.white.opacity(0.10))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 62)
-                }
-            }
-        }
-        .frame(maxWidth: 880, alignment: .leading)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-    #endif
 
     /// Button row below the glass panel, outside it (Sodalite#15 round 6) so the plate stays a compact metadata card; each GlassActionButton carries its own material so the row needs no plate.
     private func actionButtonRow(vm: DetailViewModel) -> some View {
@@ -2517,7 +2480,12 @@ struct SeriesDetailView: View {
     @ViewBuilder
     /// Whole-section placeholder while getSeasons is in flight: skeleton season tabs above the episode skeleton row. Mirrors seasonSection's ScrollView/spacing/padding so the swap doesn't shift layout.
     private func seasonSectionSkeleton(vm: DetailViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        #if os(tvOS)
+        let sectionSpacing: CGFloat = 32
+        #else
+        let sectionSpacing: CGFloat = 20
+        #endif
+        VStack(alignment: .leading, spacing: sectionSpacing) {
             // Same horizontal poster rail as the real season row; keep its footprint stable while loading.
             // to the page even when the viewport proposes 402. The content column then takes 742,
             // and every sibling (glass panel, action row, hero logo) is drawn at that width and
