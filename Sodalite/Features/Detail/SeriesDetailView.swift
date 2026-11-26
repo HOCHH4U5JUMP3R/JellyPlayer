@@ -262,7 +262,7 @@ struct SeriesDetailView: View {
         #if os(tvOS)
         // Keep the default-focus scope outside the loading/content switch so it survives
         // the transition from the loading anchor to the actual Play button.
-        .defaultFocus($playButtonFocused, true, priority: .userInitiated)
+        .defaultFocus($focusedAction, .play, priority: .userInitiated)
         #endif
         .animation(didSettleIn ? .easeInOut(duration: 0.25) : nil, value: viewModel?.isLoading)
         // Back/Menu always leaves the detail page. The in-page "Show Series" action remains the
@@ -467,13 +467,6 @@ struct SeriesDetailView: View {
                 .detailCoverPush()
         }
         .onAppear {
-            #if os(tvOS)
-            // Navigation can retain this view's state while another destination is shown.
-            // Reclaim Play focus on every appearance, not just the button's first insertion.
-            DispatchQueue.main.async {
-                focusAction(.play)
-            }
-            #endif
             if viewModel == nil, let userID = sessionUserID {
                 selectedEpisode = initialEpisode
                 viewModel = DetailViewModel(
@@ -503,6 +496,13 @@ struct SeriesDetailView: View {
             }
             // Open the animation gate once the cover's present transition has settled.
             deferOnMain(by: 0.35) { didSettleIn = true }
+        }
+        .onDisappear {
+            #if os(tvOS)
+            // Do not let a retained navigation destination restore synopsis focus on its next visit.
+            focusedAction = nil
+            playButtonFocused = false
+            #endif
         }
         .onChange(of: viewModel?.isLoading) { _, _ in
             updateBackdropURL()
