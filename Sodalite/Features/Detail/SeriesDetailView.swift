@@ -51,7 +51,6 @@ struct SeriesDetailView: View {
     @FocusState private var focusedSeasonID: String?
     @FocusState private var focusedEpisodeID: String?
     /// Separate focus binding used by the player-return and vertical-navigation paths.
-    @Namespace private var detailFocusScope
     @FocusState private var playButtonFocused: Bool
     /// Keeps the temporary Menu-dismiss anchor independent from the real Play action's focus state.
     @FocusState private var loadingDismissFocused: Bool
@@ -250,7 +249,6 @@ struct SeriesDetailView: View {
                 // its fixed-size placeholder; replacing the whole page here caused focus and
                 // layout to be rebuilt when isLoading changed.
                 contentOverlay(vm: vm)
-                    .focusScope(detailFocusScope)
             } else {
                 // The view model is created in onAppear. Until then, keep a neutral loading
                 // surface and a focus anchor so Menu still dismisses the detail route safely.
@@ -349,10 +347,7 @@ struct SeriesDetailView: View {
             if !isPlaying {
                 // Restore focus to the control the user used (Play button vs episode card). Two-step write (nil then target) forces a real transition (same-value write is a no-op); DispatchQueue.main.async batches the second write into the same render cycle so no intermediate no-focus flash.
                 if playOriginatedFromPlayButton {
-                    playButtonFocused = false
-                    DispatchQueue.main.async {
-                        playButtonFocused = true
-                    }
+                    forcePlayFocus()
                 } else if let ep = playItem {
                     // Sodalite#230: the stop already moved the page past this episode, so the card
                     // to come back to is the successor, the one Play now starts.
@@ -495,6 +490,11 @@ struct SeriesDetailView: View {
                     updateBackdropURL()
                 }
             }
+            #if os(tvOS)
+            // A retained navigation destination can reappear with its view model already alive.
+            // Reassert Play on every appearance; the item-id change above covers first creation.
+            forcePlayFocus()
+            #endif
         }
         .onDisappear {
             #if os(tvOS)
@@ -506,17 +506,15 @@ struct SeriesDetailView: View {
         .onChange(of: viewModel?.isLoading) { _, _ in
             updateBackdropURL()
         }
-        // Play is where a detail page opens, and HOW it gets there is the whole question
-        // (Sodalite#146 round 2). It used to be a deferred `@FocusState` write once `isLoading`
-        // flipped, which is a focus MOVE, and a move is what makes tvOS scroll the newly focused
-        // control into its preferred place: about 180 pt above the bottom edge, against the 64 pt the
-        // page reserves, which is the 116 pt the page was found resting at. `defaultFocus` is the
-        // same destination without the move: it names where focus BELONGS when this subtree is first
-        // evaluated, so there is no arrival to scroll to.
-        //
-        // It also explains why the defect came and went. A push racing the first focus evaluation is
-        // either redundant or a move, depending on which lands first, and that is decided by how fast
-        // the detail fetch returns.
+        // Match MovieDetailView: the default focus belongs to the page root, not to a nested
+        // focus scope inside the scrolling content.
+        .defaultFocus($playButtonFocused, true)
+        .onChange(of: viewModel?.item.id) { _, newID in
+            guard newID != nil else { return }
+            #if os(tvOS)
+            forcePlayFocus()
+            #endif
+        }
         .onChange(of: selectedEpisode?.id) { _, newID in
             updateBackdropURL()
             // Episode lists are slim (no MediaStreams/MediaSources, or placeholder sources on a lazy server); on opening into episode mode pull full detail and swap in (same id) so the TechInfoBox and the version button see the real files.
@@ -1341,7 +1339,6 @@ struct SeriesDetailView: View {
                 }
                 .focused($focusedAction, equals: .play)
                 .focused($playButtonFocused)
-                .prefersDefaultFocus(true, in: detailFocusScope)
                 .onMoveCommand { direction in
                     switch direction {
                     case .up: focusAction(actionAbovePlay)
@@ -1998,6 +1995,25 @@ struct SeriesDetailView: View {
             focusedAction = action
             playButtonFocused = action == .play
         }
+    }
+
+    /// Explicitly move focus to the real Play control. Clearing both bindings first is required
+    /// when the destination is already logically selected but tvOS retained another control.
+    private func forcePlayFocus() {
+        #if os(tvOS)
+        setFocusWithoutAnimation {
+            focusedAction = nil
+            playButtonFocused = false
+        }
+        DispatchQueue.main.async {
+            setFocusWithoutAnimation {
+                focusedAction = .play
+                playButtonFocused = true
+            }
+        }
+        #else
+        playButtonFocused = true
+        #endif
     }
 
     private func focusSynopsis(from action: DetailAction) {
