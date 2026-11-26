@@ -88,7 +88,7 @@ struct DetailHeroSynopsis: View {
             .contentShape(Rectangle())
             // Reserve the same footprint as the loading placeholder. The synopsis must not
             // compete with Play for initial focus while its text is still being resolved.
-            .frame(height: 90, alignment: .topLeading)
+            .frame(height: 112, alignment: .topLeading)
             .clipped()
             // Pending metadata must not make an already visible episode synopsis impossible to focus.
             // Initial focus is assigned explicitly to Play by the containing detail page.
