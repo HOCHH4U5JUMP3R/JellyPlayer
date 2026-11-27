@@ -2228,11 +2228,19 @@ struct SeriesDetailView: View {
                                 focusedID: $focusedSeasonID,
                                 isEntryFocusEnabled: seasonEntryTargetID == nil || seasonEntryTargetID == season.id,
                                 onMove: { direction in
-                                    guard direction == .left || direction == .right,
-                                          let index = vm.seasons.firstIndex(where: { $0.id == season.id }) else { return }
-                                    let nextIndex = index + (direction == .right ? 1 : -1)
-                                    guard vm.seasons.indices.contains(nextIndex) else { return }
-                                    setFocusWithoutAnimation { focusedSeasonID = vm.seasons[nextIndex].id }
+                                    switch direction {
+                                    case .left, .right:
+                                        guard let index = vm.seasons.firstIndex(where: { $0.id == season.id }) else { return }
+                                        let nextIndex = index + (direction == .right ? 1 : -1)
+                                        guard vm.seasons.indices.contains(nextIndex) else { return }
+                                        setFocusWithoutAnimation { focusedSeasonID = vm.seasons[nextIndex].id }
+                                    case .up:
+                                        focusAction(.play)
+                                    case .down:
+                                        focusEpisodeRow(vm: vm, targetSeasonID: season.id)
+                                    default:
+                                        break
+                                    }
                                 },
                                 action: {
                                     // Don't reset the hero to series root here: flipping the short episode panel to the taller series panel while focus is on the season bar makes tvOS follow the tab and scroll the page down. "Serie anzeigen" resets the hero explicitly.
@@ -2254,18 +2262,6 @@ struct SeriesDetailView: View {
                 }
                 .scrollClipDisabled()
                 .focusSectionCompat()
-                #if os(tvOS)
-                .onMoveCommand { direction in
-                    switch direction {
-                    case .up:
-                        focusAction(.play)
-                    case .down:
-                        focusEpisodeRow(vm: vm, targetSeasonID: focusedSeasonID ?? vm.selectedSeasonID)
-                    default:
-                        break
-                    }
-                }
-                #endif
                 .onChange(of: focusedSeasonID) { oldID, newID in
                     if let newID {
                         // The selected season is the authoritative vertical entry target.
@@ -2414,13 +2410,21 @@ struct SeriesDetailView: View {
                     episodeCardTile(
                         episode, vm: vm, playTargetID: playTargetID, cardSize: cardSize,
                         onMove: { direction in
-                            guard direction == .left || direction == .right,
-                                  let index = vm.episodes.firstIndex(where: { $0.id == episode.id }) else { return }
-                            let nextIndex = index + (direction == .right ? 1 : -1)
-                            guard vm.episodes.indices.contains(nextIndex) else { return }
-                            let target = vm.episodes[nextIndex].id
-                            episodeProxy.scrollTo(target, anchor: .center)
-                            setFocusWithoutAnimation { focusedEpisodeID = target }
+                            switch direction {
+                            case .left, .right:
+                                guard let index = vm.episodes.firstIndex(where: { $0.id == episode.id }) else { return }
+                                let nextIndex = index + (direction == .right ? 1 : -1)
+                                guard vm.episodes.indices.contains(nextIndex) else { return }
+                                let target = vm.episodes[nextIndex].id
+                                episodeProxy.scrollTo(target, anchor: .center)
+                                setFocusWithoutAnimation { focusedEpisodeID = target }
+                            case .up:
+                                focusUpFromEpisodeRow(vm: vm)
+                            case .down:
+                                focusFirstCast(vm: vm)
+                            default:
+                                break
+                            }
                         }
                     )
                 }
@@ -2430,15 +2434,6 @@ struct SeriesDetailView: View {
         .scrollPosition($episodeRowPosition)
         .scrollClipDisabled()
         .focusSectionCompat()
-        #if os(tvOS)
-        .onMoveCommand { direction in
-            switch direction {
-            case .up: focusUpFromEpisodeRow(vm: vm)
-            case .down: focusFirstCast(vm: vm)
-            default: break
-            }
-        }
-        #endif
         .onChange(of: focusedEpisodeID) { _, newID in
             // "Show Details" restores focus to the row; bounce up to Play.
             if pendingPlayFocusAfterMenu, newID != nil {
