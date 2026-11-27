@@ -2227,6 +2227,13 @@ struct SeriesDetailView: View {
                                 isSelected: vm.selectedSeasonID == season.id,
                                 focusedID: $focusedSeasonID,
                                 isEntryFocusEnabled: seasonEntryTargetID == nil || seasonEntryTargetID == season.id,
+                                onMove: { direction in
+                                    guard direction == .left || direction == .right,
+                                          let index = vm.seasons.firstIndex(where: { $0.id == season.id }) else { return }
+                                    let nextIndex = index + (direction == .right ? 1 : -1)
+                                    guard vm.seasons.indices.contains(nextIndex) else { return }
+                                    setFocusWithoutAnimation { focusedSeasonID = vm.seasons[nextIndex].id }
+                                },
                                 action: {
                                     // Don't reset the hero to series root here: flipping the short episode panel to the taller series panel while focus is on the season bar makes tvOS follow the tab and scroll the page down. "Serie anzeigen" resets the hero explicitly.
                                     Task { await vm.loadEpisodes(seasonID: season.id) }
@@ -2254,12 +2261,6 @@ struct SeriesDetailView: View {
                         focusAction(.play)
                     case .down:
                         focusEpisodeRow(vm: vm, targetSeasonID: focusedSeasonID ?? vm.selectedSeasonID)
-                    case .left, .right:
-                        guard let current = focusedSeasonID,
-                              let index = vm.seasons.firstIndex(where: { $0.id == current }) else { break }
-                        let nextIndex = index + (direction == .right ? 1 : -1)
-                        guard vm.seasons.indices.contains(nextIndex) else { break }
-                        setFocusWithoutAnimation { focusedSeasonID = vm.seasons[nextIndex].id }
                     default:
                         break
                     }
@@ -2410,7 +2411,18 @@ struct SeriesDetailView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: railSpacing) {
                 ForEach(vm.episodes) { episode in
-                    episodeCardTile(episode, vm: vm, playTargetID: playTargetID, cardSize: cardSize)
+                    episodeCardTile(
+                        episode, vm: vm, playTargetID: playTargetID, cardSize: cardSize,
+                        onMove: { direction in
+                            guard direction == .left || direction == .right,
+                                  let index = vm.episodes.firstIndex(where: { $0.id == episode.id }) else { return }
+                            let nextIndex = index + (direction == .right ? 1 : -1)
+                            guard vm.episodes.indices.contains(nextIndex) else { return }
+                            let target = vm.episodes[nextIndex].id
+                            episodeProxy.scrollTo(target, anchor: .center)
+                            setFocusWithoutAnimation { focusedEpisodeID = target }
+                        }
+                    )
                 }
             }
             .padding(.vertical, 6)
@@ -2423,14 +2435,6 @@ struct SeriesDetailView: View {
             switch direction {
             case .up: focusUpFromEpisodeRow(vm: vm)
             case .down: focusFirstCast(vm: vm)
-            case .left, .right:
-                guard let current = focusedEpisodeID,
-                      let index = vm.episodes.firstIndex(where: { $0.id == current }) else { break }
-                let nextIndex = index + (direction == .right ? 1 : -1)
-                guard vm.episodes.indices.contains(nextIndex) else { break }
-                let target = vm.episodes[nextIndex].id
-                episodeProxy.scrollTo(target, anchor: .center)
-                setFocusWithoutAnimation { focusedEpisodeID = target }
             default: break
             }
         }
@@ -2467,7 +2471,8 @@ struct SeriesDetailView: View {
         _ episode: JellyfinItem,
         vm: DetailViewModel,
         playTargetID: String?,
-        cardSize: CGSize
+        cardSize: CGSize,
+        onMove: @escaping (MoveCommandDirection) -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Button {
@@ -2477,6 +2482,9 @@ struct SeriesDetailView: View {
             }
             .buttonStyle(EpisodeCardButtonStyle())
             .focused($focusedEpisodeID, equals: episode.id)
+            #if os(tvOS)
+            .onMoveCommand(perform: onMove)
+            #endif
             // Keep the system preview so it inherits the current accent, theme and page background.
             .contextMenu { episodeContextMenu(episode, vm: vm) }
         }
