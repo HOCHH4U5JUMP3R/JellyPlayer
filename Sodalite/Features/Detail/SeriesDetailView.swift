@@ -48,6 +48,8 @@ struct SeriesDetailView: View {
     @State private var pageScrollProxy: ScrollViewProxy?
     /// Scroll target on the glass panel; "Show Details" brings the episode panel into view with it.
     private static let pageTopAnchor = "detailPageTop"
+    private enum SeriesFocusRail { case seasons, episodes, other }
+    @State private var activeSeriesFocusRail: SeriesFocusRail = .other
     @FocusState private var focusedSeasonID: String?
     @FocusState private var focusedEpisodeID: String?
     /// Separate focus binding used by the player-return and vertical-navigation paths.
@@ -371,6 +373,7 @@ struct SeriesDetailView: View {
                     focusedEpisodeID = nil
                     episodeAim.sessionMoved(to: targetID)
                     returnFocusEpisodeID = targetID
+                    activeSeriesFocusRail = .episodes
                     pendingEpisodeFocus = targetID
                     let target = targetID
                     deferOnMain(by: 0.6) {
@@ -2081,6 +2084,7 @@ struct SeriesDetailView: View {
     /// a fully watched season enters on its final episode.
     private func focusEpisodeRow(vm: DetailViewModel, targetSeasonID: String? = nil, targetEpisodeID: String? = nil) {
         guard let seasonID = targetSeasonID ?? vm.selectedSeasonID else { return }
+        activeSeriesFocusRail = .episodes
         if vm.selectedSeasonID == seasonID, !vm.episodes.isEmpty {
             applyEpisodeFocusTarget(vm: vm, seasonID: seasonID, targetEpisodeID: targetEpisodeID)
             return
@@ -2105,6 +2109,7 @@ struct SeriesDetailView: View {
             }
             guard let target else { return }
             lastFocusedSeasonID = seasonID
+            activeSeriesFocusRail = .episodes
             pendingEpisodeFocus = target
     }
 
@@ -2118,6 +2123,7 @@ struct SeriesDetailView: View {
     }
 
     private func focusFirstCast(vm: DetailViewModel) {
+        activeSeriesFocusRail = .other
         if let first = castMembers(vm: vm).first {
             setFocusWithoutAnimation { focusedCastID = first.id }
         } else {
@@ -2137,6 +2143,7 @@ struct SeriesDetailView: View {
     }
 
     private func focusFirstSimilar(vm: DetailViewModel) {
+        activeSeriesFocusRail = .other
         if let first = vm.similarItems.first {
             setFocusWithoutAnimation { focusedSimilarID = first.originKey }
         } else {
@@ -2145,6 +2152,7 @@ struct SeriesDetailView: View {
     }
 
     private func focusFirstCatalog(vm: DetailViewModel) {
+        activeSeriesFocusRail = .other
         if let first = vm.catalogSimilar.first {
             setFocusWithoutAnimation { focusedCatalogID = first.stableKey }
         }
@@ -2153,6 +2161,7 @@ struct SeriesDetailView: View {
 
     #if os(tvOS)
     private func focusSeasonRow(vm: DetailViewModel) {
+        activeSeriesFocusRail = .seasons
         // Return to Next Up's season. With no current/next episode (all watched or no history),
         // the series fallback is always season one, never whichever tab happened to be selected last.
         let currentSeasonID = vm.nextUpEpisode?.seasonId
@@ -2167,6 +2176,7 @@ struct SeriesDetailView: View {
 
     /// Up from episodes restores the exact season that was focused before entering the episode rail.
     private func focusUpFromEpisodeRow(vm: DetailViewModel) {
+        activeSeriesFocusRail = .seasons
         let target = lastFocusedSeasonID.flatMap { remembered in
             vm.seasons.contains(where: { $0.id == remembered }) ? remembered : nil
         } ?? vm.selectedSeasonID ?? vm.seasons.first?.id
@@ -2226,7 +2236,7 @@ struct SeriesDetailView: View {
                                 isPlayed: vm.isSeasonPlayed(season),
                                 isSelected: vm.selectedSeasonID == season.id,
                                 focusedID: $focusedSeasonID,
-                                isEntryFocusEnabled: seasonEntryTargetID == nil || seasonEntryTargetID == season.id,
+                                isEntryFocusEnabled: activeSeriesFocusRail == .seasons && (seasonEntryTargetID == nil || seasonEntryTargetID == season.id),
                                 onMove: { direction in
                                     switch direction {
                                     case .left, .right:
@@ -2235,6 +2245,7 @@ struct SeriesDetailView: View {
                                         guard vm.seasons.indices.contains(nextIndex) else { return }
                                         setFocusWithoutAnimation { focusedSeasonID = vm.seasons[nextIndex].id }
                                     case .up:
+                                        activeSeriesFocusRail = .other
                                         focusAction(.play)
                                     case .down:
                                         focusEpisodeRow(vm: vm, targetSeasonID: season.id)
@@ -2477,6 +2488,7 @@ struct SeriesDetailView: View {
             }
             .buttonStyle(EpisodeCardButtonStyle())
             .focused($focusedEpisodeID, equals: episode.id)
+            .disabled(activeSeriesFocusRail != .episodes)
             #if os(tvOS)
             .onMoveCommand(perform: onMove)
             #endif
